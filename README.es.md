@@ -45,6 +45,14 @@ Es gratis, de código abierto y funciona por completo en tu PC. Sin cuentas ni t
 | 🖥️ **Varias pantallas** | Un notch por pantalla (opcional) |
 | 🔄 **Actualizaciones** | Actualizaciones firmadas que apruebas tú |
 
+## Capturas
+
+<table>
+<tr><td align="center"><img src="docs/screenshots/es-panel.png" width="420" alt="Panel"><br><sub>Panel</sub></td><td align="center"><img src="docs/screenshots/es-planner.png" width="420" alt="Agenda"><br><sub>Agenda</sub></td></tr>
+<tr><td align="center"><img src="docs/screenshots/es-habits.png" width="420" alt="Hábitos"><br><sub>Hábitos</sub></td><td align="center"><img src="docs/screenshots/es-calendar.png" width="420" alt="Calendario"><br><sub>Calendario</sub></td></tr>
+<tr><td align="center"><img src="docs/screenshots/es-system.png" width="420" alt="Sistema"><br><sub>Sistema</sub></td><td align="center"><img src="docs/screenshots/es-translator.png" width="420" alt="Traductor"><br><sub>Traductor</sub></td></tr>
+</table>
+
 ## Instalar
 
 1. Descarga `Noki_<versión>_x64-setup.exe` desde la página de [Releases](../../releases).

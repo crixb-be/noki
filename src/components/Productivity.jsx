@@ -211,7 +211,7 @@ function TasksView() {
       </ul>
       {doneCount > 0 && (
         <button onClick={clearDone} className="shrink-0 self-end text-[10px] text-white/35 hover:text-white/70">
-          Limpiar {doneCount} completada{doneCount > 1 ? "s" : ""}
+          {`Limpiar ${doneCount} completada${doneCount > 1 ? "s" : ""}`}
         </button>
       )}
     </div>

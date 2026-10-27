@@ -44,6 +44,14 @@ It is free, open source and runs fully on your PC. No account, no telemetry.
 | 🖥️ **Multi-monitor** | Optional one notch per screen |
 | 🔄 **Updates** | Signed updates you approve yourself |
 
+## Screenshots
+
+<table>
+<tr><td align="center"><img src="docs/screenshots/en-panel.png" width="420" alt="Panel"><br><sub>Panel</sub></td><td align="center"><img src="docs/screenshots/en-planner.png" width="420" alt="Planner"><br><sub>Planner</sub></td></tr>
+<tr><td align="center"><img src="docs/screenshots/en-habits.png" width="420" alt="Habits"><br><sub>Habits</sub></td><td align="center"><img src="docs/screenshots/en-calendar.png" width="420" alt="Calendar"><br><sub>Calendar</sub></td></tr>
+<tr><td align="center"><img src="docs/screenshots/en-system.png" width="420" alt="System"><br><sub>System</sub></td><td align="center"><img src="docs/screenshots/en-translator.png" width="420" alt="Translator"><br><sub>Translator</sub></td></tr>
+</table>
+
 ## Install
 
 1. Download `Noki_<version>_x64-setup.exe` from the [Releases](../../releases) page.

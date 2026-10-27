@@ -573,6 +573,7 @@ export const EN = {
   "Turco": "Turkish",
   "Ucraniano": "Ukrainian",
   "Detectar idioma": "Detect language",
+  "Detectado:": "Detected:",
   "Idioma del texto": "Text language",
   "Traducir a": "Translate to",
   "Traducir": "Translate",
@@ -607,6 +608,7 @@ export const EN = {
 
 /** Textos con partes variables: expresión → función que arma el inglés. */
 export const PATTERNS = [
+  [/^Limpiar (\d+) completadas?$/, (m) => `Clear ${m[1]} completed`],
   [/^(\d+) tareas? pendientes?$/, (m) => `${m[1]} pending task${m[1] === "1" ? "" : "s"}`],
   [/^(\d+) pendientes?$/, (m) => `${m[1]} pending`],
   [/^(\d+) tarea\(s\), (\d+) evento\(s\)$/, (m) => `${m[1]} task(s), ${m[2]} event(s)`],

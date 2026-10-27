@@ -109,7 +109,7 @@ export default function CalendarView({ cal }) {
       <div className="flex min-h-0 min-w-0 flex-1 flex-col rounded-3xl bg-white/5 p-2.5">
         <div className="mb-1.5 flex shrink-0 items-center justify-between text-[11px] text-white/55">
           <span className="truncate font-medium text-white/75">{dayLabel(selected, now)}</span>
-          {selectedTasks.length > 0 && <span className="shrink-0 text-red-300">{selectedTasks.length} pendiente{selectedTasks.length === 1 ? "" : "s"}</span>}
+          {selectedTasks.length > 0 && <span className="shrink-0 text-red-300">{`${selectedTasks.length} pendiente${selectedTasks.length === 1 ? "" : "s"}`}</span>}
         </div>
         <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain pr-1">
           {!hasSources && <div className="mb-2 text-[10px] text-white/30">Conecta Google Calendar u Outlook desde Ajustes para ver sus eventos.</div>}
