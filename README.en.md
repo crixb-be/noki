@@ -136,7 +136,8 @@ In **Settings → Appearance** you can:
 <td align="center"><img src="docs/screenshots/en-look-image.png" width="420" alt="Notch with an image" /><br /><sub><b>An image</b> · as the background of the notch and the strip</sub></td>
 </tr>
 <tr>
-<td align="center" colspan="2"><img src="docs/screenshots/en-closed.png" width="420" alt="Noki closed" /><br /><sub><b>Closed</b> · time, tasks, habits, weather, battery and what's playing</sub></td>
+<td align="center"><img src="docs/screenshots/en-look-strip.png" width="420" alt="Strip in another color" /><br /><sub><b>The strip your way</b> · the sides of the notch can be another color, an image or transparent</sub></td>
+<td align="center"><img src="docs/screenshots/en-closed.png" width="420" alt="Noki closed" /><br /><sub><b>Closed</b> · time, tasks, habits, weather, battery and what's playing</sub></td>
 </tr>
 </table>
 

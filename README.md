@@ -136,7 +136,8 @@ En **Ajustes → Apariencia** puedes:
 <td align="center"><img src="docs/screenshots/es-look-image.png" width="420" alt="Notch con imagen" /><br /><sub><b>Una imagen</b> · de fondo en el notch y en la franja</sub></td>
 </tr>
 <tr>
-<td align="center" colspan="2"><img src="docs/screenshots/es-closed.png" width="420" alt="Noki cerrado" /><br /><sub><b>Cerrado</b> · hora, tareas, hábitos, clima, batería y lo que suena</sub></td>
+<td align="center"><img src="docs/screenshots/es-look-strip.png" width="420" alt="Franja de otro color" /><br /><sub><b>La franja a tu gusto</b> · los costados del notch pueden ser de otro color, una imagen o transparentes</sub></td>
+<td align="center"><img src="docs/screenshots/es-closed.png" width="420" alt="Noki cerrado" /><br /><sub><b>Cerrado</b> · hora, tareas, hábitos, clima, batería y lo que suena</sub></td>
 </tr>
 </table>
 
