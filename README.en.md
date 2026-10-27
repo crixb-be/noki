@@ -50,11 +50,16 @@ It is **free, open source and runs fully on your PC**: no accounts, no telemetry
 <td align="center"><img src="docs/screenshots/en-habits.png" width="420" alt="Habits" /><br /><sub><b>Habits</b> · goals, streaks and reminders</sub></td>
 </tr>
 <tr>
-<td align="center"><img src="docs/screenshots/en-calendar.png" width="420" alt="Calendar" /><br /><sub><b>Calendar</b> · your tasks and events for the month</sub></td>
-<td align="center"><img src="docs/screenshots/en-system.png" width="420" alt="System" /><br /><sub><b>System</b> · CPU, RAM, disks and network</sub></td>
+<td align="center"><img src="docs/screenshots/en-music.png" width="420" alt="Music" /><br /><sub><b>Music</b> · album art, progress and lyrics</sub></td>
+<td align="center"><img src="docs/screenshots/en-ai.png" width="420" alt="AI chat" /><br /><sub><b>AI chat</b> · quick answers with your own key</sub></td>
 </tr>
 <tr>
-<td align="center" colspan="2"><img src="docs/screenshots/en-translator.png" width="420" alt="Translator" /><br /><sub><b>Translator</b> · text and images, no API key</sub></td>
+<td align="center"><img src="docs/screenshots/en-files.png" width="420" alt="Files" /><br /><sub><b>Files</b> · drop, drag out, compress and more</sub></td>
+<td align="center"><img src="docs/screenshots/en-calendar.png" width="420" alt="Calendar" /><br /><sub><b>Calendar</b> · your tasks and events for the month</sub></td>
+</tr>
+<tr>
+<td align="center"><img src="docs/screenshots/en-system.png" width="420" alt="System" /><br /><sub><b>System</b> · CPU, RAM, disks and network</sub></td>
+<td align="center"><img src="docs/screenshots/en-translator.png" width="420" alt="Translator" /><br /><sub><b>Translator</b> · text and images, no API key</sub></td>
 </tr>
 </table>
 
@@ -124,6 +129,25 @@ In **Settings → Appearance** you can:
 - Fill the **strip beside the notch** so it looks like a single piece (same as the notch, transparent, a color, an image or automatic).
 - Decide **what shows when it's closed**: time, date, pending tasks, today's habits, temperature, battery and what's playing.
 - Adjust sizes, position, opacity and a 12 or 24-hour clock.
+
+<table>
+<tr>
+<td align="center"><img src="docs/screenshots/en-look-color.png" width="420" alt="Colored notch" /><br /><sub><b>A color</b> · the notch and the strip to match</sub></td>
+<td align="center"><img src="docs/screenshots/en-look-image.png" width="420" alt="Notch with an image" /><br /><sub><b>An image</b> · as the background of the notch and the strip</sub></td>
+</tr>
+<tr>
+<td align="center" colspan="2"><img src="docs/screenshots/en-closed.png" width="420" alt="Noki closed" /><br /><sub><b>Closed</b> · time, tasks, habits, weather, battery and what's playing</sub></td>
+</tr>
+</table>
+
+## 🔌 And much more
+
+- **Calendars by link.** Add any calendar that gives you an `.ics` or `webcal://` address. In Google Calendar: Settings → your calendar → “Integrate calendar” → “Secret address in iCal format”. In Outlook: Settings → Calendar → Shared calendars → “Publish a calendar”. They are read-only and refresh every 15 minutes.
+- **Backup.** In Settings → About you can **export** your settings and data (tasks, notes, habits, chat…) to a file and **import** them on another PC. API keys are not included.
+- **AI chat your way.** Pick Gemini, Claude, an OpenAI-compatible service or Ollama on your own machine. Keys are kept in the Windows Credential Manager.
+- **One shortcut for everything.** `Alt+N` opens and closes the notch (you can change it in Settings → Shortcuts).
+- **Useful alerts.** Volume, brightness, charger, low battery, internet, Caps Lock and health reminders, each with its own switch.
+- **Several screens.** One notch per monitor, and it hides by itself when something goes full screen.
 
 ## 🔐 Privacy
 

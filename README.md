@@ -50,11 +50,16 @@ Es **gratis, de código abierto y funciona por completo en tu PC**: sin cuentas,
 <td align="center"><img src="docs/screenshots/es-habits.png" width="420" alt="Hábitos" /><br /><sub><b>Hábitos</b> · metas, rachas y recordatorios</sub></td>
 </tr>
 <tr>
-<td align="center"><img src="docs/screenshots/es-calendar.png" width="420" alt="Calendario" /><br /><sub><b>Calendario</b> · tus tareas y eventos del mes</sub></td>
-<td align="center"><img src="docs/screenshots/es-system.png" width="420" alt="Sistema" /><br /><sub><b>Sistema</b> · CPU, RAM, discos y red</sub></td>
+<td align="center"><img src="docs/screenshots/es-music.png" width="420" alt="Música" /><br /><sub><b>Música</b> · carátula, progreso y letras</sub></td>
+<td align="center"><img src="docs/screenshots/es-ai.png" width="420" alt="Chat de IA" /><br /><sub><b>Chat de IA</b> · respuestas rápidas con tu propia clave</sub></td>
 </tr>
 <tr>
-<td align="center" colspan="2"><img src="docs/screenshots/es-translator.png" width="420" alt="Traductor" /><br /><sub><b>Traductor</b> · de texto e imágenes, sin clave de API</sub></td>
+<td align="center"><img src="docs/screenshots/es-files.png" width="420" alt="Archivos" /><br /><sub><b>Archivos</b> · suéltalos, arrástralos, comprime y más</sub></td>
+<td align="center"><img src="docs/screenshots/es-calendar.png" width="420" alt="Calendario" /><br /><sub><b>Calendario</b> · tus tareas y eventos del mes</sub></td>
+</tr>
+<tr>
+<td align="center"><img src="docs/screenshots/es-system.png" width="420" alt="Sistema" /><br /><sub><b>Sistema</b> · CPU, RAM, discos y red</sub></td>
+<td align="center"><img src="docs/screenshots/es-translator.png" width="420" alt="Traductor" /><br /><sub><b>Traductor</b> · de texto e imágenes, sin clave de API</sub></td>
 </tr>
 </table>
 
@@ -124,6 +129,25 @@ En **Ajustes → Apariencia** puedes:
 - Rellenar la **franja a los costados** del notch para que parezca una sola pieza (igual que el notch, transparente, un color, una imagen o automática).
 - Decidir **qué se ve cuando está cerrado**: hora, fecha, tareas pendientes, hábitos del día, temperatura, batería y lo que suena.
 - Ajustar tamaños, posición, opacidad y reloj de 12 o 24 horas.
+
+<table>
+<tr>
+<td align="center"><img src="docs/screenshots/es-look-color.png" width="420" alt="Notch de color" /><br /><sub><b>Un color</b> · el notch y la franja a juego</sub></td>
+<td align="center"><img src="docs/screenshots/es-look-image.png" width="420" alt="Notch con imagen" /><br /><sub><b>Una imagen</b> · de fondo en el notch y en la franja</sub></td>
+</tr>
+<tr>
+<td align="center" colspan="2"><img src="docs/screenshots/es-closed.png" width="420" alt="Noki cerrado" /><br /><sub><b>Cerrado</b> · hora, tareas, hábitos, clima, batería y lo que suena</sub></td>
+</tr>
+</table>
+
+## 🔌 Y mucho más
+
+- **Calendarios por enlace.** Añade cualquier calendario que te dé una dirección `.ics` o `webcal://`. En Google Calendar: Configuración → tu calendario → «Integrar calendario» → «Dirección secreta en formato iCal». En Outlook: Configuración → Calendario → Calendarios compartidos → «Publicar un calendario». Son de solo lectura y se actualizan cada 15 minutos.
+- **Copia de seguridad.** En Ajustes → Acerca de puedes **exportar** tus ajustes y datos (tareas, notas, hábitos, chat…) a un archivo y **importarlos** en otro equipo. No incluye las claves de API.
+- **Chat de IA a tu manera.** Elige Gemini, Claude, un servicio compatible con OpenAI u Ollama en tu propio equipo. Las claves se guardan en el Administrador de credenciales de Windows.
+- **Un atajo para todo.** `Alt+N` abre y cierra el notch (puedes cambiarlo en Ajustes → Atajos).
+- **Avisos útiles.** Volumen, brillo, cargador, batería baja, internet, Bloq Mayús y recordatorios de salud, cada uno con su interruptor.
+- **Varias pantallas.** Un notch por monitor, y se oculta solo cuando algo va en pantalla completa.
 
 ## 🔐 Privacidad
 
