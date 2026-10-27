@@ -33,3 +33,7 @@ Abre un issue con la plantilla *Feature request*. Las ideas pequeñas y concreta
 - Noki is licensed under **GPL-3.0-or-later**. By contributing you agree your contribution is released under the same license. /
   Noki usa la licencia **GPL-3.0-o-posterior**. Al contribuir aceptas que tu aporte se publique con la misma licencia.
 - Do not copy code or assets from projects with incompatible licenses. / No copies código ni recursos de proyectos con licencias incompatibles.
+
+## Questions / Preguntas
+
+For questions, ideas or to show your setup, use [Discussions](../../discussions). / Para dudas, ideas o para enseñar tu configuración, usa [Discussions](../../discussions).

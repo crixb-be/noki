@@ -46,20 +46,20 @@ Es **gratis, de código abierto y funciona por completo en tu PC**: sin cuentas,
 
 <table>
 <tr>
-<td align="center"><img src="docs/screenshots/es-planner.png" width="420" alt="Agenda" /><br /><sub><b>Agenda</b> · tareas con fecha y categoría</sub></td>
-<td align="center"><img src="docs/screenshots/es-habits.png" width="420" alt="Hábitos" /><br /><sub><b>Hábitos</b> · metas, rachas y recordatorios</sub></td>
+<td align="center" width="50%"><img src="docs/screenshots/es-planner.png" width="420" alt="Agenda" /><br /><sub><b>Agenda</b> · tareas con fecha y categoría</sub></td>
+<td align="center" width="50%"><img src="docs/screenshots/es-habits.png" width="420" alt="Hábitos" /><br /><sub><b>Hábitos</b> · metas, rachas y recordatorios</sub></td>
 </tr>
 <tr>
-<td align="center"><img src="docs/screenshots/es-music.png" width="420" alt="Música" /><br /><sub><b>Música</b> · carátula, progreso y letras</sub></td>
-<td align="center"><img src="docs/screenshots/es-ai.png" width="420" alt="Chat de IA" /><br /><sub><b>Chat de IA</b> · respuestas rápidas con tu propia clave</sub></td>
+<td align="center" width="50%"><img src="docs/screenshots/es-music.png" width="420" alt="Música" /><br /><sub><b>Música</b> · carátula, progreso y letras</sub></td>
+<td align="center" width="50%"><img src="docs/screenshots/es-ai.png" width="420" alt="Chat de IA" /><br /><sub><b>Chat de IA</b> · respuestas rápidas con tu propia clave</sub></td>
 </tr>
 <tr>
-<td align="center"><img src="docs/screenshots/es-files.png" width="420" alt="Archivos" /><br /><sub><b>Archivos</b> · suéltalos, arrástralos, comprime y más</sub></td>
-<td align="center"><img src="docs/screenshots/es-calendar.png" width="420" alt="Calendario" /><br /><sub><b>Calendario</b> · tus tareas y eventos del mes</sub></td>
+<td align="center" width="50%"><img src="docs/screenshots/es-files.png" width="420" alt="Archivos" /><br /><sub><b>Archivos</b> · suéltalos, arrástralos, comprime y más</sub></td>
+<td align="center" width="50%"><img src="docs/screenshots/es-calendar.png" width="420" alt="Calendario" /><br /><sub><b>Calendario</b> · tus tareas y eventos del mes</sub></td>
 </tr>
 <tr>
-<td align="center"><img src="docs/screenshots/es-system.png" width="420" alt="Sistema" /><br /><sub><b>Sistema</b> · CPU, RAM, discos y red</sub></td>
-<td align="center"><img src="docs/screenshots/es-translator.png" width="420" alt="Traductor" /><br /><sub><b>Traductor</b> · de texto e imágenes, sin clave de API</sub></td>
+<td align="center" width="50%"><img src="docs/screenshots/es-system.png" width="420" alt="Sistema" /><br /><sub><b>Sistema</b> · CPU, RAM, discos y red</sub></td>
+<td align="center" width="50%"><img src="docs/screenshots/es-translator.png" width="420" alt="Traductor" /><br /><sub><b>Traductor</b> · de texto e imágenes, sin clave de API</sub></td>
 </tr>
 </table>
 
@@ -132,12 +132,12 @@ En **Ajustes → Apariencia** puedes:
 
 <table>
 <tr>
-<td align="center"><img src="docs/screenshots/es-look-color.png" width="420" alt="Notch de color" /><br /><sub><b>Un color</b> · el notch y la franja a juego</sub></td>
-<td align="center"><img src="docs/screenshots/es-look-image.png" width="420" alt="Notch con imagen" /><br /><sub><b>Una imagen</b> · de fondo en el notch y en la franja</sub></td>
+<td align="center" width="50%"><img src="docs/screenshots/es-look-color.png" width="420" alt="Notch de color" /><br /><sub><b>Un color</b> · el notch y la franja a juego</sub></td>
+<td align="center" width="50%"><img src="docs/screenshots/es-look-image.png" width="420" alt="Notch con imagen" /><br /><sub><b>Una imagen</b> · de fondo en el notch y en la franja</sub></td>
 </tr>
 <tr>
-<td align="center"><img src="docs/screenshots/es-look-strip.png" width="420" alt="Franja de otro color" /><br /><sub><b>La franja a tu gusto</b> · los costados del notch pueden ser de otro color, una imagen o transparentes</sub></td>
-<td align="center"><img src="docs/screenshots/es-closed.png" width="420" alt="Noki cerrado" /><br /><sub><b>Cerrado</b> · hora, tareas, hábitos, clima, batería y lo que suena</sub></td>
+<td align="center" width="50%"><img src="docs/screenshots/es-look-strip.png" width="420" alt="Franja de otro color" /><br /><sub><b>La franja a tu gusto</b> · los costados del notch pueden ser de otro color, una imagen o transparentes</sub></td>
+<td align="center" width="50%"><img src="docs/screenshots/es-closed.png" width="420" alt="Noki cerrado" /><br /><sub><b>Cerrado</b> · hora, tareas, hábitos, clima, batería y lo que suena</sub></td>
 </tr>
 </table>
 
@@ -198,7 +198,7 @@ Pruebas: `cd src-tauri && cargo test --lib`. Para publicar versiones con actuali
 
 ## 🤝 Contribuir
 
-Los reportes de errores y las ideas son muy bienvenidos: abre un [issue](../../issues/new/choose) o lee [CONTRIBUTING.md](CONTRIBUTING.md).
+Los reportes de errores y las ideas son muy bienvenidos: abre un [issue](../../issues/new/choose), conversa en [Discussions](../../discussions) o lee [CONTRIBUTING.md](CONTRIBUTING.md).
 
 ## 💛 Apoya el proyecto
 

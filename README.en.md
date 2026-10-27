@@ -46,20 +46,20 @@ It is **free, open source and runs fully on your PC**: no accounts, no telemetry
 
 <table>
 <tr>
-<td align="center"><img src="docs/screenshots/en-planner.png" width="420" alt="Planner" /><br /><sub><b>Planner</b> · tasks with date and category</sub></td>
-<td align="center"><img src="docs/screenshots/en-habits.png" width="420" alt="Habits" /><br /><sub><b>Habits</b> · goals, streaks and reminders</sub></td>
+<td align="center" width="50%"><img src="docs/screenshots/en-planner.png" width="420" alt="Planner" /><br /><sub><b>Planner</b> · tasks with date and category</sub></td>
+<td align="center" width="50%"><img src="docs/screenshots/en-habits.png" width="420" alt="Habits" /><br /><sub><b>Habits</b> · goals, streaks and reminders</sub></td>
 </tr>
 <tr>
-<td align="center"><img src="docs/screenshots/en-music.png" width="420" alt="Music" /><br /><sub><b>Music</b> · album art, progress and lyrics</sub></td>
-<td align="center"><img src="docs/screenshots/en-ai.png" width="420" alt="AI chat" /><br /><sub><b>AI chat</b> · quick answers with your own key</sub></td>
+<td align="center" width="50%"><img src="docs/screenshots/en-music.png" width="420" alt="Music" /><br /><sub><b>Music</b> · album art, progress and lyrics</sub></td>
+<td align="center" width="50%"><img src="docs/screenshots/en-ai.png" width="420" alt="AI chat" /><br /><sub><b>AI chat</b> · quick answers with your own key</sub></td>
 </tr>
 <tr>
-<td align="center"><img src="docs/screenshots/en-files.png" width="420" alt="Files" /><br /><sub><b>Files</b> · drop, drag out, compress and more</sub></td>
-<td align="center"><img src="docs/screenshots/en-calendar.png" width="420" alt="Calendar" /><br /><sub><b>Calendar</b> · your tasks and events for the month</sub></td>
+<td align="center" width="50%"><img src="docs/screenshots/en-files.png" width="420" alt="Files" /><br /><sub><b>Files</b> · drop, drag out, compress and more</sub></td>
+<td align="center" width="50%"><img src="docs/screenshots/en-calendar.png" width="420" alt="Calendar" /><br /><sub><b>Calendar</b> · your tasks and events for the month</sub></td>
 </tr>
 <tr>
-<td align="center"><img src="docs/screenshots/en-system.png" width="420" alt="System" /><br /><sub><b>System</b> · CPU, RAM, disks and network</sub></td>
-<td align="center"><img src="docs/screenshots/en-translator.png" width="420" alt="Translator" /><br /><sub><b>Translator</b> · text and images, no API key</sub></td>
+<td align="center" width="50%"><img src="docs/screenshots/en-system.png" width="420" alt="System" /><br /><sub><b>System</b> · CPU, RAM, disks and network</sub></td>
+<td align="center" width="50%"><img src="docs/screenshots/en-translator.png" width="420" alt="Translator" /><br /><sub><b>Translator</b> · text and images, no API key</sub></td>
 </tr>
 </table>
 
@@ -132,12 +132,12 @@ In **Settings → Appearance** you can:
 
 <table>
 <tr>
-<td align="center"><img src="docs/screenshots/en-look-color.png" width="420" alt="Colored notch" /><br /><sub><b>A color</b> · the notch and the strip to match</sub></td>
-<td align="center"><img src="docs/screenshots/en-look-image.png" width="420" alt="Notch with an image" /><br /><sub><b>An image</b> · as the background of the notch and the strip</sub></td>
+<td align="center" width="50%"><img src="docs/screenshots/en-look-color.png" width="420" alt="Colored notch" /><br /><sub><b>A color</b> · the notch and the strip to match</sub></td>
+<td align="center" width="50%"><img src="docs/screenshots/en-look-image.png" width="420" alt="Notch with an image" /><br /><sub><b>An image</b> · as the background of the notch and the strip</sub></td>
 </tr>
 <tr>
-<td align="center"><img src="docs/screenshots/en-look-strip.png" width="420" alt="Strip in another color" /><br /><sub><b>The strip your way</b> · the sides of the notch can be another color, an image or transparent</sub></td>
-<td align="center"><img src="docs/screenshots/en-closed.png" width="420" alt="Noki closed" /><br /><sub><b>Closed</b> · time, tasks, habits, weather, battery and what's playing</sub></td>
+<td align="center" width="50%"><img src="docs/screenshots/en-look-strip.png" width="420" alt="Strip in another color" /><br /><sub><b>The strip your way</b> · the sides of the notch can be another color, an image or transparent</sub></td>
+<td align="center" width="50%"><img src="docs/screenshots/en-closed.png" width="420" alt="Noki closed" /><br /><sub><b>Closed</b> · time, tasks, habits, weather, battery and what's playing</sub></td>
 </tr>
 </table>
 
@@ -198,7 +198,7 @@ Tests: `cd src-tauri && cargo test --lib`. To publish versions with automatic up
 
 ## 🤝 Contributing
 
-Bug reports and ideas are very welcome: open an [issue](../../issues/new/choose) or read [CONTRIBUTING.md](CONTRIBUTING.md).
+Bug reports and ideas are very welcome: open an [issue](../../issues/new/choose), chat in [Discussions](../../discussions) or read [CONTRIBUTING.md](CONTRIBUTING.md).
 
 ## 💛 Support the project
 
