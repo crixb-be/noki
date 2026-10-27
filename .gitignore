@@ -1,0 +1,30 @@
+# Dependencias y compilación
+node_modules
+dist
+src-tauri/target
+src-tauri/gen
+
+# Instaladores y salida de scripts\publicar
+instalador
+publicar
+*.exe
+
+# Secretos: la clave privada de firma NUNCA va al repositorio
+*.key
+*.key.pub
+.env
+.env.*
+
+# Datos personales y copias de seguridad de la app
+settings.json
+data.json
+*-copia-*.json
+Noki-copia-*.json
+
+# Sistema y editores
+.DS_Store
+Thumbs.db
+.vscode/*
+!.vscode/extensions.json
+.idea
+*.log

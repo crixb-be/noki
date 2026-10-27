@@ -1,0 +1,36 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+html, body, #root {
+  margin: 0;
+  width: 100%;
+  height: 100%;
+  font-family: "Segoe UI", system-ui, sans-serif;
+}
+
+/* Ventana del notch: transparente y sin selección de texto. */
+[data-view="notch"] body,
+[data-view="notch"] html {
+  background: transparent;
+  overflow: hidden;
+  user-select: none;
+}
+
+/* Ventana de ajustes: ventana normal, fondo sólido. */
+[data-view="settings"] body {
+  background: #09090b;
+  color: #fff;
+}
+
+[data-view="settings"] ::-webkit-scrollbar { width: 10px; }
+[data-view="settings"] ::-webkit-scrollbar-thumb { background: rgba(255,255,255,.15); border-radius: 9999px; border: 3px solid #09090b; }
+
+/* Barras de desplazamiento discretas en el notch. */
+[data-view="notch"] ::-webkit-scrollbar { width: 6px; height: 6px; }
+[data-view="notch"] ::-webkit-scrollbar-track { background: transparent; }
+[data-view="notch"] ::-webkit-scrollbar-thumb { background: rgba(255, 255, 255, 0.18); border-radius: 9999px; }
+[data-view="notch"] ::-webkit-scrollbar-thumb:hover { background: rgba(255, 255, 255, 0.32); }
+[data-view="notch"] ::-webkit-scrollbar-button { display: none; }
+.no-scrollbar { scrollbar-width: none; }
+.no-scrollbar::-webkit-scrollbar { display: none; }

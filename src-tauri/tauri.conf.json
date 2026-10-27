@@ -1,0 +1,78 @@
+{
+  "$schema": "https://schema.tauri.app/config/2",
+  "productName": "Noki",
+  "version": "1.0.0",
+  "identifier": "com.noki.app",
+  "build": {
+    "beforeDevCommand": "npm run dev",
+    "devUrl": "http://localhost:1420",
+    "beforeBuildCommand": "npm run build",
+    "frontendDist": "../dist"
+  },
+  "app": {
+    "withGlobalTauri": false,
+    "windows": [
+      {
+        "label": "main",
+        "title": "Noki",
+        "width": 572,
+        "height": 348,
+        "decorations": false,
+        "transparent": true,
+        "alwaysOnTop": true,
+        "resizable": false,
+        "maximizable": false,
+        "minimizable": false,
+        "skipTaskbar": true,
+        "shadow": false,
+        "focus": false,
+        "visible": false
+      }
+    ],
+    "security": {
+      "csp": "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https: http://asset.localhost asset:; media-src 'self' blob: data:; connect-src 'self' ipc: http://ipc.localhost https: http://localhost:* http://127.0.0.1:*"
+    }
+  },
+  "bundle": {
+    "active": true,
+    "targets": [
+      "nsis"
+    ],
+    "icon": [
+      "icons/32x32.png",
+      "icons/128x128.png",
+      "icons/128x128@2x.png",
+      "icons/icon.png",
+      "icons/icon.ico"
+    ],
+    "publisher": "Cristhian Bustamante",
+    "copyright": "© 2026 Cristhian Bustamante",
+    "category": "Utility",
+    "shortDescription": "Noki: un notch amigable para Windows",
+    "longDescription": "Notch superpuesto para Windows con música, productividad, estante de archivos, asistente de IA y ventana de ajustes.",
+    "windows": {
+      "webviewInstallMode": {
+        "type": "downloadBootstrapper"
+      },
+      "nsis": {
+        "installMode": "currentUser",
+        "languages": [
+          "Spanish",
+          "English"
+        ],
+        "displayLanguageSelector": false,
+        "installerIcon": "icons/icon.ico"
+      }
+    },
+    "createUpdaterArtifacts": true
+  },
+  "plugins": {
+    "updater": {
+      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IDE1NTBENDNBNDQxOTNBNEUKUldST09obEVPdFJRRlplWVdLcW5VT1RvV3R4Tk5ObXNUeDg0bG5KMHZlTVRXUDk1WEdVOEpNWXMK",
+      "windows": {
+        "installMode": "passive"
+      },
+      "requireSignedVersion": true
+    }
+  }
+}

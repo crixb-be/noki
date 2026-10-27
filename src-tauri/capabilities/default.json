@@ -1,0 +1,7 @@
+{
+  "$schema": "../gen/schemas/desktop-schema.json",
+  "identifier": "default",
+  "description": "Permisos de las ventanas del notch y de ajustes",
+  "windows": ["main", "main-*", "settings"],
+  "permissions": ["core:default", "drag:default", "dialog:default"]
+}
