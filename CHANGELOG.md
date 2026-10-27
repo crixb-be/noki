@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.0.1 — Translation fixes / Arreglos de traducción
+
+- Fixed leftover Spanish text in the English interface (detected language, pending tasks, clear completed). /
+  Corregido texto en español que quedaba en la interfaz en inglés (idioma detectado, tareas pendientes, limpiar completadas).
+- Framed screenshots and AI-assistance note in the README. / Capturas con marco y nota de ayuda de IA en el README.
+
 ## 1.0.0 — First public release / Primera versión pública
 
 - **Renamed to Noki** (formerly “Mi Notch”), with a new logo. Settings, data and saved API keys migrate automatically. /
