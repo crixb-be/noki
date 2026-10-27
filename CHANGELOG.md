@@ -1,5 +1,10 @@
 # Changelog
 
+## 1.0.2 — App icons / Iconos de apps
+
+- App icons now retry when Windows fails to provide them the first time, instead of staying as a letter until restart. /
+  Los iconos de las apps se reintentan si Windows no los da a la primera, en vez de quedarse con la inicial hasta reiniciar.
+
 ## 1.0.1 — Translation fixes / Arreglos de traducción
 
 - Fixed leftover Spanish text in the English interface (detected language, pending tasks, clear completed). /
