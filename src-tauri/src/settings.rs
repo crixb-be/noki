@@ -83,6 +83,8 @@ pub struct Appearance {
     pub bar_opacity: i32,
     /// Icono de Noki (bandeja y ventana de Ajustes): "oceano" (oficial), "atardecer", "aurora", "pastel-atardecer" o "pastel-aurora".
     pub app_icon: String,
+    /// La carita animada de Noki dentro del notch.
+    pub mascot: bool,
 }
 
 impl Default for Appearance {
@@ -113,6 +115,7 @@ impl Default for Appearance {
             bar_dim: 35,
             bar_opacity: 100,
             app_icon: crate::appicon::DEFAULT.into(),
+            mascot: true,
         }
     }
 }

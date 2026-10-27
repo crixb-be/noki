@@ -15,6 +15,7 @@ import HabitsView from "./components/HabitsView.jsx";
 import SystemView from "./components/SystemView.jsx";
 import ScreenTime from "./components/ScreenTime.jsx";
 import Visualizer from "./components/Visualizer.jsx";
+import Mascot, { useLook, useMascotMood } from "./components/Mascot.jsx";
 import PeekContent, { peekSize } from "./components/Peek.jsx";
 import { useCalendar } from "./hooks/useCalendar.js";
 import { useWeather } from "./hooks/useWeather.js";
@@ -144,6 +145,7 @@ function Notch({ settings, update }) {
   const [habits] = useStore("habits", EMPTY_HABITS);
   const activeHabits = (habits.items ?? []).filter((i) => i.active !== false);
   const habitsDone = activeHabits.filter((i) => countOn(habits, i.id) >= i.goal).length;
+  const doneTasks = todos.filter((t) => t.done).length;
   const aiChat = useAiChat(); // el chat sigue respondiendo aunque cambies de pestaña
   const weather = useWeather({ weather: settings.weather, enabled: settings.modules.weather, leader });
 
@@ -182,6 +184,18 @@ function Notch({ settings, update }) {
     if (expanded && !dragging && defaultTab && defaultTab !== "last") setTab(defaultTab);
   }, [expanded]); // eslint-disable-line react-hooks/exhaustive-deps
 
+  const mascotOn = settings.appearance.mascot;
+  const look = useLook(mascotOn);
+  const { mood, poke } = useMascotMood({
+    enabled: mascotOn,
+    doneTasks,
+    habitsDone,
+    pomoAlert: pomo.alert,
+    playing: media.available && media.playing,
+    dragging,
+    battery,
+  });
+
   const peek = expanded ? null : rawPeek;
   const banner = expanded && rawPeek?.kind === "text" ? rawPeek : null;
   const peekDims = peek ? peekSize(peek, settings.appearance.collapsedW, settings.appearance.collapsedH) : null;
@@ -189,7 +203,7 @@ function Notch({ settings, update }) {
   const apx = settings.appearance;
   const compactItems = [apx.showClock, apx.showDate, apx.showTasks, apx.showHabits, apx.showWeather, apx.showBattery].filter(Boolean).length;
   const compactNeeded =
-    32 + (apx.showClock ? 46 : 0) + (apx.showDate ? 78 : 0) + (apx.showTasks ? 34 : 0) + (apx.showHabits ? 44 : 0) + (apx.showWeather ? 54 : 0) + (apx.showBattery ? 66 : 0) + (apx.showActivity ? 36 : 0) + 8 * compactItems;
+    32 + (apx.showClock ? 46 : 0) + (apx.showDate ? 78 : 0) + (apx.showTasks ? 34 : 0) + (apx.showHabits ? 44 : 0) + (apx.showWeather ? 54 : 0) + (apx.showBattery ? 66 : 0) + (apx.showActivity ? 36 : 0) + (apx.mascot ? 40 : 0) + 8 * compactItems;
   const compactW = Math.min(Math.max(apx.collapsedW, compactNeeded), apx.expandedW);
 
   // Rust necesita saber el tamaño del aviso para que su zona reciba clics (slider de volumen/brillo).
@@ -328,6 +342,7 @@ function Notch({ settings, update }) {
                 <div className="flex items-center gap-3">
                   <Clock withDate={tabs.length < 6} hour12={!ap.clock24} />
                   {tabs.length < 8 && <Battery info={battery} />}
+                  {ap.mascot && tabs.length < 10 && <Mascot size={22} mood={mood} look={look} onPoke={poke} />}
                 </div>
                 <nav className="flex gap-0.5 rounded-full bg-white/10 p-1">
                   {tabs.map((t) => (
@@ -393,7 +408,10 @@ function Notch({ settings, update }) {
               <div className="flex shrink-0 items-center gap-2">
                 {(ap.showClock || ap.showDate) && <Clock showTime={ap.showClock} withDate={ap.showDate} hour12={!ap.clock24} />}
               </div>
-              <div className="flex min-w-0 flex-1 justify-center">{ap.showActivity ? indicator : null}</div>
+              <div className="flex min-w-0 flex-1 items-center justify-center gap-2.5">
+                {ap.mascot && <Mascot size={20} mood={mood} look={look} />}
+                {ap.showActivity ? indicator : null}
+              </div>
               <div className="flex shrink-0 items-center gap-2 text-xs tabular-nums">
                 {ap.showTasks && (
                   <span className="text-white/80" title={`${pendingTasks} tarea${pendingTasks === 1 ? "" : "s"} pendiente${pendingTasks === 1 ? "" : "s"}`}>✓ {pendingTasks}</span>

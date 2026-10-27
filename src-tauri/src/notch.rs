@@ -536,6 +536,9 @@ struct WinLoop {
     last_tint: Instant,
     last_tint_emit: Instant,
     tint: Option<(u8, u8, u8)>,
+    /// Personaje: última mirada enviada (cuantizada) y cuándo.
+    last_look: Option<(i32, i32)>,
+    last_look_at: Instant,
 }
 
 impl WinLoop {
@@ -551,6 +554,8 @@ impl WinLoop {
             last_tint: long_ago,
             last_tint_emit: long_ago,
             tint: None,
+            last_look: None,
+            last_look_at: long_ago,
         }
     }
 }
@@ -636,6 +641,28 @@ fn run_loop(app: AppHandle) {
                     lp.ignoring = Some(true);
                 }
                 continue;
+            }
+
+            // El personaje del notch mira hacia el cursor: se avisa de su posición relativa (como mucho cada 60 ms y solo si cambia).
+            if s.appearance.mascot && now - lp.last_look_at >= Duration::from_millis(60) {
+                lp.last_look_at = now;
+                let cx = (layout.pill.left + layout.pill.right) / 2;
+                let cy = layout.pill.top + layout.pill.height() / 2;
+                let dx = (cur.x - cx) as f64 / layout.scale;
+                let dy = (cur.y - cy) as f64 / layout.scale;
+                let near = dx.abs() < 700.0 && dy > -60.0 && dy < 500.0;
+                let q = if near {
+                    (((dx / 260.0).clamp(-1.0, 1.0) * 20.0).round() as i32, ((dy / 180.0).clamp(-1.0, 1.0) * 20.0).round() as i32)
+                } else {
+                    (99, 99)
+                };
+                if lp.last_look != Some(q) {
+                    lp.last_look = Some(q);
+                    let _ = app.emit(
+                        "mascot-cursor",
+                        serde_json::json!({ "label": label, "near": near, "x": q.0 as f64 / 20.0, "y": q.1 as f64 / 20.0 }),
+                    );
+                }
             }
 
             // Franja en modo «automático»: toma el color de lo que hay justo debajo de ella (el programa abierto).

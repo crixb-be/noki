@@ -261,6 +261,9 @@ function Appearance({ s, set }) {
   return (
     <Page title="Apariencia" subtitle="Tamaño, posición y transparencia. Los cambios se ven al instante en el notch.">
       <IconPicker value={a.appIcon} onChange={(v) => ap({ appIcon: v })} />
+      <Row title="Personaje en el notch" hint="Una carita que parpadea, te mira y reacciona: se alegra al terminar tareas, hábitos o un Pomodoro, baila con la música y se adormece de noche.">
+        <Toggle checked={a.mascot} onChange={(v) => ap({ mascot: v })} />
+      </Row>
       <Row title="Ancho (compacto)">
         <Slider value={a.collapsedW} min={120} max={600} step={2} unit=" px" onChange={(v) => ap({ collapsedW: v })} />
       </Row>

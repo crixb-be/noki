@@ -1,5 +1,12 @@
 # Changelog
 
+## Unreleased — Character and new logo / Personaje y logo nuevo
+
+- **New logo** (Ciruela Océano) and a **Noki icon picker** in Settings → Appearance (tray and Settings icon). /
+  **Logo nuevo** (Ciruela Océano) y un **selector del icono de Noki** en Ajustes → Apariencia (bandeja y Ajustes).
+- **Character in the notch**: a little face that blinks, looks at your cursor, cheers when you finish a task, a habit or a Pomodoro, dances to the music, gets surprised if you click it (dizzy if you click it a lot), opens its mouth when you drop a file, and gets sleepy at night or on low battery. It can be turned off in Settings → Appearance. /
+  **Personaje en el notch**: una carita que parpadea, mira tu cursor, se alegra al terminar una tarea, un hábito o un Pomodoro, baila con la música, se sorprende si la pinchas (y se marea si la pinchas mucho), abre la boca al soltar un archivo y se adormece de noche o con poca batería. Se apaga en Ajustes → Apariencia.
+
 ## 1.0.2 — App icons / Iconos de apps
 
 - App icons now retry when Windows fails to provide them the first time, instead of staying as a letter until restart. /

@@ -4,6 +4,8 @@
  */
 export const EN = {
   // icono de Noki
+  "Personaje en el notch": "Character in the notch",
+  "Una carita que parpadea, te mira y reacciona: se alegra al terminar tareas, hábitos o un Pomodoro, baila con la música y se adormece de noche.": "A little face that blinks, looks at you and reacts: it cheers when you finish tasks, habits or a Pomodoro, dances to music and gets sleepy at night.",
   "Icono de Noki": "Noki icon",
   "Cambia el icono de la bandeja y de Ajustes. El del instalador y el de los accesos directos lo fija Windows al instalar y no cambia.": "Changes the tray and Settings icon. The installer and shortcut icons are set by Windows at install time and don't change.",
   "Océano": "Ocean",
