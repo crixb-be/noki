@@ -1,0 +1,55 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1280 400" width="1280" height="400">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#0A0F1F"/>
+      <stop offset="1" stop-color="#111B3A"/>
+    </linearGradient>
+    <linearGradient id="logo" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#34D6B6"/>
+      <stop offset="1" stop-color="#3B9CF5"/>
+    </linearGradient>
+    <linearGradient id="title" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0" stop-color="#FFFFFF"/>
+      <stop offset="1" stop-color="#9FE8D8"/>
+    </linearGradient>
+    <radialGradient id="glow1" cx="0.15" cy="0.2" r="0.6">
+      <stop offset="0" stop-color="#34D6B6" stop-opacity="0.28"/>
+      <stop offset="1" stop-color="#34D6B6" stop-opacity="0"/>
+    </radialGradient>
+    <radialGradient id="glow2" cx="0.9" cy="0.9" r="0.6">
+      <stop offset="0" stop-color="#3B9CF5" stop-opacity="0.30"/>
+      <stop offset="1" stop-color="#3B9CF5" stop-opacity="0"/>
+    </radialGradient>
+    <clipPath id="tile"><rect width="1024" height="1024" rx="232"/></clipPath>
+  </defs>
+
+  <rect width="1280" height="400" fill="url(#bg)"/>
+  <rect width="1280" height="400" fill="url(#glow1)"/>
+  <rect width="1280" height="400" fill="url(#glow2)"/>
+
+  <!-- logo -->
+  <g transform="translate(118 96) scale(0.2)">
+    <rect width="1024" height="1024" rx="232" fill="url(#logo)"/>
+    <g clip-path="url(#tile)">
+      <path d="M214 -10 H810 V400 a160 160 0 0 1 -160 160 H374 a160 160 0 0 1 -160 -160 Z" fill="#0C0C12"/>
+      <ellipse cx="338" cy="420" rx="34" ry="24" fill="#FF8FB1" opacity="0.8"/>
+      <ellipse cx="686" cy="420" rx="34" ry="24" fill="#FF8FB1" opacity="0.8"/>
+      <ellipse cx="406" cy="332" rx="52" ry="68" fill="#FFFFFF"/>
+      <ellipse cx="618" cy="332" rx="52" ry="68" fill="#FFFFFF"/>
+      <circle cx="420" cy="310" r="16" fill="#0C0C12"/>
+      <circle cx="632" cy="310" r="16" fill="#0C0C12"/>
+      <path d="M452 440 Q512 494 572 440" fill="none" stroke="#FFFFFF" stroke-width="24" stroke-linecap="round"/>
+    </g>
+  </g>
+
+  <!-- texto -->
+  <text x="372" y="214" font-family="Segoe UI, Arial, sans-serif" font-size="132" font-weight="800" fill="url(#title)" letter-spacing="-3">Noki</text>
+  <text x="376" y="270" font-family="Segoe UI, Arial, sans-serif" font-size="34" font-weight="500" fill="#DCE6FF">Un notch amigable para tu escritorio de Windows</text>
+  <text x="376" y="314" font-family="Segoe UI, Arial, sans-serif" font-size="22" fill="#8FA3D6">Música · Agenda · Hábitos · Archivos · Calendario · Clima · IA · Traductor</text>
+
+  <!-- puntitos decorativos -->
+  <g fill="#FFFFFF" opacity="0.18">
+    <circle cx="1140" cy="86" r="3"/><circle cx="1180" cy="120" r="2"/><circle cx="1096" cy="150" r="2"/>
+    <circle cx="1210" cy="60" r="2"/><circle cx="1160" cy="330" r="3"/><circle cx="1100" cy="290" r="2"/>
+  </g>
+</svg>

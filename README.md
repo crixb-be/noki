@@ -1,139 +1,197 @@
 <div align="center">
 
-<img src="assets/noki-logo.svg" alt="Noki" width="120" />
+<img src="assets/banner.png" alt="Noki: un notch amigable para tu escritorio de Windows" width="100%" />
 
-# Noki
+<br />
 
-**A friendly notch for your Windows desktop.**
-Music, tasks, files, calendar, weather, quick toggles, a fast AI chat and a translator — all inside a small, customizable notch at the top of your screen.
+[![Versión](https://img.shields.io/github/v/release/crixb-be/noki?style=for-the-badge&color=34D6B6&labelColor=0A0F1F&label=versi%C3%B3n)](../../releases/latest)
+[![Descargas](https://img.shields.io/github/downloads/crixb-be/noki/total?style=for-the-badge&color=3B9CF5&labelColor=0A0F1F&label=descargas)](../../releases)
+[![Windows](https://img.shields.io/badge/Windows-10%20%7C%2011-0078D4?style=for-the-badge&logo=windows&logoColor=white&labelColor=0A0F1F)](../../releases/latest)
+[![Licencia](https://img.shields.io/badge/licencia-GPL--3.0-8B5CF6?style=for-the-badge&labelColor=0A0F1F)](LICENSE)
+[![Ko-fi](https://img.shields.io/badge/Ko--fi-Inv%C3%ADtame%20un%20caf%C3%A9-FF5E5B?style=for-the-badge&logo=kofi&logoColor=white&labelColor=0A0F1F)](https://ko-fi.com/cristhianbillybustamante)
 
-[English](README.md) · [Español](README.es.md)
+**🇪🇸 Español** · [🇬🇧 English](README.en.md)
 
-[![License: GPL v3](https://img.shields.io/badge/license-GPL--3.0--or--later-blue.svg)](LICENSE)
-![Platform](https://img.shields.io/badge/platform-Windows%2010%20%7C%2011-0078D4)
-[![Ko-fi](https://img.shields.io/badge/support-Ko--fi-ff5e5b)](https://ko-fi.com/cristhianbillybustamante)
+<h3>
+  <a href="../../releases/latest">⬇️ Descargar Noki para Windows</a>
+  &nbsp;·&nbsp;
+  <a href="#-primeros-pasos">Primeros pasos</a>
+  &nbsp;·&nbsp;
+  <a href="#-funciones">Funciones</a>
+</h3>
 
 </div>
 
----
+<br />
 
-## What is Noki?
+**Noki** vive en la parte de arriba de tu pantalla, como el notch de una Mac. Pasa el cursor por encima (o pulsa `Alt+N`) y se abre en un panel con todo lo que usas a diario: tu música, tus tareas, tus hábitos, tus archivos, el clima y mucho más. Cuando no lo necesitas, se encoge y casi desaparece.
 
-Noki sits at the top of your screen like the notch of a Mac. Hover over it (or press `Alt+N`) and it opens into a small
-dashboard. Other windows work *below* it, like with a taskbar, and it hides by itself when you go full screen.
+Es **gratis, de código abierto y funciona por completo en tu PC**: sin cuentas, sin telemetría.
 
-It is free, open source and runs fully on your PC. No account, no telemetry.
+<div align="center">
+<img src="docs/screenshots/es-panel.png" alt="El panel de Noki con el clima, los interruptores rápidos y tus apps" width="640" />
+</div>
 
-## Features
+## ✨ ¿Por qué Noki?
 
 | | |
 |---|---|
-| 🏠 **Panel** | One-tap toggles (Wi-Fi, Bluetooth, keep awake, dark mode, microphone, sound, Do not disturb, screenshot, lock), current weather with hourly and daily forecast, and your favorite apps with their real icons |
-| 🎵 **Music** | Shows and controls whatever is playing (Spotify, YouTube Music, VLC, browser…), album art, seek bar, synced lyrics and an audio visualizer that reacts to your real sound |
-| ✅ **Planner** | Tasks with date, time, category and reminders (type “call 15m” or “meeting 14:30”), quick notes and a Pomodoro timer |
-| 💧 **Habits** | Daily habits with a goal, streaks and reminders — drink water, take a pill, walk, read… Turn each habit (or the whole module) on or off |
-| 🖥️ **System** | CPU, RAM, disks and network in real time, and the programs using the most memory or CPU (with a button to close them) |
-| ⏱️ **Screen time** | *Optional, off by default.* How long you use each app today and over 7 days. Stays on your PC; ignores time when you are away |
-| 📁 **Files** | Drop files on the notch to keep them on a shelf; drag them back out, compress, extract, copy, move or send them to the recycle bin |
-| 📅 **Calendar** | Month view with your tasks and events (Google, Outlook or any iCal link) and alerts before meetings |
-| ✨ **AI chat** | A quick chat for fast answers (Gemini, Claude, OpenAI-compatible or local Ollama) that keeps answering in the background. Bring your own API key |
-| 🧰 **Tools** | App launcher, clipboard history (opt-in) and a **translator** for text and images — no API key needed |
-| 🎨 **Your design** | Notch color or image, automatic color that follows the app below it, a strip beside the notch, choose what shows when closed (time, date, tasks, temperature, battery…) |
-| 🌐 **Languages** | English and Spanish |
-| 🔔 **Alerts** | Volume, brightness, charger, low battery, internet, audio device, Caps Lock, keyboard language, health reminders |
-| 🖥️ **Multi-monitor** | Optional one notch per screen |
-| 🔄 **Updates** | Signed updates you approve yourself |
+| 🎯 **Todo a un gesto** | Un solo lugar para música, tareas, calendario, clima, archivos, traductor y más, sin abrir diez ventanas |
+| 🪟 **Convive con tus ventanas** | Se registra como una barra de Windows: las demás ventanas trabajan por debajo y se oculta solo en pantalla completa |
+| 🎨 **Hecho a tu gusto** | Cambia su color o ponle una imagen, haz que tome el color del programa que tengas abierto y elige qué muestra cuando está cerrado |
+| 🔒 **Privado** | Tus datos se quedan en tu PC. Las claves de API van al Administrador de credenciales de Windows |
+| 🌐 **Español e inglés** | Cámbialo al instante en los ajustes |
 
-## Screenshots
+## 📸 Un vistazo
 
 <table>
-<tr><td align="center"><img src="docs/screenshots/en-panel.png" width="420" alt="Panel"><br><sub>Panel</sub></td><td align="center"><img src="docs/screenshots/en-planner.png" width="420" alt="Planner"><br><sub>Planner</sub></td></tr>
-<tr><td align="center"><img src="docs/screenshots/en-habits.png" width="420" alt="Habits"><br><sub>Habits</sub></td><td align="center"><img src="docs/screenshots/en-calendar.png" width="420" alt="Calendar"><br><sub>Calendar</sub></td></tr>
-<tr><td align="center"><img src="docs/screenshots/en-system.png" width="420" alt="System"><br><sub>System</sub></td><td align="center"><img src="docs/screenshots/en-translator.png" width="420" alt="Translator"><br><sub>Translator</sub></td></tr>
+<tr>
+<td align="center"><img src="docs/screenshots/es-planner.png" width="420" alt="Agenda" /><br /><sub><b>Agenda</b> · tareas con fecha y categoría</sub></td>
+<td align="center"><img src="docs/screenshots/es-habits.png" width="420" alt="Hábitos" /><br /><sub><b>Hábitos</b> · metas, rachas y recordatorios</sub></td>
+</tr>
+<tr>
+<td align="center"><img src="docs/screenshots/es-calendar.png" width="420" alt="Calendario" /><br /><sub><b>Calendario</b> · tus tareas y eventos del mes</sub></td>
+<td align="center"><img src="docs/screenshots/es-system.png" width="420" alt="Sistema" /><br /><sub><b>Sistema</b> · CPU, RAM, discos y red</sub></td>
+</tr>
+<tr>
+<td align="center" colspan="2"><img src="docs/screenshots/es-translator.png" width="420" alt="Traductor" /><br /><sub><b>Traductor</b> · de texto e imágenes, sin clave de API</sub></td>
+</tr>
 </table>
 
-## Install
+## 🧩 Funciones
 
-1. Download `Noki_<version>_x64-setup.exe` from the [Releases](../../releases) page.
-2. Run it. It installs for your user only (no administrator rights). If Microsoft Edge WebView2 is missing, the installer downloads it.
-3. Open **Noki** from the Start menu. Its icon appears in the tray: left click = Settings, right click = menu.
+<table>
+<tr>
+<td width="50%" valign="top">
 
-> **Windows SmartScreen:** the installer is not yet signed with a paid code-signing certificate, so Windows may show
-> “Windows protected your PC”. Choose **More info → Run anyway**. You can always build it yourself from source (below).
+**🏠 Panel**
+Interruptores de un toque (Wi-Fi, Bluetooth, mantener activo, modo oscuro, micrófono, sonido, No molestar, captura y bloqueo), el clima por horas y días, y tus apps favoritas con sus iconos reales.
 
-Your settings live in `%APPDATA%\com.noki.app`. API keys are stored in the **Windows Credential Manager**, never in files or backups.
+**🎵 Música**
+Muestra y controla lo que suene (Spotify, YouTube Music, VLC, el navegador…): carátula, barra de progreso, **letras sincronizadas** y un visualizador que reacciona a tu sonido real.
 
-### Coming from “Mi Notch”?
-Noki is the new name of Mi Notch. On first launch it copies your settings, data and saved keys over automatically.
-You can uninstall the old version afterwards.
+**✅ Agenda**
+Tareas con fecha, hora y categoría. Escribe «llamar 15m» o «reunión 14:30» y las entiende. Incluye notas rápidas y un **Pomodoro**.
 
-## Privacy
+**💧 Hábitos**
+Tomar agua, la pastilla, caminar… con meta diaria, **rachas** y recordatorios. Activa o pausa cada hábito.
 
-Everything stays on your PC. Noki only goes online when you use something that needs it:
+**📁 Archivos**
+Suelta archivos en el notch para guardarlos; arrástralos de vuelta, comprímelos, extráelos, cópialos, muévelos o mándalos a la papelera.
 
-| Feature | Service | When |
+</td>
+<td width="50%" valign="top">
+
+**📅 Calendario**
+Vista mensual con tus tareas y eventos de Google, Outlook o cualquier enlace iCal, y avisos antes de las reuniones.
+
+**✨ Chat de IA**
+Un chat rápido para dudas y respuestas breves (Gemini, Claude, compatibles con OpenAI u Ollama local). Sigue respondiendo en segundo plano. Usas tu propia clave.
+
+**🌐 Traductor**
+Traduce texto mientras escribes y **también imágenes** (con el OCR de Windows, en tu PC). No necesita clave de API.
+
+**🖥️ Sistema**
+CPU, RAM, discos y red en tiempo real, y los programas que más consumen, con botón para cerrarlos.
+
+**⏱️ Tiempo de pantalla**
+*Opcional, apagado por defecto.* Cuánto usas cada app, solo en tu PC.
+
+**🔔 Avisos y más**
+Volumen, brillo, cargador, batería baja, internet, Bloq Mayús, recordatorios de salud, un notch por pantalla y actualizaciones firmadas.
+
+</td>
+</tr>
+</table>
+
+## 🚀 Primeros pasos
+
+1. **Descarga** `Noki_<versión>_x64-setup.exe` desde [Releases](../../releases/latest) y ejecútalo. Se instala solo para tu usuario (no pide administrador). Si falta Microsoft Edge WebView2, el instalador lo descarga.
+2. **Abre Noki** desde el menú Inicio. Verás un pequeño notch arriba, en el centro de tu pantalla, y su icono en la bandeja (clic izquierdo = Ajustes, clic derecho = menú).
+3. **Pasa el cursor por encima** o pulsa **`Alt+N`** para abrirlo. Haz clic en los iconos de arriba para cambiar de pestaña.
+4. Abre **Ajustes** (⚙) para activar o apagar módulos, elegir el idioma, cambiar su aspecto y conectar tu calendario, tu ciudad o tu clave de IA.
+
+> **Aviso de Windows SmartScreen:** el instalador todavía no está firmado con un certificado de pago, así que Windows puede mostrar «Windows protegió su PC». Es normal: elige **Más información → Ejecutar de todas formas**. Si prefieres no hacerlo, puedes [compilarlo tú mismo](#-compilar-desde-el-código).
+
+Tus ajustes se guardan en `%APPDATA%\com.noki.app`. Si vienes de «Mi Notch» (el nombre anterior), Noki copia tus ajustes, datos y claves la primera vez que se abre; después puedes desinstalar la versión vieja.
+
+## 🎨 Hazlo tuyo
+
+En **Ajustes → Apariencia** puedes:
+
+- Elegir el **color** del notch o ponerle una **imagen** de fondo.
+- Activar el **color automático**: toma el color del programa que tengas abierto debajo y cambia con él.
+- Rellenar la **franja a los costados** del notch para que parezca una sola pieza (igual que el notch, transparente, un color, una imagen o automática).
+- Decidir **qué se ve cuando está cerrado**: hora, fecha, tareas pendientes, hábitos del día, temperatura, batería y lo que suena.
+- Ajustar tamaños, posición, opacidad y reloj de 12 o 24 horas.
+
+## 🔐 Privacidad
+
+Todo se queda en tu PC. Noki solo se conecta a internet cuando usas algo que lo necesita:
+
+| Función | Servicio | Cuándo |
 |---|---|---|
-| Weather | [Open-Meteo](https://open-meteo.com) | when a city is set |
-| Text translation | Google Translate web service (unofficial endpoint) | while you translate |
-| Image text (OCR) | Windows built-in OCR, **local** | nothing leaves your PC |
-| Lyrics | [LRCLIB](https://lrclib.net) | when you open lyrics |
-| Detect my city | [ipwho.is](https://ipwho.is) | only when you press the button |
-| AI chat | the provider you choose, with *your* key | when you send a message |
-| Calendars | the iCal links you add | every 15 minutes |
-| Updates | the address you configure (e.g. GitHub Releases) | on start / every 6 h, if enabled |
+| Clima | [Open-Meteo](https://open-meteo.com) | si eliges una ciudad |
+| Traducción de texto | Servicio web de Google Translate (punto de acceso no oficial) | mientras traduces |
+| Texto de imágenes (OCR) | OCR de Windows, **local** | nada sale de tu PC |
+| Letras | [LRCLIB](https://lrclib.net) | al abrir las letras |
+| Detectar mi ciudad | [ipwho.is](https://ipwho.is) | solo al pulsar el botón |
+| Chat de IA | el proveedor que elijas, con *tu* clave | al enviar un mensaje |
+| Calendarios | los enlaces iCal que añadas | cada 15 minutos |
+| Actualizaciones | GitHub Releases | al abrir y cada 6 h, si está activado |
 
-## Build from source
+## 🛠️ Compilar desde el código
 
-Requirements: Windows 10/11, [Node.js 20+](https://nodejs.org), [Rust (stable)](https://rustup.rs) and the
-Visual Studio Build Tools with the “Desktop development with C++” workload.
+Requisitos: Windows 10/11, [Node.js 20+](https://nodejs.org), [Rust (estable)](https://rustup.rs) y las Visual Studio Build Tools con la carga «Desarrollo de escritorio con C++».
 
 ```bash
 npm install
-npm run tauri dev      # development mode with hot reload
-npm run tauri build    # builds the NSIS installer (unsigned updater artifacts)
+npm run tauri dev      # modo desarrollo con recarga
+npm run tauri build    # genera el instalador NSIS
 ```
 
-To produce a signed installer for auto-updates, create your own updater key
-(`npx tauri signer generate -w %USERPROFILE%\.tauri\noki.key`), put its public key in
-`src-tauri/tauri.conf.json` and run `scripts\compilar.ps1`. **Never commit your private key.**
+Pruebas: `cd src-tauri && cargo test --lib`. Para publicar versiones con actualizaciones automáticas mira [docs/RELEASING.md](docs/RELEASING.md) (**nunca subas tu clave privada de firma**).
 
-Tests: `cd src-tauri && cargo test --lib`.
+<details>
+<summary><b>Cómo funciona por dentro</b></summary>
 
-### How it works
-- A fixed-size transparent window per monitor; a Rust thread reads the cursor every 25 ms to decide click-through,
-  hover open/close and full-screen hiding.
-- With “Reserve space” it registers as a Windows AppBar, so maximized windows stay below the notch.
-- Frontend: React 18 + Tailwind, talking to Rust through Tauri commands and events.
+- Una ventana transparente de tamaño fijo por pantalla; un hilo de Rust lee el cursor cada 25 ms para decidir el click-through, abrir y cerrar al pasar el cursor y ocultarse en pantalla completa.
+- Con «Reservar espacio» se registra como AppBar de Windows, así las ventanas maximizadas quedan debajo del notch.
+- Interfaz en React 18 + Tailwind, que habla con Rust mediante comandos y eventos de Tauri 2.
 
-| Path | What it does |
+| Ruta | Qué hace |
 |---|---|
-| `src-tauri/src/notch.rs` | Position, AppBar, click-through, hover, full screen |
-| `src-tauri/src/dropzone.rs` | Native drop target for dragging files onto the notch |
-| `src-tauri/src/quick.rs` | Panel toggles (radios, dark mode, audio, keep awake) |
-| `src-tauri/src/settings.rs` | Typed settings, validation, atomic saving |
-| `src/App.jsx` | The notch (shape, tabs, animation) |
-| `src/components/SettingsWindow.jsx` | Settings window |
-| `src/lib/en.js` | English translations |
+| `src-tauri/src/notch.rs` | Posición, AppBar, click-through, hover y pantalla completa |
+| `src-tauri/src/dropzone.rs` | Destino nativo para arrastrar archivos al notch |
+| `src-tauri/src/quick.rs` | Interruptores del Panel |
+| `src-tauri/src/settings.rs` | Ajustes tipados, validación y guardado atómico |
+| `src/App.jsx` | El notch (forma, pestañas, animación) |
+| `src/components/SettingsWindow.jsx` | La ventana de Ajustes |
+| `src/lib/en.js` | Traducciones al inglés |
 
-## Contributing
+</details>
 
-Bug reports and ideas are very welcome — see [CONTRIBUTING.md](CONTRIBUTING.md).
+## 🤝 Contribuir
 
-## Credits
+Los reportes de errores y las ideas son muy bienvenidos: abre un [issue](../../issues/new/choose) o lee [CONTRIBUTING.md](CONTRIBUTING.md).
 
-- Made by **[Cristhian Bustamante](https://www.instagram.com/cristhian.billy/)** with the help of AI (Claude Code).
-- Inspired by the notch of Mac laptops and by desktop “notch” apps — that idea encouraged me to make my own version.
-- Built on open-source software; see [THIRD-PARTY-NOTICES.md](THIRD-PARTY-NOTICES.md).
+## 💛 Apoya el proyecto
 
-## Support
+Noki es gratis. Si te gusta, puedes **[invitarme un café en Ko-fi](https://ko-fi.com/cristhianbillybustamante)** ☕ o simplemente seguirme:
 
-Noki is free. If you like it, you can [buy me a coffee on Ko-fi](https://ko-fi.com/cristhianbillybustamante) ☕ —
-or just follow along: [Instagram](https://www.instagram.com/cristhian.billy/) ·
-[Facebook](https://www.facebook.com/cristhian.bustamanteespinoza/) · [X](https://x.com/Cristhian_0702)
+[Instagram](https://www.instagram.com/cristhian.billy/) · [Facebook](https://www.facebook.com/cristhian.bustamanteespinoza/) · [X](https://x.com/Cristhian_0702)
 
-## License
+## 🙏 Créditos
 
-Copyright © 2026 Cristhian Bustamante.
+- Hecho por **Cristhian Bustamante** con ayuda de IA ([Claude Code](https://claude.com/claude-code)).
+- Inspirado en el notch de las laptops Mac y en las apps de «notch» para escritorio: gracias a esa idea me animé a hacer mi propia versión.
+- Construido sobre software de código abierto, mira [THIRD-PARTY-NOTICES.md](THIRD-PARTY-NOTICES.md).
 
-Noki is free software: you can redistribute it and/or modify it under the terms of the
-[GNU General Public License v3.0 or later](LICENSE). It comes with **no warranty**.
+## 📄 Licencia
+
+Copyright © 2026 Cristhian Bustamante. Noki es software libre: puedes redistribuirlo y modificarlo bajo los términos de la [Licencia Pública General de GNU v3.0 o posterior](LICENSE). Se ofrece **sin garantía**.
+
+<div align="center">
+<br />
+<sub>Hecho con ☕ y mucho cariño · Si Noki te sirve, ¡regálale una ⭐ al repositorio!</sub>
+</div>
