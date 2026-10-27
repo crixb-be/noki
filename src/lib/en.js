@@ -3,6 +3,13 @@
  * y, si hay traducción, se sustituye (ver i18n.js). Lo que no esté aquí se queda en español.
  */
 export const EN = {
+  // icono de Noki
+  "Icono de Noki": "Noki icon",
+  "Cambia el icono de la bandeja y de Ajustes. El del instalador y el de los accesos directos lo fija Windows al instalar y no cambia.": "Changes the tray and Settings icon. The installer and shortcut icons are set by Windows at install time and don't change.",
+  "Océano": "Ocean",
+  "Atardecer": "Sunset",
+  "Atardecer pastel": "Pastel sunset",
+  "Aurora pastel": "Pastel aurora",
   // pestañas y secciones
   "Panel": "Panel",
   "Música": "Music",

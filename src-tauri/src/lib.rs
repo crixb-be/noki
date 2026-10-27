@@ -1,3 +1,4 @@
+mod appicon;
 mod ai;
 mod backgrounds;
 mod calendar;
@@ -69,6 +70,9 @@ fn commit_settings(app: &AppHandle, mut new: Settings) -> Result<Option<String>,
     }
     if let Some(item) = app.try_state::<TrayDnd>() {
         let _ = item.0.set_checked(new.general.dnd);
+    }
+    if new.appearance.app_icon != prev.appearance.app_icon {
+        appicon::apply(app, &new.appearance.app_icon);
     }
     let _ = app.emit("settings-changed", &new.masked());
     Ok(warning)
@@ -226,7 +230,12 @@ fn show_settings(app: &AppHandle, section: Option<String>) -> Result<(), String>
         .center()
         .theme(Some(Theme::Dark))
         .build()
-        .map(|_| ())
+        .map(|w| {
+            let id = app.state::<NotchState>().settings.lock().unwrap().appearance.app_icon.clone();
+            if let Some(img) = appicon::image(&id) {
+                let _ = w.set_icon(img);
+            }
+        })
         .map_err(|e| e.to_string())
 }
 
@@ -520,8 +529,9 @@ fn build_tray(app: &AppHandle) -> tauri::Result<()> {
                 open_settings_async(tray.app_handle(), None);
             }
         });
-    if let Some(icon) = app.default_window_icon() {
-        builder = builder.icon(icon.clone());
+    let chosen = app.try_state::<NotchState>().map(|st| st.settings.lock().unwrap().appearance.app_icon.clone());
+    if let Some(icon) = chosen.as_deref().and_then(appicon::image).or_else(|| app.default_window_icon().cloned()) {
+        builder = builder.icon(icon);
     }
     builder.build(app)?;
     Ok(())

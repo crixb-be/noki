@@ -81,6 +81,8 @@ pub struct Appearance {
     pub bar_image: String,
     pub bar_dim: i32,
     pub bar_opacity: i32,
+    /// Icono de Noki (bandeja y ventana de Ajustes): "oceano" (oficial), "atardecer", "aurora", "pastel-atardecer" o "pastel-aurora".
+    pub app_icon: String,
 }
 
 impl Default for Appearance {
@@ -110,6 +112,7 @@ impl Default for Appearance {
             bar_image: String::new(),
             bar_dim: 35,
             bar_opacity: 100,
+            app_icon: crate::appicon::DEFAULT.into(),
         }
     }
 }
@@ -428,6 +431,9 @@ impl Settings {
         a.opacity = a.opacity.clamp(30, 100);
         a.notch_dim = a.notch_dim.clamp(0, 85);
         a.bar_dim = a.bar_dim.clamp(0, 85);
+        if !crate::appicon::valid(&a.app_icon) {
+            a.app_icon = crate::appicon::DEFAULT.into();
+        }
         a.bar_opacity = a.bar_opacity.clamp(0, 100);
         for c in [&mut a.notch_color, &mut a.bar_color] {
             if !crate::backgrounds::valid_color(c) {

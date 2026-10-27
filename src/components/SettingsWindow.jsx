@@ -7,6 +7,7 @@ import { useSettings } from "../hooks/useSettings.js";
 import { useBgImage } from "../lib/background.js";
 import { presetLanguage, useLanguage } from "../lib/i18n.js";
 import NokiLogo from "./NokiLogo.jsx";
+import { APP_ICONS } from "../lib/icons.js";
 
 /** Datos del desarrollador (apartado «Desarrollador»). */
 const DEV = {
@@ -227,11 +228,39 @@ function ImagePicker({ name, onChange }) {
   );
 }
 
+/** Elegir el icono de Noki (bandeja y ventana de Ajustes). */
+function IconPicker({ value, onChange }) {
+  return (
+    <div className="border-b border-white/5 pb-4 pt-3.5">
+      <div className="text-sm">Icono de Noki</div>
+      <div className="mt-0.5 text-xs leading-snug text-white/40">
+        Cambia el icono de la bandeja y de Ajustes. El del instalador y el de los accesos directos lo fija Windows al instalar y no cambia.
+      </div>
+      <div className="mt-3 flex flex-wrap gap-3">
+        {APP_ICONS.map((i) => (
+          <button
+            key={i.id}
+            onClick={() => onChange(i.id)}
+            aria-pressed={value === i.id}
+            className={`flex w-24 flex-col items-center gap-1.5 rounded-2xl p-2.5 text-xs transition-all duration-200 ${
+              value === i.id ? "bg-white/15 ring-2 ring-white/60" : "bg-white/5 hover:bg-white/10"
+            }`}
+          >
+            <NokiLogo size={52} variant={i.id} />
+            <span className="text-center leading-tight text-white/75">{i.name}</span>
+          </button>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 function Appearance({ s, set }) {
   const a = s.appearance;
   const ap = (patch) => set({ appearance: patch });
   return (
     <Page title="Apariencia" subtitle="Tamaño, posición y transparencia. Los cambios se ven al instante en el notch.">
+      <IconPicker value={a.appIcon} onChange={(v) => ap({ appIcon: v })} />
       <Row title="Ancho (compacto)">
         <Slider value={a.collapsedW} min={120} max={600} step={2} unit=" px" onChange={(v) => ap({ collapsedW: v })} />
       </Row>
@@ -996,11 +1025,11 @@ function SocialButton({ id, label, url }) {
   );
 }
 
-function Developer() {
+function Developer({ icon }) {
   return (
     <Page title="Desarrollador" subtitle="La persona detrás de Noki.">
       <div className="mt-2 flex items-center gap-5 rounded-2xl bg-white/5 p-5">
-        <NokiLogo size={72} />
+        <NokiLogo size={72} variant={icon} />
         <div className="min-w-0">
           <div className="text-lg font-semibold">{DEV.name}</div>
           <div className="mt-0.5 text-sm text-white/55">Creador de Noki</div>
@@ -1062,7 +1091,7 @@ export default function SettingsWindow() {
     <div className="flex h-full select-none">
       <aside className="flex w-52 shrink-0 flex-col gap-0.5 overflow-y-auto border-r border-white/5 bg-zinc-950 p-3">
         <div className="mb-2 flex items-center gap-2.5 px-3 pt-1 text-sm font-semibold tracking-wide text-white/80">
-          <NokiLogo size={26} />
+          <NokiLogo size={26} variant={settings.appearance.appIcon} />
           Noki
         </div>
         {SECTIONS.map((x) => (
@@ -1089,7 +1118,7 @@ export default function SettingsWindow() {
         {section === "calendar" && <CalendarSettings s={settings} set={update} />}
         {section === "weather" && <WeatherSettings s={settings} set={update} />}
         {section === "ai" && <Ai s={settings} set={update} />}
-        {section === "developer" && <Developer />}
+        {section === "developer" && <Developer icon={settings.appearance.appIcon} />}
         {section === "about" && <About reset={reset} s={settings} set={update} />}
         {warning && section !== "shortcuts" && (
           <div className="mt-4 rounded-lg bg-amber-500/10 p-3 text-sm text-amber-300">{warning}</div>
