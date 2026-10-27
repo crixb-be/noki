@@ -28,7 +28,7 @@ if (-not (Test-Path $exe) -or -not (Test-Path $sig)) {
 
 $out = "publicar"
 New-Item -ItemType Directory -Force $out | Out-Null
-$name = "Mi-Notch_${version}_x64-setup.exe"
+$name = "Noki_${version}_x64-setup.exe"
 Copy-Item $exe (Join-Path $out $name) -Force   # copia idéntica: la firma sigue siendo válida
 
 $base = $BaseUrl.TrimEnd('/')
