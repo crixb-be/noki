@@ -34,7 +34,7 @@ Es **gratis, de código abierto y funciona por completo en tu PC**: sin cuentas,
 
 ## ✨ ¿Por qué Noki?
 
-| | |
+| Ventaja | Qué significa |
 |---|---|
 | 🎯 **Todo a un gesto** | Un solo lugar para música, tareas, calendario, clima, archivos, traductor y más, sin abrir diez ventanas |
 | 🪟 **Convive con tus ventanas** | Se registra como una barra de Windows: las demás ventanas trabajan por debajo y se oculta solo en pantalla completa |

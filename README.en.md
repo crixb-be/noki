@@ -34,7 +34,7 @@ It is **free, open source and runs fully on your PC**: no accounts, no telemetry
 
 ## ✨ Why Noki?
 
-| | |
+| Advantage | What it means |
 |---|---|
 | 🎯 **Everything one gesture away** | One place for music, tasks, calendar, weather, files, translator and more — without opening ten windows |
 | 🪟 **Plays nicely with your windows** | It registers like a Windows bar: other windows work below it, and it hides by itself in full screen |
