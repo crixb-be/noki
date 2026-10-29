@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { listen } from "@tauri-apps/api/event";
-import { getCurrentWindow } from "@tauri-apps/api/window";
+import { LABEL } from "../hooks/useNotchOpen.js";
+import { useTauriEvent } from "../hooks/useTauriEvent.js";
 
 /**
  * La carita de Noki dentro del notch. Parpadea, sigue el cursor con la mirada y reacciona:
@@ -9,27 +9,12 @@ import { getCurrentWindow } from "@tauri-apps/api/window";
  * Está dibujada en código (sin imágenes) para seguir el color y el tamaño del notch.
  */
 
-const LABEL = getCurrentWindow().label;
-
 const STROKE = { fill: "none", stroke: "#FFFFFF", strokeLinecap: "round", strokeLinejoin: "round" };
 
 /** Hacia dónde mira: x e y entre -1 y 1 (el centro del notch es 0, 0). Rust avisa de la posición del cursor. */
 export function useLook(enabled) {
   const [look, setLook] = useState({ x: 0, y: 0 });
-  useEffect(() => {
-    if (!enabled) return;
-    let unlisten;
-    let cancelled = false;
-    listen("mascot-cursor", (e) => {
-      const p = e.payload;
-      if (p.label !== LABEL) return;
-      setLook(p.near ? { x: p.x, y: p.y } : { x: 0, y: 0 });
-    }).then((fn) => (cancelled ? fn() : (unlisten = fn)));
-    return () => {
-      cancelled = true;
-      unlisten?.();
-    };
-  }, [enabled]);
+  useTauriEvent("mascot-cursor", (p) => p.label === LABEL && setLook(p.near ? { x: p.x, y: p.y } : { x: 0, y: 0 }), enabled);
   return look;
 }
 

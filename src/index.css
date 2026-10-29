@@ -69,3 +69,12 @@ html, body, #root {
 @media (prefers-reduced-motion: reduce) {
   .mascot, .mascot-body, .mascot-blink, .mascot-z { animation: none !important; }
 }
+
+/* Animaciones del notch: quien prefiera menos movimiento las ve sin transición. */
+@media (prefers-reduced-motion: reduce) {
+  [data-view="notch"] *, [data-view="notch"] *::before, [data-view="notch"] *::after {
+    animation-duration: 1ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 1ms !important;
+  }
+}
