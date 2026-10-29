@@ -21,7 +21,7 @@ import { useAiChat } from "./hooks/useAiChat.js";
 import { EMPTY_HABITS, countOn, useHabits } from "./hooks/useHabits.js";
 import { fillFor, rgba, useBgImage } from "./lib/background.js";
 import { weatherInfo } from "./lib/wmo.js";
-import { resolveSkin } from "./lib/skins.js";
+import { THEMES, resolveTheme } from "./lib/themes.js";
 import { presetLanguage, useLanguage } from "./lib/i18n.js";
 
 // Misma curva y duración para ancho y alto: el notch se abre y cierra como una sola pieza.
@@ -181,13 +181,17 @@ function Notch({ settings, update }) {
   const weatherNow = weather.data?.current ? weatherInfo(weather.data.current.weather_code, weather.data.current.is_day) : null;
   const [tint, setTint] = useState(null); // color bajo la franja en modo automático (lo mide Rust)
   useTauriEvent("bar-tint", (p) => p.label === LABEL && setTint(p.color), ap.barMode === "auto" || ap.notchAuto);
-  const notchImg = useBgImage(ap.notchAuto ? "" : ap.notchImage);
+  // Tema de temporada: pinta el notch y la franja sin tocar los colores que guardaste en Ajustes.
+  const themeId = resolveTheme(ap.theme, ap.birthday);
+  const theme = ap.themeColors ? THEMES[themeId] : null;
+  const notchImg = useBgImage(ap.notchAuto || theme ? "" : ap.notchImage);
   const barImg = useBgImage(ap.barMode === "image" ? ap.barImage : "");
-  const notchColor = ap.notchAuto ? tint ?? ap.notchColor : ap.notchColor;
+  const notchColor = theme ? theme.notch : ap.notchAuto ? tint ?? ap.notchColor : ap.notchColor;
   const bg = rgba(notchColor, ap.opacity); // color plano: también lo usan las «orejas»
   const notchFill = fillFor({ color: notchColor, opacity: ap.opacity, image: notchImg, dim: ap.notchDim });
-  const barFill =
-    ap.barMode === "none"
+  const barFill = theme
+    ? rgba(theme.bar, Math.max(ap.barOpacity, 85))
+    : ap.barMode === "none"
       ? null
       : ap.barMode === "match"
         ? bg
@@ -210,7 +214,7 @@ function Notch({ settings, update }) {
     unpinTimer.current = setTimeout(() => invoke("set_pinned", { pinned: false }).catch(() => {}), 700);
   };
 
-  const mascotState = { mood, look, poke, skin: resolveSkin(ap.mascotSkin, ap.birthday) };
+  const mascotState = { mood, look, poke, skin: ap.themeMascot ? themeId : "none" };
   const habitStats = { done: habitsDone, total: activeHabits.length };
 
   return (

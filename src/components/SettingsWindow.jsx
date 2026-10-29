@@ -7,7 +7,7 @@ import { useSettings } from "../hooks/useSettings.js";
 import { useBgImage } from "../lib/background.js";
 import { presetLanguage, useLanguage } from "../lib/i18n.js";
 import Mascot from "./Mascot.jsx";
-import { SKINS, resolveSkin } from "../lib/skins.js";
+import { THEMES, THEME_CHOICES, resolveTheme } from "../lib/themes.js";
 import NokiLogo from "./NokiLogo.jsx";
 import { APP_ICONS } from "../lib/icons.js";
 
@@ -266,27 +266,31 @@ function Appearance({ s, set }) {
       <Row title="Personaje en el notch" hint="Una carita que parpadea, te mira y reacciona: se alegra al terminar tareas, hábitos o un Pomodoro, baila con la música y se adormece de noche.">
         <Toggle checked={a.mascot} onChange={(v) => ap({ mascot: v })} />
       </Row>
-      {a.mascot && (
+      {(
         <>
           <div className="border-b border-white/5 pb-4 pt-3.5">
-            <div className="text-sm">Disfraz de Noki</div>
+            <div className="text-sm">Tema de temporada</div>
             <div className="mt-0.5 text-xs leading-snug text-white/40">
-              «Automático» lo viste de Halloween (24 oct–2 nov), de Navidad (1–26 dic) y de cumpleaños el día que indiques abajo.
+              «Automático» pone Halloween (24 oct–2 nov), Navidad (1–26 dic), Amor (7–14 feb) y Cumpleaños el día que indiques abajo.
             </div>
             <div className="mt-3 flex flex-wrap gap-3">
-              {SKINS.map(([id, label]) => {
-                const shown = id === "auto" ? resolveSkin("auto", a.birthday) : id;
+              {THEME_CHOICES.map(([id, label]) => {
+                const shown = id === "auto" ? resolveTheme("auto", a.birthday) : id;
+                const t = THEMES[shown];
                 return (
                   <button
                     key={id}
-                    onClick={() => ap({ mascotSkin: id })}
-                    aria-pressed={a.mascotSkin === id}
+                    onClick={() => ap({ theme: id })}
+                    aria-pressed={a.theme === id}
                     className={`flex w-24 flex-col items-center gap-1.5 rounded-2xl p-2.5 text-xs transition-all duration-200 ${
-                      a.mascotSkin === id ? "bg-white/15 ring-2 ring-white/60" : "bg-white/5 hover:bg-white/10"
+                      a.theme === id ? "bg-white/15 ring-2 ring-white/60" : "bg-white/5 hover:bg-white/10"
                     }`}
                   >
-                    <span className="flex h-12 w-full items-center justify-center rounded-xl bg-black">
-                      <Mascot size={28} skin={shown} />
+                    <span
+                      className="flex h-12 w-full items-center justify-center overflow-hidden rounded-xl border-t-4"
+                      style={{ background: a.themeColors && t ? t.notch : "#000", borderColor: a.themeColors && t ? t.bar : "transparent" }}
+                    >
+                      {a.themeMascot ? <Mascot size={26} skin={shown} /> : <Mascot size={26} />}
                     </span>
                     <span className="text-center leading-tight text-white/75">{label}</span>
                   </button>
@@ -294,7 +298,13 @@ function Appearance({ s, set }) {
               })}
             </div>
           </div>
-          <Row title="Tu cumpleaños" hint="Solo día y mes; se guarda únicamente en este equipo. Ese día Noki lleva gorro de fiesta.">
+          <Row title="Vestir al personaje" hint="Gorro de bruja, de Papá Noel, de fiesta o ojitos de corazón.">
+            <Toggle checked={a.themeMascot} onChange={(v) => ap({ themeMascot: v })} />
+          </Row>
+          <Row title="Colores del notch y los costados" hint="Pinta el notch y la franja lateral con los colores del tema. Tus colores e imagen guardados no se pierden: al desactivarlo vuelven.">
+            <Toggle checked={a.themeColors} onChange={(v) => ap({ themeColors: v })} />
+          </Row>
+          <Row title="Tu cumpleaños" hint="Solo día y mes; se guarda únicamente en este equipo. Ese día se activa el tema de cumpleaños.">
             <div className="flex items-center gap-2">
               <input
                 type="date"

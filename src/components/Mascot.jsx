@@ -91,9 +91,21 @@ export function useMascotMood({ enabled, doneTasks, habitsDone, pomoAlert, playi
   return { mood, poke };
 }
 
-function Eyes({ mood, look }) {
+function Eyes({ mood, look, skin }) {
   const ox = look.x * 3.4;
   const oy = look.y * 2.6;
+  const Heart = ({ cx }) => {
+    const x = cx + ox;
+    const y = 17 + oy;
+    return (
+      <g className="mascot-blink">
+        <path
+          d={`M${x} ${y + 7} C${x - 9} ${y + 1} ${x - 6} ${y - 6} ${x - 3} ${y - 5.4} C${x - 1.4} ${y - 5} ${x} ${y - 3.6} ${x} ${y - 2.6} C${x} ${y - 3.6} ${x + 1.4} ${y - 5} ${x + 3} ${y - 5.4} C${x + 6} ${y - 6} ${x + 9} ${y + 1} ${x} ${y + 7}Z`}
+          fill="#FB7185"
+        />
+      </g>
+    );
+  };
   const Dot = ({ cx }) => (
     <g className="mascot-blink">
       <ellipse cx={cx + ox} cy={17 + oy} rx="5.2" ry="6.4" fill="#FFFFFF" />
@@ -137,6 +149,13 @@ function Eyes({ mood, look }) {
         </g>
       );
     default:
+      if (skin === "love")
+        return (
+          <>
+            <Heart cx={20} />
+            <Heart cx={44} />
+          </>
+        );
       return (
         <>
           <Dot cx={20} />
@@ -186,6 +205,16 @@ function Costume({ skin }) {
           <rect x="31.6" y="11.6" width="3.2" height="3.4" rx="0.6" fill="none" stroke="#FDE68A" strokeWidth="1" />
         </g>
       );
+    case "love":
+      return (
+        <g>
+          <path d="M32 15 C22 8.5 25 0.8 29.6 2.4 C31 2.9 32 4.2 32 5.4 C32 4.2 33 2.9 34.4 2.4 C39 0.8 42 8.5 32 15Z" fill="#FB7185" />
+          <g className="mascot-confetti" fill="#F9A8D4">
+            <path d="M13 12 C9.5 9.5 10.6 6.6 12.3 7.2 C12.8 7.4 13 7.9 13 8.3 C13 7.9 13.2 7.4 13.7 7.2 C15.4 6.6 16.5 9.5 13 12Z" />
+            <path d="M52 15 C49.5 13.2 50.3 11.1 51.5 11.5 C51.9 11.7 52 12 52 12.3 C52 12 52.2 11.7 52.6 11.5 C53.8 11.1 54.5 13.2 52 15Z" />
+          </g>
+        </g>
+      );
     case "birthday":
       return (
         <g>
@@ -219,7 +248,7 @@ export default function Mascot({ size = 22, mood = "idle", look = { x: 0, y: 0 }
       <svg viewBox="0 0 64 40" width={size * 1.6} height={size} overflow="visible">
         <g className="mascot-body">
           <g transform={dressed ? "translate(6.4 9.6) scale(0.8)" : undefined}>
-            <Eyes mood={mood} look={look} />
+            <Eyes mood={mood} look={look} skin={skin} />
             <Mouth mood={mood} />
           </g>
           {dressed && <Costume skin={skin} />}

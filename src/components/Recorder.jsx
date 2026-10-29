@@ -85,7 +85,10 @@ const shape = (id, n) => {
 
 let playing = null; // una sola grabación suena a la vez
 
-function Item({ rec, open, onToggle }) {
+const pill = "rounded-full bg-white/10 px-3 py-1 text-[11px] transition-all duration-200 hover:bg-white/20 active:scale-95 disabled:opacity-50";
+
+/** Panel derecho: reproductor, nombre, transcripción completa y acciones de una grabación. */
+function Detail({ rec, onDeleted }) {
   const audio = useRef(null);
   const [isPlaying, setIsPlaying] = useState(false);
   const [progress, setProgress] = useState(0);
@@ -93,7 +96,7 @@ function Item({ rec, open, onToggle }) {
   const [error, setError] = useState(null);
   const [confirm, setConfirm] = useState(false);
   const [name, setName] = useState(rec.name);
-  const bars = useMemo(() => shape(rec.id, 48), [rec.id]);
+  const bars = useMemo(() => shape(rec.id, 56), [rec.id]);
 
   useEffect(
     () => () => {
@@ -149,13 +152,26 @@ function Item({ rec, open, onToggle }) {
     setBusy(null);
   };
   const rename = () => name.trim() && name.trim() !== rec.name && getRecording(rec.id).then((r) => saveRecording({ ...r, name: name.trim() }));
-  const remove = () => (confirm ? deleteRecording(rec.id) : (setConfirm(true), setTimeout(() => setConfirm(false), 2500)));
-
-  const pill = "rounded-full bg-white/10 px-3 py-1 text-[11px] transition-all duration-200 hover:bg-white/20 active:scale-95 disabled:opacity-50";
+  const remove = () => {
+    if (!confirm) {
+      setConfirm(true);
+      setTimeout(() => setConfirm(false), 2500);
+      return;
+    }
+    deleteRecording(rec.id).then(onDeleted);
+  };
 
   return (
-    <li className={`overflow-hidden rounded-2xl ring-1 transition-colors duration-300 ${open ? "bg-white/[0.09] ring-white/15" : "bg-white/[0.05] ring-white/[0.06] hover:bg-white/[0.08]"}`}>
-      <div className="flex items-center gap-3 px-3 py-2">
+    <div className="flex h-full min-h-0 flex-col gap-2">
+      <input
+        value={name}
+        onChange={(e) => setName(e.target.value)}
+        onBlur={rename}
+        onKeyDown={(e) => e.key === "Enter" && e.currentTarget.blur()}
+        aria-label="Nombre"
+        className="w-full shrink-0 truncate rounded-xl bg-transparent px-1 text-sm font-medium outline-none ring-1 ring-transparent transition focus:bg-white/10 focus:ring-white/20"
+      />
+      <div className="flex shrink-0 items-center gap-3 rounded-2xl bg-black/20 px-3 py-2">
         <button
           onClick={toggle}
           aria-label={isPlaying ? "Pausar" : "Reproducir"}
@@ -163,118 +179,117 @@ function Item({ rec, open, onToggle }) {
         >
           {isPlaying ? "❚❚" : <span className="ml-0.5">▶</span>}
         </button>
-        <div className="min-w-0 flex-1">
-          <div className="flex items-center gap-2">
-            <span className="min-w-0 flex-1 truncate text-xs font-medium">{rec.name}</span>
-            {rec.transcript && <span className="shrink-0 rounded-full bg-emerald-400/15 px-1.5 py-px text-[9px] font-medium text-emerald-300">Transcrita</span>}
-          </div>
-          <div className="mt-1 flex items-center gap-2">
-            <div onClick={seek} className="flex h-5 min-w-0 flex-1 cursor-pointer items-center gap-[2px]" role="slider" aria-label="Posición" aria-valuenow={Math.round(progress * 100)}>
-              {bars.map((b, i) => (
-                <span
-                  key={i}
-                  className={`max-w-[4px] min-w-0 flex-1 rounded-full transition-colors duration-150 ${i / bars.length < progress ? "bg-rose-300" : "bg-white/20"}`}
-                  style={{ height: `${b * 100}%` }}
-                />
-              ))}
-            </div>
-            <span className="w-8 shrink-0 text-right text-[10px] tabular-nums text-white/50">{fmtDur(isPlaying || progress ? progress * rec.duration : rec.duration)}</span>
-          </div>
+        <div onClick={seek} className="flex h-6 min-w-0 flex-1 cursor-pointer items-center gap-[2px]" role="slider" aria-label="Posición" aria-valuenow={Math.round(progress * 100)}>
+          {bars.map((b, i) => (
+            <span key={i} className={`min-w-0 max-w-[4px] flex-1 rounded-full transition-colors duration-150 ${i / bars.length < progress ? "bg-rose-300" : "bg-white/20"}`} style={{ height: `${b * 100}%` }} />
+          ))}
         </div>
-        <div className="flex shrink-0 flex-col items-end gap-1">
-          <span className="text-[10px] text-white/35">{new Date(rec.created).toLocaleDateString(locale(), { day: "numeric", month: "short" })}</span>
-          <button onClick={onToggle} aria-label="Detalles" className={`text-[10px] text-white/40 transition-transform duration-300 hover:text-white ${open ? "rotate-180" : ""}`}>▼</button>
-        </div>
+        <span className="shrink-0 text-[10px] tabular-nums text-white/50">
+          {fmtDur(isPlaying || progress ? progress * rec.duration : 0)} / {fmtDur(rec.duration)}
+        </span>
       </div>
-      {open && (
-        <div className="flex animate-[tabIn_220ms_ease-out_both] flex-col gap-2 border-t border-white/5 px-3 pb-3 pt-2">
-          <div className="flex items-center gap-1.5">
-            <input
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-              onBlur={rename}
-              onKeyDown={(e) => e.key === "Enter" && e.currentTarget.blur()}
-              aria-label="Nombre"
-              className="min-w-0 flex-1 rounded-full bg-black/25 px-3 py-1 text-[11px] outline-none ring-1 ring-white/10 focus:ring-white/30"
-            />
-            <button onClick={run} disabled={busy !== null} className={`${pill} shrink-0`}>
-              {busy === null ? (rec.transcript ? "↻ Transcribir de nuevo" : "✨ Transcribir") : busy === "work" ? "Transcribiendo…" : `${isEn() ? "Downloading model" : "Descargando modelo"} ${busy}%`}
-            </button>
-            <button onClick={remove} className={`${pill} shrink-0 ${confirm ? "!bg-red-500/30 text-red-300" : ""}`} aria-label="Borrar">
-              {confirm ? "¿Seguro?" : "🗑"}
-            </button>
-          </div>
-          {typeof busy === "number" && <div className="h-1 overflow-hidden rounded-full bg-white/10"><div className="h-full rounded-full bg-gradient-to-r from-rose-400 to-fuchsia-500 transition-all" style={{ width: `${busy}%` }} /></div>}
-          {busy === 0 && <div className="text-[10px] text-white/35">La primera vez se descarga el modelo (~40 MB); después funciona sin internet.</div>}
-          {error && <div className="text-[10px] text-amber-300">{error}</div>}
-          {rec.transcript && (
-            <div className="relative">
-              <p className="max-h-24 select-text overflow-y-auto rounded-xl bg-black/25 p-2.5 pr-9 text-[11px] leading-relaxed text-white/85">{rec.transcript}</p>
-              <button onClick={() => navigator.clipboard.writeText(rec.transcript)} title="Copiar" aria-label="Copiar" className="absolute right-1.5 top-1.5 rounded-full bg-white/10 px-1.5 text-[11px] hover:bg-white/20">
-                ⧉
-              </button>
-            </div>
-          )}
+      <div className="flex shrink-0 items-center gap-1.5">
+        <button onClick={run} disabled={busy !== null} className={pill}>
+          {busy === null ? (rec.transcript ? "↻ Transcribir de nuevo" : "✨ Transcribir") : busy === "work" ? "Transcribiendo…" : `${isEn() ? "Downloading model" : "Descargando modelo"} ${busy}%`}
+        </button>
+        {rec.transcript && (
+          <button onClick={() => navigator.clipboard.writeText(rec.transcript)} className={pill}>
+            ⧉ Copiar
+          </button>
+        )}
+        <button onClick={remove} className={`${pill} ml-auto ${confirm ? "!bg-red-500/30 text-red-300" : ""}`}>
+          {confirm ? "¿Seguro?" : "🗑 Borrar"}
+        </button>
+      </div>
+      {typeof busy === "number" && (
+        <div className="h-1 shrink-0 overflow-hidden rounded-full bg-white/10">
+          <div className="h-full rounded-full bg-gradient-to-r from-rose-400 to-fuchsia-500 transition-all" style={{ width: `${busy}%` }} />
         </div>
       )}
-    </li>
+      {busy === 0 && <div className="shrink-0 text-[10px] text-white/35">La primera vez se descarga el modelo (~40 MB); después funciona sin internet.</div>}
+      {error && <div className="shrink-0 text-[10px] text-amber-300">{error}</div>}
+      <div className="min-h-0 flex-1 select-text overflow-y-auto whitespace-pre-wrap rounded-2xl bg-white/5 p-3 text-xs leading-relaxed text-white/85">
+        {rec.transcript ?? <span className="text-white/30">Aún sin transcribir. Pulsa «Transcribir» para convertir el audio en texto, en tu equipo.</span>}
+      </div>
+    </div>
   );
 }
 
-/** Grabadora: graba la voz, guarda los audios en el equipo y, si quieres, los transcribe en local (Whisper). */
+/** Mientras se graba: cronómetro grande y onda en vivo. */
+function Live({ secs, levels }) {
+  return (
+    <div className="flex h-full flex-col items-center justify-center gap-4">
+      <span className="text-4xl font-semibold tabular-nums text-rose-200">{fmtDur(secs)}</span>
+      <div className="flex h-12 w-full items-center justify-center gap-[3px]" aria-hidden="true">
+        {levels.map((l, i) => (
+          <span key={i} className="w-[4px] shrink-0 rounded-full bg-rose-300 transition-[height] duration-100" style={{ height: `${Math.max(10, l * 100)}%`, opacity: 0.35 + (i / levels.length) * 0.65 }} />
+        ))}
+      </div>
+      <span className="text-[11px] text-white/40">Grabando… pulsa Detener para guardar</span>
+    </div>
+  );
+}
+
+/** Grabadora: lista de audios a la izquierda y, al tocar uno, su reproductor y texto a la derecha (como en Notas). */
 export default function Recorder() {
   const items = useRecordings();
-  const [openId, setOpenId] = useState(null);
+  const [selected, setSelected] = useState(null);
   const { state, secs, levels, error, start, stop } = useRecorder(async ({ blob, duration }) => {
     const created = Date.now();
     const name = `${isEn() ? "Recording" : "Grabación"} ${new Date(created).toLocaleString(locale(), { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" })}`;
     await saveRecording({ id: created, name, created, duration, blob, transcript: null });
-    setOpenId(created);
+    setSelected(created);
   });
   const recording = state === "recording";
-  const total = items.reduce((t, r) => t + r.duration, 0);
+  const current = items.find((r) => r.id === selected) ?? null;
 
   return (
-    <div className="flex h-full flex-col gap-2">
-      <div className={`flex shrink-0 items-center gap-3 rounded-3xl px-3 py-2.5 ring-1 transition-colors duration-500 ${recording ? "bg-gradient-to-r from-rose-500/25 to-fuchsia-500/15 ring-rose-400/30" : "bg-white/[0.06] ring-white/[0.06]"}`}>
+    <div className="flex h-full gap-2 rounded-3xl bg-white/5 p-3">
+      <div className="flex w-40 shrink-0 flex-col gap-1">
         <button
           onClick={recording ? stop : start}
-          aria-label={recording ? "Detener" : "Grabar"}
-          className="relative flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-rose-400 to-rose-600 shadow-lg shadow-rose-500/30 transition-transform duration-200 hover:scale-105 active:scale-90"
+          className={`flex items-center justify-center gap-2 rounded-full py-1.5 text-xs font-medium text-white transition-all duration-300 active:scale-95 ${
+            recording ? "bg-rose-500" : "bg-gradient-to-r from-rose-500 to-fuchsia-500 hover:brightness-110"
+          }`}
         >
-          {recording && <span className="absolute inset-0 animate-ping rounded-full bg-rose-400/50" />}
-          <span className={`relative bg-white transition-all duration-300 ${recording ? "h-3.5 w-3.5 rounded-[3px]" : "h-3.5 w-3.5 rounded-full"}`} />
+          <span className={`relative h-2.5 w-2.5 bg-white ${recording ? "rounded-[2px]" : "rounded-full"}`}>
+            {recording && <span className="absolute inset-0 animate-ping rounded-full bg-white/70" />}
+          </span>
+          {recording ? `${isEn() ? "Stop" : "Detener"} · ${fmtDur(secs)}` : "Grabar"}
         </button>
+        {error && <div className="rounded-xl bg-amber-500/10 px-2 py-1 text-[10px] leading-snug text-amber-300">{error}</div>}
+        <ul className="flex min-h-0 flex-1 flex-col gap-0.5 overflow-y-auto pr-1">
+          {items.length === 0 && <li className="py-4 text-center text-[11px] text-white/30">Sin grabaciones</li>}
+          {items.map((r) => (
+            <li key={r.id}>
+              <button
+                onClick={() => setSelected(r.id)}
+                className={`flex w-full items-center gap-2 rounded-xl px-2 py-1 text-left transition-colors ${r.id === selected && !recording ? "bg-white/15" : "text-white/60 hover:bg-white/5"}`}
+              >
+                <span className="shrink-0 text-sm">{r.transcript ? "📝" : "🎙"}</span>
+                <span className="min-w-0 flex-1">
+                  <span className="block truncate text-xs">{r.name}</span>
+                  <span className="block text-[10px] tabular-nums text-white/35">
+                    {new Date(r.created).toLocaleDateString(locale(), { day: "numeric", month: "short" })} · {fmtDur(r.duration)}
+                  </span>
+                </span>
+              </button>
+            </li>
+          ))}
+        </ul>
+      </div>
+      <div className="min-w-0 flex-1">
         {recording ? (
-          <>
-            <span className="w-12 shrink-0 text-lg font-semibold tabular-nums text-rose-200">{fmtDur(secs)}</span>
-            <div className="flex h-8 min-w-0 flex-1 items-center justify-end gap-[3px]" aria-hidden="true">
-              {levels.map((l, i) => (
-                <span key={i} className="w-[3px] shrink-0 rounded-full bg-rose-300 transition-[height] duration-100" style={{ height: `${Math.max(12, l * 100)}%`, opacity: 0.35 + (i / levels.length) * 0.65 }} />
-              ))}
-            </div>
-          </>
+          <Live secs={secs} levels={levels} />
+        ) : current ? (
+          <Detail key={current.id} rec={current} onDeleted={() => setSelected(null)} />
         ) : (
-          <div className="min-w-0 flex-1">
-            <div className="text-xs font-medium">Grabar un audio</div>
-            <div className="truncate text-[10px] text-white/40">
-              {items.length ? `${items.length} ${isEn() ? (items.length === 1 ? "recording" : "recordings") : items.length === 1 ? "grabación" : "grabaciones"} · ${fmtDur(total)} · ` : ""}Tus audios se guardan solo en este equipo.
-            </div>
+          <div className="flex h-full flex-col items-center justify-center gap-1 text-white/30">
+            <span className="text-2xl opacity-60">🎙</span>
+            <span className="text-xs">{items.length ? "Elige una grabación" : "Pulsa Grabar para empezar"}</span>
           </div>
         )}
       </div>
-      {error && <div className="shrink-0 rounded-xl bg-amber-500/10 px-3 py-1.5 text-[10px] text-amber-300">{error}</div>}
-      <ul className="flex min-h-0 flex-1 flex-col gap-1.5 overflow-y-auto pr-1">
-        {items.length === 0 && (
-          <li className="flex flex-1 flex-col items-center justify-center gap-1 text-white/30">
-            <span className="text-2xl opacity-60">🎙</span>
-            <span className="text-[11px]">Sin grabaciones</span>
-          </li>
-        )}
-        {items.map((r) => (
-          <Item key={r.id} rec={r} open={openId === r.id} onToggle={() => setOpenId(openId === r.id ? null : r.id)} />
-        ))}
-      </ul>
     </div>
   );
 }
