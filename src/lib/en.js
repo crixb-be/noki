@@ -173,6 +173,8 @@ export const EN = {
   "Qué tan sólido es el color del tema en el notch central.": "How solid the theme color is on the center notch.",
   "Transparencia de la franja con tema": "Themed side strip transparency",
   "Qué tan sólido es el color del tema en los costados.": "How solid the theme color is on the sides.",
+  "Día": "Day",
+  "Mes": "Month",
   "Cara de Noki": "Noki's face",
   "Disfraz del personaje: gorro de bruja, de Papá Noel, de fiesta u ojitos de corazón.": "The character's costume: witch hat, Santa hat, party hat or heart eyes.",
   "Notch central": "Center notch",

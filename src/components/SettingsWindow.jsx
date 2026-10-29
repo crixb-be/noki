@@ -5,7 +5,7 @@ import { getVersion } from "@tauri-apps/api/app";
 import { open, save } from "@tauri-apps/plugin-dialog";
 import { useSettings } from "../hooks/useSettings.js";
 import { useBgImage } from "../lib/background.js";
-import { presetLanguage, useLanguage } from "../lib/i18n.js";
+import { locale, presetLanguage, useLanguage } from "../lib/i18n.js";
 import Mascot from "./Mascot.jsx";
 import { THEMES, THEME_CHOICES, resolveTheme } from "../lib/themes.js";
 import NokiLogo from "./NokiLogo.jsx";
@@ -41,14 +41,69 @@ const SECTIONS = [
 
 // ───────────── primitivas de formulario ─────────────
 
+const CARD = "mb-2.5 rounded-2xl bg-white/[0.04] ring-1 ring-white/[0.06] transition-colors duration-200 hover:bg-white/[0.06]";
+
+/** Icono de cada ajuste (se ve en un cuadrito a la izquierda del título). */
+const ROW_ICONS = {
+  "Idioma de la interfaz": "🌐", "Mostrar el notch": "👁️", "Iniciar con Windows": "🚀", "Ocultar en pantalla completa": "🖥️",
+  "Pantalla principal del notch": "🖥️", "Monitor": "🖥️", "Abrir al": "👆", "Retraso al abrir": "⏳", "Retraso al cerrar": "⌛",
+  "Personaje en el notch": "😊", "Transparencia del notch con tema": "💧", "Transparencia de la franja con tema": "💧",
+  "Mismo tema para todo": "🎭", "Tu cumpleaños": "🎂", "Ancho (compacto)": "↔️", "Alto (compacto)": "↕️",
+  "Ancho (expandido)": "↔️", "Alto (expandido)": "↕️", "Desplazamiento horizontal": "⇄", "Opacidad del fondo": "💧",
+  "Color automático": "🪄", "Color": "🎨", "Imagen": "🖼️", "Oscurecer imagen": "🌓", "Fondo de la franja": "🎨",
+  "Color de la franja": "🎨", "Imagen de la franja": "🖼️", "Opacidad de la franja": "💧", "Hora": "🕐", "Fecha": "📅",
+  "Tareas pendientes": "✅", "Hábitos de hoy": "🎯", "Temperatura": "🌡️", "Batería": "🔋", "Actividad en el centro": "🎵",
+  "Reloj de 24 horas": "🕛", "Visualizador de audio": "📊", "Letras en el reproductor": "🎤", "Pestaña al abrir": "📑",
+  "Enfoque": "🍅", "Descanso corto": "☕", "Descanso largo": "🛋️", "Ciclos hasta el descanso largo": "🔁",
+  "Empezar la siguiente fase sola": "⏭️", "Sonido en las alertas": "🔔", "Descanso de vista (20-20-20)": "👀",
+  "Levantarse y estirarse": "🧘", "Cada": "⏲️", "Elementos que se recuerdan": "📝", "Duración de cada aviso": "⏱️",
+  "Abrir / cerrar el notch": "⌨️", "Proveedor": "🤖", "API key": "🔑", "Modelo": "🧠", "Dirección del servidor": "🔗",
+  "Instrucciones del asistente": "📜", "Aviso antes de cada reunión": "⏰", "Ciudad actual": "📍", "Unidades": "📏",
+  "Buscar automáticamente": "🔄", "Versión": "🏷️", "Licencia": "📄", "Carpeta de datos": "📂", "Restablecer ajustes": "♻️",
+  "Cerrar Noki": "⏻", "Apoya el proyecto": "☕", "Código fuente": "💻",
+};
+const EMOJI_LEAD = /^((?:\p{Extended_Pictographic}|⇪)(?:️|‍\p{Extended_Pictographic})*)\s+/u;
+
+/** Separa un emoji inicial del título ("🏠 Panel") o busca el icono del ajuste. */
+function splitTitle(title) {
+  if (typeof title !== "string") return { icon: "⚙️", text: title };
+  const m = title.match(EMOJI_LEAD);
+  if (m) return { icon: m[1], text: title.slice(m[0].length) };
+  return { icon: ROW_ICONS[title] ?? "⚙️", text: title };
+}
+
+const IconTile = ({ icon, size = "h-9 w-9 text-lg" }) => (
+  <span className={`flex shrink-0 items-center justify-center rounded-xl bg-white/[0.07] ${size}`} aria-hidden="true">{icon}</span>
+);
+
 function Row({ title, hint, children }) {
+  const { icon, text } = splitTitle(title);
   return (
-    <div className="flex items-center justify-between gap-6 border-b border-white/5 py-3.5">
-      <div className="min-w-0">
-        <div className="text-sm">{title}</div>
-        {hint && <div className="mt-0.5 text-xs leading-snug text-white/40">{hint}</div>}
+    <div className={`${CARD} flex items-center justify-between gap-4 px-4 py-3`}>
+      <div className="flex min-w-0 items-center gap-3">
+        <IconTile icon={icon} />
+        <div className="min-w-0">
+          <div className="text-sm">{text}</div>
+          {hint && <div className="mt-0.5 text-xs leading-snug text-white/40">{hint}</div>}
+        </div>
       </div>
       <div className="shrink-0">{children}</div>
+    </div>
+  );
+}
+
+const SECTION_ICONS = {
+  "Fondo del notch": "🎨", "Franja a los costados del notch": "🌈", "Contenido": "🧩", "Qué se ve en el notch cerrado": "👁️",
+  "Reloj": "🕐", "Otros": "✨", "Pomodoro": "🍅", "Salud": "💚",
+};
+
+/** Cabecera de un grupo de ajustes. */
+function SectionTitle({ children }) {
+  return (
+    <div className="mb-2.5 mt-7 flex items-center gap-2 text-[13px] font-semibold tracking-wide text-white/75 first:mt-1">
+      <span className="flex h-6 w-6 items-center justify-center rounded-lg bg-white/[0.07] text-sm" aria-hidden="true">{SECTION_ICONS[children] ?? "•"}</span>
+      <span>{children}</span>
+      <span className="ml-1 h-px flex-1 bg-white/10" />
     </div>
   );
 }
@@ -111,11 +166,17 @@ const input =
 const button = "rounded-lg bg-white/10 px-3 py-1.5 text-sm transition-colors hover:bg-white/20";
 
 function Page({ title, subtitle, children }) {
+  const icon = SECTIONS.find((x) => x.label === title)?.icon;
   return (
     <div>
-      <h1 className="text-xl font-semibold">{title}</h1>
-      {subtitle && <p className="mt-1 text-sm text-white/40">{subtitle}</p>}
-      <div className="mt-4">{children}</div>
+      <div className="flex items-center gap-3">
+        {icon && <IconTile icon={icon} size="h-11 w-11 text-2xl" />}
+        <div>
+          <h1 className="text-xl font-semibold">{title}</h1>
+          {subtitle && <p className="mt-0.5 text-sm text-white/40">{subtitle}</p>}
+        </div>
+      </div>
+      <div className="mt-5">{children}</div>
     </div>
   );
 }
@@ -233,10 +294,15 @@ function ImagePicker({ name, onChange }) {
 /** Elegir el icono de Noki (bandeja y ventana de Ajustes). */
 function IconPicker({ value, onChange }) {
   return (
-    <div className="border-b border-white/5 pb-4 pt-3.5">
-      <div className="text-sm">Icono de Noki</div>
-      <div className="mt-0.5 text-xs leading-snug text-white/40">
-        Cambia el icono de la bandeja y de Ajustes. El del instalador y el de los accesos directos lo fija Windows al instalar y no cambia.
+    <div className={`${CARD} px-4 py-3`}>
+      <div className="flex items-center gap-3">
+        <IconTile icon="🖼️" />
+        <div>
+          <div className="text-sm">Icono de Noki</div>
+          <div className="mt-0.5 text-xs leading-snug text-white/40">
+            Cambia el icono de la bandeja y de Ajustes. El del instalador y el de los accesos directos lo fija Windows al instalar y no cambia.
+          </div>
+        </div>
       </div>
       <div className="mt-3 flex flex-wrap gap-3">
         {APP_ICONS.map((i) => (
@@ -260,9 +326,14 @@ function IconPicker({ value, onChange }) {
 /** Selector de tema para una parte (cara, notch o franja), con vista previa de cada opción. */
 function ThemePicker({ title, hint, value, birthday, kind, onChange }) {
   return (
-    <div className="border-b border-white/5 pb-4 pt-3.5">
-      <div className="text-sm">{title}</div>
-      <div className="mt-0.5 text-xs leading-snug text-white/40">{hint}</div>
+    <div className={`${CARD} px-4 py-3`}>
+      <div className="flex items-center gap-3">
+        <IconTile icon={{ face: "😊", notch: "🔲", bar: "➖" }[kind]} />
+        <div>
+          <div className="text-sm">{title}</div>
+          <div className="mt-0.5 text-xs leading-snug text-white/40">{hint}</div>
+        </div>
+      </div>
       <div className="mt-3 flex flex-wrap gap-3">
         {THEME_CHOICES.map(([id, label]) => {
           const shown = id === "auto" ? resolveTheme("auto", birthday) : id;
@@ -347,11 +418,15 @@ function Appearance({ s, set }) {
           </Row>
           <Row title="Tu cumpleaños" hint="Solo día y mes; se guarda únicamente en este equipo. Ese día se activa el tema de cumpleaños.">
             <div className="flex items-center gap-2">
-              <input
-                type="date"
-                value={a.birthday ? `2000-${a.birthday}` : ""}
-                onChange={(e) => ap({ birthday: e.target.value ? e.target.value.slice(5) : "" })}
-                className="rounded-lg border border-white/10 bg-zinc-900 px-3 py-1.5 text-sm outline-none focus:border-white/30 [color-scheme:dark]"
+              <Select
+                value={a.birthday ? String(Number(a.birthday.slice(3))) : ""}
+                onChange={(v) => ap({ birthday: v && a.birthday ? `${a.birthday.slice(0, 2)}-${String(v).padStart(2, "0")}` : v ? `01-${String(v).padStart(2, "0")}` : "" })}
+                options={[["", "Día"], ...Array.from({ length: 31 }, (_, i) => [String(i + 1), String(i + 1)])]}
+              />
+              <Select
+                value={a.birthday ? String(Number(a.birthday.slice(0, 2))) : ""}
+                onChange={(v) => ap({ birthday: v ? `${String(v).padStart(2, "0")}-${a.birthday ? a.birthday.slice(3) : "01"}` : "" })}
+                options={[["", "Mes"], ...Array.from({ length: 12 }, (_, i) => [String(i + 1), new Date(2000, i, 1).toLocaleDateString(locale(), { month: "long" })])]}
               />
               {a.birthday && (
                 <button onClick={() => ap({ birthday: "" })} className="text-xs text-white/40 hover:text-white/80">
@@ -380,7 +455,7 @@ function Appearance({ s, set }) {
       <Row title="Opacidad del fondo" hint="Con una imagen de fondo en el notch no se aplica; usa «Oscurecer imagen».">
         <Slider value={a.opacity} min={30} max={100} unit=" %" onChange={(v) => ap({ opacity: v })} />
       </Row>
-      <div className="mb-1 mt-5 text-xs uppercase tracking-wider text-white/35">Fondo del notch</div>
+      <SectionTitle>Fondo del notch</SectionTitle>
       <Row title="Color automático" hint="El notch toma el color del programa que tengas abierto debajo y cambia con él. Reemplaza al color y a la imagen.">
         <Toggle checked={a.notchAuto} onChange={(v) => ap({ notchAuto: v })} />
       </Row>
@@ -399,7 +474,7 @@ function Appearance({ s, set }) {
           <Slider value={a.notchDim} min={0} max={85} unit=" %" onChange={(v) => ap({ notchDim: v })} />
         </Row>
       )}
-      <div className="mb-1 mt-5 text-xs uppercase tracking-wider text-white/35">Franja a los costados del notch</div>
+      <SectionTitle>Franja a los costados del notch</SectionTitle>
       <Row title="Fondo de la franja" hint="La barra de arriba que cruza toda la pantalla (la que reserva el espacio). «Igual que el notch» la hace parecer parte de él; «Automático» toma el color del programa que tengas abierto debajo y cambia con él.">
         <Select
           value={a.barMode}
@@ -429,8 +504,7 @@ function Appearance({ s, set }) {
           <Slider value={a.barOpacity} min={0} max={100} unit=" %" onChange={(v) => ap({ barOpacity: v })} />
         </Row>
       )}
-      <div className="mb-1 mt-5 text-xs uppercase tracking-wider text-white/35">Contenido</div>
-      <div className="mb-1 mt-5 text-xs uppercase tracking-wider text-white/35">Qué se ve en el notch cerrado</div>
+      <SectionTitle>Qué se ve en el notch cerrado</SectionTitle>
       <Row title="Hora">
         <Toggle checked={a.showClock} onChange={(v) => ap({ showClock: v })} />
       </Row>
@@ -452,11 +526,11 @@ function Appearance({ s, set }) {
       <Row title="Actividad en el centro" hint="Música sonando, Pomodoro, reunión próxima o No molestar.">
         <Toggle checked={a.showActivity} onChange={(v) => ap({ showActivity: v })} />
       </Row>
-      <div className="mb-1 mt-5 text-xs uppercase tracking-wider text-white/35">Reloj</div>
+      <SectionTitle>Reloj</SectionTitle>
       <Row title="Reloj de 24 horas" hint="Apagado muestra 12 horas con a. m. / p. m.">
         <Toggle checked={a.clock24} onChange={(v) => ap({ clock24: v })} />
       </Row>
-      <div className="mb-1 mt-5 text-xs uppercase tracking-wider text-white/35">Otros</div>
+      <SectionTitle>Otros</SectionTitle>
       <Row title="Visualizador de audio" hint="Barras que reaccionan al sonido real del equipo mientras suena música. Solo se analiza el nivel por banda; no se guarda audio.">
         <Toggle checked={a.visualizer} onChange={(v) => ap({ visualizer: v })} />
       </Row>
@@ -536,7 +610,7 @@ function Productivity({ s, set }) {
   const pp = (patch) => set({ productivity: patch });
   return (
     <Page title="Agenda" subtitle="Tareas, notas y enfoque.">
-      <div className="mb-1 mt-2 text-xs uppercase tracking-wider text-white/35">Pomodoro</div>
+      <SectionTitle>Pomodoro</SectionTitle>
       <Row title="Enfoque">
         <Slider value={p.workMin} min={5} max={90} unit=" min" onChange={(v) => pp({ workMin: v })} />
       </Row>
@@ -556,7 +630,7 @@ function Productivity({ s, set }) {
         <Toggle checked={p.sound} onChange={(v) => pp({ sound: v })} />
       </Row>
 
-      <div className="mb-1 mt-6 text-xs uppercase tracking-wider text-white/35">Salud</div>
+      <SectionTitle>Salud</SectionTitle>
       <Row title="Descanso de vista (20-20-20)" hint="Cada cierto tiempo de uso te recuerda mirar algo lejano durante 20 segundos.">
         <Toggle checked={s.health.eyes} onChange={(v) => set({ health: { eyes: v } })} />
       </Row>
