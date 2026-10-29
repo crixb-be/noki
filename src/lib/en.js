@@ -163,6 +163,19 @@ export const EN = {
   "Anterior": "Previous",
   "Siguiente": "Next",
 
+  // grabadora
+  "Grabadora": "Recorder",
+  "Grabar": "Record",
+  "Detener": "Stop",
+  "Tus audios se guardan solo en este equipo.": "Your audio is saved only on this PC.",
+  "Sin grabaciones": "No recordings",
+  "📝 Transcribir": "📝 Transcribe",
+  "↻ Transcribir de nuevo": "↻ Transcribe again",
+  "Transcribiendo…": "Transcribing…",
+  "La primera vez se descarga el modelo (~40 MB); después funciona sin internet.": "The first time the model is downloaded (~40 MB); after that it works offline.",
+  "Noki no tiene permiso para usar el micrófono.": "Noki doesn't have permission to use the microphone.",
+  "No se encontró ningún micrófono.": "No microphone found.",
+  "¿Seguro?": "Sure?",
   // notas y tareas
   "Nota vacía": "Empty note",
   "Escribe aquí…": "Write here…",

@@ -5,6 +5,7 @@ import { PHASE_LABEL, fmtTime } from "../hooks/usePomodoro.js";
 import { dayKey, fmtDue, nextOccurrence } from "../lib/time.js";
 import { parseQuickTask } from "../lib/quickTask.js";
 import Notes from "./Notes.jsx";
+import Recorder from "./Recorder.jsx";
 
 const chip = "rounded-full bg-white/10 px-3 py-1 text-xs transition-all duration-300 hover:bg-white/20 active:scale-95 disabled:opacity-30";
 const inputCls = "min-w-0 rounded-full bg-white/10 px-3 py-1.5 text-xs outline-none placeholder:text-white/30 focus:bg-white/15";
@@ -225,6 +226,7 @@ const TASK_CATEGORIES = ["Todas", "Personal", "Trabajo", "Uni", "Casa", "Otros"]
 const SUBTABS = [
   { id: "tasks", label: "Tareas", icon: "✅" },
   { id: "notes", label: "Notas", icon: "📝" },
+  { id: "voice", label: "Grabadora", icon: "🎙" },
   { id: "focus", label: "Enfoque", icon: "🍅" },
 ];
 
@@ -247,6 +249,7 @@ export default function Productivity({ pomo, prod }) {
         {sub === "focus" && <FocusView pomo={pomo} prod={prod} />}
         {sub === "tasks" && <TasksView />}
         {sub === "notes" && <Notes />}
+        {sub === "voice" && <Recorder />}
       </div>
     </div>
   );
