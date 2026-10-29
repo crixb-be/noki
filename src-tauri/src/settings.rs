@@ -90,6 +90,9 @@ pub struct Appearance {
     pub mascot_theme: String,
     pub notch_theme: String,
     pub bar_theme: String,
+    /// Opacidad (%) del color del tema en el notch central y en la franja de los costados.
+    pub notch_theme_opacity: i32,
+    pub bar_theme_opacity: i32,
     /// Cumpleaños de quien usa Noki, "MM-DD" (vacío si no se indica). Solo se usa en este equipo.
     pub birthday: String,
 }
@@ -126,6 +129,8 @@ impl Default for Appearance {
             mascot_theme: "auto".into(),
             notch_theme: "auto".into(),
             bar_theme: "auto".into(),
+            notch_theme_opacity: 100,
+            bar_theme_opacity: 90,
             birthday: String::new(),
         }
     }
@@ -470,6 +475,8 @@ impl Settings {
             a.app_icon = crate::appicon::DEFAULT.into();
         }
         a.bar_opacity = a.bar_opacity.clamp(0, 100);
+        a.notch_theme_opacity = a.notch_theme_opacity.clamp(20, 100);
+        a.bar_theme_opacity = a.bar_theme_opacity.clamp(0, 100);
         for t in [&mut a.mascot_theme, &mut a.notch_theme, &mut a.bar_theme] {
             if !["auto", "none", "halloween", "christmas", "birthday", "love"].contains(&t.as_str()) {
                 *t = "auto".into();

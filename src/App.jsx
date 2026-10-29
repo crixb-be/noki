@@ -189,10 +189,11 @@ function Notch({ settings, update }) {
   const notchImg = useBgImage(ap.notchAuto || notchTheme ? "" : ap.notchImage);
   const barImg = useBgImage(ap.barMode === "image" ? ap.barImage : "");
   const notchColor = notchTheme ? notchTheme.notch : ap.notchAuto ? tint ?? ap.notchColor : ap.notchColor;
-  const bg = rgba(notchColor, ap.opacity); // color plano: también lo usan las «orejas»
-  const notchFill = fillFor({ color: notchColor, opacity: ap.opacity, image: notchImg, dim: ap.notchDim });
+  const notchOpacity = notchTheme ? ap.notchThemeOpacity : ap.opacity;
+  const bg = rgba(notchColor, notchOpacity); // color plano: también lo usan las «orejas»
+  const notchFill = fillFor({ color: notchColor, opacity: notchOpacity, image: notchImg, dim: ap.notchDim });
   const barFill = barTheme
-    ? rgba(barTheme.bar, Math.max(ap.barOpacity, 85))
+    ? rgba(barTheme.bar, ap.barThemeOpacity)
     : ap.barMode === "none"
       ? null
       : ap.barMode === "match"

@@ -324,6 +324,9 @@ function Appearance({ s, set }) {
             kind="notch"
             onChange={(v) => ap({ notchTheme: v })}
           />
+          <Row title="Transparencia del notch con tema" hint="Qué tan sólido es el color del tema en el notch central.">
+            <Slider value={a.notchThemeOpacity} min={20} max={100} unit=" %" onChange={(v) => ap({ notchThemeOpacity: v })} />
+          </Row>
           <ThemePicker
             title="Franja de los costados"
             hint="La barra a los lados del notch. «Ninguno» usa tu configuración."
@@ -332,6 +335,9 @@ function Appearance({ s, set }) {
             kind="bar"
             onChange={(v) => ap({ barTheme: v })}
           />
+          <Row title="Transparencia de la franja con tema" hint="Qué tan sólido es el color del tema en los costados.">
+            <Slider value={a.barThemeOpacity} min={0} max={100} unit=" %" onChange={(v) => ap({ barThemeOpacity: v })} />
+          </Row>
           <Row title="Mismo tema para todo" hint="«Automático» pone Halloween (24 oct–2 nov), Navidad (1–26 dic), Amor (7–14 feb) y Cumpleaños el día que indiques abajo.">
             <Select
               value=""

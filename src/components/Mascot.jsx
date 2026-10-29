@@ -106,11 +106,6 @@ function Eyes({ mood, look, skin }) {
       </g>
     );
   };
-  const Dot = ({ cx }) => (
-    <g className="mascot-blink">
-      <ellipse cx={cx + ox} cy={17 + oy} rx="5.2" ry="6.4" fill="#FFFFFF" />
-    </g>
-  );
   switch (mood) {
     case "happy":
     case "dance":
@@ -157,10 +152,12 @@ function Eyes({ mood, look, skin }) {
           </>
         );
       return (
-        <>
-          <Dot cx={20} />
-          <Dot cx={44} />
-        </>
+        <g transform={`translate(${ox} ${oy})`}>
+          <g {...STROKE} strokeWidth="3.4">
+            <path d="M14.5 20 Q20 13 25.5 20" />
+            <path d="M38.5 20 Q44 13 49.5 20" />
+          </g>
+        </g>
       );
   }
 }
@@ -179,7 +176,7 @@ function Mouth({ mood }) {
     case "drop":
       return <ellipse cx="32" cy="32" rx="4.6" ry="5.6" fill="#FFFFFF" />;
     default:
-      return <path {...STROKE} strokeWidth="3" d="M26 30 Q32 35 38 30" />;
+      return <path {...STROKE} strokeWidth="3" d="M28 30.5 Q32 34.5 36 30.5" />;
   }
 }
 

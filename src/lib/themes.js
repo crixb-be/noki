@@ -7,11 +7,11 @@ export const THEMES = {
     label: "Halloween 🎃", notch: "#1A0B2B", bar: "#F97316",
     // Decoración del notch (x, y en %, s = tamaño relativo, c = también en el notch cerrado) y de la franja lateral.
     decor: [
-      { e: "🎃", x: 4, y: 78, s: 1.5, c: 1 }, { e: "🦇", x: 90, y: 12, s: 1.2, c: 1, fly: 1 }, { e: "🔥", x: 94, y: 80, s: 1.3, c: 1 },
-      { e: "👻", x: 78, y: 70, s: 1.1, fly: 1 }, { e: "🕸️", x: 1, y: 2, s: 1.6 }, { e: "🦇", x: 14, y: 20, s: 0.9, fly: 1 },
+      { e: "🎃", x: 4, y: 78, s: 1.5, c: 1 }, { e: "🦇", x: 90, y: 12, s: 1.2, fly: 1 }, { e: "🔥", x: 94, y: 80, s: 1.3, c: 1 },
+      { e: "👻", x: 78, y: 70, s: 1.1, fly: 1 }, { e: "🕸️", x: 2, y: 8, s: 1.7, c: 1 }, { e: "💀", x: 70, y: 24, s: 1.3, c: 1 }, { e: "💀", x: 22, y: 80, s: 1.1 }, { e: "🦇", x: 14, y: 20, s: 0.9, fly: 1 },
       { e: "🔥", x: 4, y: 40, s: 0.9 }, { e: "🎃", x: 88, y: 46, s: 1 },
     ],
-    strip: ["🎃", "🦇", "🔥", "👻"],
+    strip: ["🎃", "🕸️", "🦇", "💀", "🔥", "👻"],
   },
   christmas: {
     label: "Navidad 🎅", notch: "#0E2A1C", bar: "#C62B2E",
