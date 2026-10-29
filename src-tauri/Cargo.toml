@@ -1,6 +1,6 @@
 [package]
 name = "noki"
-version = "1.0.2"
+version = "1.1.0"
 description = "Noki: a friendly notch for your Windows desktop"
 authors = ["Cristhian Bustamante"]
 license = "GPL-3.0-or-later"

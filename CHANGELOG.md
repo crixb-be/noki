@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased — Character and new logo / Personaje y logo nuevo
+## 1.1.0 — Character and new logo / Personaje y logo nuevo
 
 - **New logo** (Ciruela Océano) and a **Noki icon picker** in Settings → Appearance (tray and Settings icon). /
   **Logo nuevo** (Ciruela Océano) y un **selector del icono de Noki** en Ajustes → Apariencia (bandeja y Ajustes).

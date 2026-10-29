@@ -39,6 +39,7 @@ It is **free, open source and runs fully on your PC**: no accounts, no telemetry
 | 🎯 **Everything one gesture away** | One place for music, tasks, calendar, weather, files, translator and more — without opening ten windows |
 | 🪟 **Plays nicely with your windows** | It registers like a Windows bar: other windows work below it, and it hides by itself in full screen |
 | 🎨 **Made your way** | Change its color or give it an image, make it follow the color of the app below it, and choose what it shows when closed |
+| 😊 **Personality** | A little face in the notch that blinks, follows you with its eyes and cheers when you finish a task. Don't want it? Turn it off |
 | 🔒 **Private** | Your data stays on your PC. API keys go to the Windows Credential Manager |
 | 🌐 **English and Spanish** | Switch instantly in the settings |
 
@@ -124,6 +125,8 @@ Your settings live in `%APPDATA%\com.noki.app`. If you are coming from “Mi Not
 
 In **Settings → Appearance** you can:
 
+- Pick the **Noki icon** from five gradients (tray and Settings window).
+- Keep or remove the **character**: the notch's little face blinks and looks at your cursor, cheers when you finish a task, a habit or a Pomodoro, dances to the music, gets surprised if you click it (dizzy if you click it a lot), opens its mouth when you drop a file and gets sleepy at night or on low battery.
 - Pick the notch **color** or give it a background **image**.
 - Turn on **automatic color**: it takes the color of the app open underneath and changes with it.
 - Fill the **strip beside the notch** so it looks like a single piece (same as the notch, transparent, a color, an image or automatic).

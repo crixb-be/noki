@@ -39,6 +39,7 @@ Es **gratis, de código abierto y funciona por completo en tu PC**: sin cuentas,
 | 🎯 **Todo a un gesto** | Un solo lugar para música, tareas, calendario, clima, archivos, traductor y más, sin abrir diez ventanas |
 | 🪟 **Convive con tus ventanas** | Se registra como una barra de Windows: las demás ventanas trabajan por debajo y se oculta solo en pantalla completa |
 | 🎨 **Hecho a tu gusto** | Cambia su color o ponle una imagen, haz que tome el color del programa que tengas abierto y elige qué muestra cuando está cerrado |
+| 😊 **Con personalidad** | Una carita en el notch que parpadea, te sigue con la mirada y se alegra cuando terminas una tarea. Si no la quieres, se apaga |
 | 🔒 **Privado** | Tus datos se quedan en tu PC. Las claves de API van al Administrador de credenciales de Windows |
 | 🌐 **Español e inglés** | Cámbialo al instante en los ajustes |
 
@@ -124,6 +125,8 @@ Tus ajustes se guardan en `%APPDATA%\com.noki.app`. Si vienes de «Mi Notch» (e
 
 En **Ajustes → Apariencia** puedes:
 
+- Elegir el **icono de Noki** entre cinco degradados (bandeja y ventana de Ajustes).
+- Dejar o quitar el **personaje**: la carita del notch parpadea y mira tu cursor, se alegra al terminar una tarea, un hábito o un Pomodoro, baila con la música, se sorprende si le haces clic (y se marea si le haces muchos), abre la boca al soltar un archivo y se adormece de noche o con poca batería.
 - Elegir el **color** del notch o ponerle una **imagen** de fondo.
 - Activar el **color automático**: toma el color del programa que tengas abierto debajo y cambia con él.
 - Rellenar la **franja a los costados** del notch para que parezca una sola pieza (igual que el notch, transparente, un color, una imagen o automática).
