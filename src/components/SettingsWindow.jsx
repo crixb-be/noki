@@ -6,6 +6,8 @@ import { open, save } from "@tauri-apps/plugin-dialog";
 import { useSettings } from "../hooks/useSettings.js";
 import { useBgImage } from "../lib/background.js";
 import { presetLanguage, useLanguage } from "../lib/i18n.js";
+import Mascot from "./Mascot.jsx";
+import { SKINS, resolveSkin } from "../lib/skins.js";
 import NokiLogo from "./NokiLogo.jsx";
 import { APP_ICONS } from "../lib/icons.js";
 
@@ -264,6 +266,46 @@ function Appearance({ s, set }) {
       <Row title="Personaje en el notch" hint="Una carita que parpadea, te mira y reacciona: se alegra al terminar tareas, hábitos o un Pomodoro, baila con la música y se adormece de noche.">
         <Toggle checked={a.mascot} onChange={(v) => ap({ mascot: v })} />
       </Row>
+      {a.mascot && (
+        <>
+          <Row title="Disfraz de Noki" hint="«Automático» lo viste de Halloween (24 oct–2 nov), de Navidad (1–26 dic) y de cumpleaños el día que indiques abajo.">
+            <div className="flex flex-wrap justify-end gap-2">
+              {SKINS.map(([id, label]) => {
+                const shown = id === "auto" ? resolveSkin("auto", a.birthday) : id;
+                return (
+                  <button
+                    key={id}
+                    onClick={() => ap({ mascotSkin: id })}
+                    className={`flex w-24 flex-col items-center gap-1.5 rounded-xl border px-2 py-2 text-[11px] transition-colors ${
+                      a.mascotSkin === id ? "border-emerald-400 bg-white/10" : "border-white/10 hover:bg-white/5"
+                    }`}
+                  >
+                    <span className="flex h-9 w-full items-center justify-center rounded-lg bg-black">
+                      <Mascot size={26} skin={shown} />
+                    </span>
+                    {label}
+                  </button>
+                );
+              })}
+            </div>
+          </Row>
+          <Row title="Tu cumpleaños" hint="Solo día y mes; se guarda únicamente en este equipo. Ese día Noki lleva gorro de fiesta.">
+            <div className="flex items-center gap-2">
+              <input
+                type="date"
+                value={a.birthday ? `2000-${a.birthday}` : ""}
+                onChange={(e) => ap({ birthday: e.target.value ? e.target.value.slice(5) : "" })}
+                className="rounded-lg border border-white/10 bg-zinc-900 px-3 py-1.5 text-sm outline-none focus:border-white/30 [color-scheme:dark]"
+              />
+              {a.birthday && (
+                <button onClick={() => ap({ birthday: "" })} className="text-xs text-white/40 hover:text-white/80">
+                  Quitar
+                </button>
+              )}
+            </div>
+          </Row>
+        </>
+      )}
       <Row title="Ancho (compacto)">
         <Slider value={a.collapsedW} min={120} max={600} step={2} unit=" px" onChange={(v) => ap({ collapsedW: v })} />
       </Row>

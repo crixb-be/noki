@@ -21,6 +21,7 @@ import { useAiChat } from "./hooks/useAiChat.js";
 import { EMPTY_HABITS, countOn, useHabits } from "./hooks/useHabits.js";
 import { fillFor, rgba, useBgImage } from "./lib/background.js";
 import { weatherInfo } from "./lib/wmo.js";
+import { resolveSkin } from "./lib/skins.js";
 import { presetLanguage, useLanguage } from "./lib/i18n.js";
 
 // Misma curva y duración para ancho y alto: el notch se abre y cierra como una sola pieza.
@@ -209,7 +210,7 @@ function Notch({ settings, update }) {
     unpinTimer.current = setTimeout(() => invoke("set_pinned", { pinned: false }).catch(() => {}), 700);
   };
 
-  const mascotState = { mood, look, poke };
+  const mascotState = { mood, look, poke, skin: resolveSkin(ap.mascotSkin, ap.birthday) };
   const habitStats = { done: habitsDone, total: activeHabits.length };
 
   return (

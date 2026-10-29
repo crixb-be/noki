@@ -85,6 +85,10 @@ pub struct Appearance {
     pub app_icon: String,
     /// La carita animada de Noki dentro del notch.
     pub mascot: bool,
+    /// Disfraz del personaje: "auto" (según la fecha), "none", "halloween", "christmas" o "birthday".
+    pub mascot_skin: String,
+    /// Cumpleaños de quien usa Noki, "MM-DD" (vacío si no se indica). Solo se usa en este equipo.
+    pub birthday: String,
 }
 
 impl Default for Appearance {
@@ -116,6 +120,8 @@ impl Default for Appearance {
             bar_opacity: 100,
             app_icon: crate::appicon::DEFAULT.into(),
             mascot: true,
+            mascot_skin: "auto".into(),
+            birthday: String::new(),
         }
     }
 }
@@ -459,6 +465,18 @@ impl Settings {
             a.app_icon = crate::appicon::DEFAULT.into();
         }
         a.bar_opacity = a.bar_opacity.clamp(0, 100);
+        if !["auto", "none", "halloween", "christmas", "birthday"].contains(&a.mascot_skin.as_str()) {
+            a.mascot_skin = "auto".into();
+        }
+        let valid_birthday = a.birthday.split_once('-').is_some_and(|(m, d)| {
+            m.len() == 2
+                && d.len() == 2
+                && matches!(m.parse::<u32>(), Ok(1..=12))
+                && matches!(d.parse::<u32>(), Ok(1..=31))
+        });
+        if !valid_birthday {
+            a.birthday.clear();
+        }
         for c in [&mut a.notch_color, &mut a.bar_color] {
             if !crate::backgrounds::valid_color(c) {
                 *c = "#000000".into();

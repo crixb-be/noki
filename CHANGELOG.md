@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- **Seasonal costumes for Noki**: Halloween, Christmas and a birthday party hat, automatic by date or chosen in Settings → Appearance. /
+  **Disfraces de temporada para Noki**: Halloween, Navidad y gorro de cumpleaños, automáticos por fecha o a elegir en Ajustes → Apariencia.
 - **Reorder tabs** in Settings → Modules. / **Reordena las pestañas** en Ajustes → Módulos y dentro de Agenda (botón ⇄).
 - **Recorder** in Planner: record your voice, keep the audio on your PC and, optionally, transcribe it locally and for free (Whisper; the ~40 MB model downloads once, then it works offline). /
   **Grabadora** en Agenda: graba tu voz, guarda los audios en tu equipo y, si quieres, transcríbelos en local y gratis (Whisper; el modelo de ~40 MB se descarga una vez y luego funciona sin internet).

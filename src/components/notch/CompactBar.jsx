@@ -59,7 +59,7 @@ export default function CompactBar({ ap, modules, mascot, indicator, pending, ha
         {(ap.showClock || ap.showDate) && <Clock showTime={ap.showClock} withDate={ap.showDate} hour12={!ap.clock24} />}
       </div>
       <div className="flex min-w-0 flex-1 items-center justify-center gap-2.5">
-        {ap.mascot && <Mascot size={20} mood={mascot.mood} look={mascot.look} />}
+        {ap.mascot && <Mascot size={20} mood={mascot.mood} look={mascot.look} skin={mascot.skin} />}
         {ap.showActivity ? <Indicator {...indicator} visualizer={ap.visualizer} /> : null}
       </div>
       <div className="flex shrink-0 items-center gap-2 text-xs tabular-nums">

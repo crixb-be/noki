@@ -23,7 +23,7 @@ export default function ExpandedView({ tabs, activeTab, setTab, settings, update
         <div className="flex items-center gap-3">
           <Clock withDate={tabs.length < 6} hour12={!ap.clock24} />
           {tabs.length < 8 && <Battery info={battery} />}
-          {ap.mascot && tabs.length < 10 && <Mascot size={22} mood={mascot.mood} look={mascot.look} onPoke={mascot.poke} />}
+          {ap.mascot && tabs.length < 10 && <Mascot size={22} mood={mascot.mood} look={mascot.look} skin={mascot.skin} onPoke={mascot.poke} />}
         </div>
         <nav className="flex gap-0.5 rounded-full bg-white/10 p-1">
           {tabs.map((t) => (

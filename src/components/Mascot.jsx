@@ -164,20 +164,65 @@ function Mouth({ mood }) {
   }
 }
 
-/** `size` es el alto en píxeles; el ancho sale solo. */
-export default function Mascot({ size = 22, mood = "idle", look = { x: 0, y: 0 }, onPoke, className = "" }) {
+/** Gorros y accesorios (arriba, y 0–17 del lienzo). La cara se reduce un poco para dejarles sitio. */
+function Costume({ skin }) {
+  switch (skin) {
+    case "christmas":
+      return (
+        <g>
+          <path d="M17 17 C19 7 29 2 41 3 C46 3.5 49 7 48 12 L47 17 Z" fill="#E5393B" />
+          <path d="M41 3 C46 3 50 6 49 12" fill="none" stroke="#C62B2E" strokeWidth="1.2" />
+          <rect x="14" y="14.5" width="36" height="5" rx="2.5" fill="#FFFFFF" />
+          <circle cx="49" cy="11.5" r="3.6" fill="#FFFFFF" />
+        </g>
+      );
+    case "halloween":
+      return (
+        <g>
+          <path d="M23 15 L34 1.5 C34.5 1 35.5 1.5 36 2.5 L42 15 Z" fill="#6B3FA0" />
+          <path d="M34 1.5 C37 1 39 3 38 4.5" fill="none" stroke="#6B3FA0" strokeWidth="2.4" strokeLinecap="round" />
+          <path d="M25 12 L41 12 L42 15 L24 15 Z" fill="#FB923C" />
+          <ellipse cx="33" cy="15.8" rx="18" ry="3" fill="#7C4DB8" />
+          <rect x="31.6" y="11.6" width="3.2" height="3.4" rx="0.6" fill="none" stroke="#FDE68A" strokeWidth="1" />
+        </g>
+      );
+    case "birthday":
+      return (
+        <g>
+          <path d="M24 17 L32 2.5 L40 17 Z" fill="#F472B6" />
+          <path d="M27.4 11 L36.6 11 M25.7 14 L38.3 14" stroke="#FDE047" strokeWidth="2" strokeLinecap="round" />
+          <circle cx="32" cy="2.4" r="2.6" fill="#38BDF8" />
+          <g className="mascot-confetti">
+            <circle cx="12" cy="9" r="1.4" fill="#FDE047" />
+            <circle cx="52" cy="7" r="1.4" fill="#34D399" />
+            <rect x="48" y="14" width="2.6" height="2.6" rx="0.5" fill="#F472B6" />
+            <rect x="12.5" y="16" width="2.6" height="2.6" rx="0.5" fill="#38BDF8" />
+          </g>
+        </g>
+      );
+    default:
+      return null;
+  }
+}
+
+/** `size` es el alto en píxeles; el ancho sale solo. `skin`: "none" | "halloween" | "christmas" | "birthday". */
+export default function Mascot({ size = 22, mood = "idle", look = { x: 0, y: 0 }, skin = "none", onPoke, className = "" }) {
+  const dressed = skin !== "none";
   return (
     <span
       role={onPoke ? "button" : "img"}
       aria-label="Noki"
       onClick={onPoke}
-      className={`mascot mascot-${mood} inline-flex shrink-0 items-center justify-center ${onPoke ? "cursor-pointer" : ""} ${className}`}
+      className={`mascot mascot-${mood} ${dressed ? `mascot-skin-${skin}` : ""} inline-flex shrink-0 items-center justify-center ${onPoke ? "cursor-pointer" : ""} ${className}`}
       style={{ height: size, width: size * 1.6 }}
     >
       <svg viewBox="0 0 64 40" width={size * 1.6} height={size} overflow="visible">
         <g className="mascot-body">
-          <Eyes mood={mood} look={look} />
-          <Mouth mood={mood} />
+          <g transform={dressed ? "translate(6.4 9.6) scale(0.8)" : undefined}>
+            <Eyes mood={mood} look={look} />
+            <Mouth mood={mood} />
+          </g>
+          {dressed && <Costume skin={skin} />}
         </g>
         {mood === "sleepy" && (
           <g fill="#FFFFFF" fontFamily="Segoe UI, sans-serif" fontWeight="700">
