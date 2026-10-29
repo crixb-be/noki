@@ -82,7 +82,7 @@ function Avatar({ size, className = "" }) {
       alt={DEV.name}
       draggable={false}
       onError={() => setFailed(true)}
-      className={`rounded-full object-cover object-[50%_20%] ring-1 ring-white/20 ${className}`}
+      className={`rounded-full object-cover object-center ring-1 ring-white/20 ${className}`}
       style={{ width: size, height: size }}
     />
   );
@@ -465,7 +465,7 @@ function Appearance({ s, set }) {
               options={[["", "Elegir…"], ...THEME_CHOICES]}
             />
           </Row>
-          <Row title="Tu cumpleaños" hint="Solo día y mes; se guarda únicamente en este equipo. Ese día se activa el tema de cumpleaños.">
+          <Row title="Tu cumpleaños" hint="Se guarda únicamente en este equipo. Ese día se activa el tema de cumpleaños y Noki te felicita (con tu edad si pones el año).">
             <div className="flex items-center gap-2">
               <Select
                 value={a.birthday ? String(Number(a.birthday.slice(3))) : ""}
@@ -477,8 +477,13 @@ function Appearance({ s, set }) {
                 onChange={(v) => ap({ birthday: v ? `${String(v).padStart(2, "0")}-${a.birthday ? a.birthday.slice(3) : "01"}` : "" })}
                 options={[["", "Mes"], ...Array.from({ length: 12 }, (_, i) => [String(i + 1), new Date(2000, i, 1).toLocaleDateString(locale(), { month: "long" })])]}
               />
+              <Select
+                value={a.birthYear ? String(a.birthYear) : ""}
+                onChange={(v) => ap({ birthYear: v ? Number(v) : 0 })}
+                options={[["", "Año"], ...Array.from({ length: new Date().getFullYear() - 1919 }, (_, i) => String(new Date().getFullYear() - i)).map((y) => [y, y])]}
+              />
               {a.birthday && (
-                <button onClick={() => ap({ birthday: "" })} className="text-xs text-white/40 hover:text-white/80">
+                <button onClick={() => ap({ birthday: "", birthYear: 0 })} className="text-xs text-white/40 hover:text-white/80">
                   Quitar
                 </button>
               )}

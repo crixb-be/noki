@@ -113,6 +113,18 @@ function Notch({ settings, update }) {
     onDrop: (paths) => addPaths(paths, setFiles),
   });
 
+  // Felicitación el día del cumpleaños (una vez al año; solo la ventana líder).
+  const [greeted, setGreeted] = useStore("birthdayGreeted", 0);
+  useEffect(() => {
+    if (!leader || !settings.appearance.birthday) return;
+    const now = new Date();
+    if (settings.appearance.birthday !== `${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}`) return;
+    if (greeted === now.getFullYear()) return;
+    const age = settings.appearance.birthYear ? now.getFullYear() - settings.appearance.birthYear : 0;
+    notify({ icon: "🎂", text: age > 0 ? `¡Feliz cumpleaños! Hoy cumples ${age}` : "¡Feliz cumpleaños!", ms: 9000, silent: true });
+    setGreeted(now.getFullYear());
+  }, [leader, settings.appearance.birthday]); // eslint-disable-line react-hooks/exhaustive-deps
+
   // Esc cierra el notch (útil cuando se abrió con el atajo).
   useEffect(() => {
     const onKey = (e) => e.key === "Escape" && invoke("request_open", { open: false, sticky: false }).catch(() => {});

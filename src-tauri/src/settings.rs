@@ -95,6 +95,8 @@ pub struct Appearance {
     pub bar_theme_opacity: i32,
     /// Cumpleaños de quien usa Noki, "MM-DD" (vacío si no se indica). Solo se usa en este equipo.
     pub birthday: String,
+    /// Año de nacimiento (0 = no indicado); solo sirve para decir tu edad el día del cumpleaños.
+    pub birth_year: i32,
 }
 
 impl Default for Appearance {
@@ -132,6 +134,7 @@ impl Default for Appearance {
             notch_theme_opacity: 100,
             bar_theme_opacity: 90,
             birthday: String::new(),
+            birth_year: 0,
         }
     }
 }
@@ -488,7 +491,11 @@ impl Settings {
                 && matches!(m.parse::<u32>(), Ok(1..=12))
                 && matches!(d.parse::<u32>(), Ok(1..=31))
         });
+        if a.birth_year != 0 && !(1900..=2100).contains(&a.birth_year) {
+            a.birth_year = 0;
+        }
         if !valid_birthday {
+            a.birth_year = 0;
             a.birthday.clear();
         }
         for c in [&mut a.notch_color, &mut a.bar_color] {
