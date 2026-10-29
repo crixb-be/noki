@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { Children, Fragment, cloneElement, isValidElement, useEffect, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import { getVersion } from "@tauri-apps/api/app";
@@ -41,7 +41,7 @@ const SECTIONS = [
 
 // ───────────── primitivas de formulario ─────────────
 
-const CARD = "mb-2.5 rounded-2xl bg-white/[0.04] ring-1 ring-white/[0.06] transition-colors duration-200 hover:bg-white/[0.06]";
+const CARD = "mb-2.5 rounded-2xl bg-white/[0.04] ring-1 ring-white/[0.06] transition-colors duration-200 hover:bg-white/[0.05]";
 
 /** Icono de cada ajuste (se ve en un cuadrito a la izquierda del título). */
 const ROW_ICONS = {
@@ -76,10 +76,11 @@ const IconTile = ({ icon, size = "h-9 w-9 text-lg" }) => (
   <span className={`flex shrink-0 items-center justify-center rounded-xl bg-white/[0.07] ${size}`} aria-hidden="true">{icon}</span>
 );
 
-function Row({ title, hint, children }) {
+/** `grouped`: la fila va dentro de un recuadro compartido (lo pone `Page`), sin tarjeta propia. */
+function Row({ title, hint, children, grouped = false }) {
   const { icon, text } = splitTitle(title);
   return (
-    <div className={`${CARD} flex items-center justify-between gap-4 px-4 py-3`}>
+    <div className={`${grouped ? "" : CARD} flex items-center justify-between gap-4 px-4 py-3`}>
       <div className="flex min-w-0 items-center gap-3">
         <IconTile icon={icon} />
         <div className="min-w-0">
@@ -165,6 +166,37 @@ const input =
   "w-72 rounded-lg border border-white/10 bg-zinc-900 px-3 py-1.5 text-sm outline-none placeholder:text-white/30 focus:border-white/30";
 const button = "rounded-lg bg-white/10 px-3 py-1.5 text-sm transition-colors hover:bg-white/20";
 
+/** Filas seguidas (bajo un mismo título) comparten un solo recuadro, separadas por una línea fina. */
+function groupRows(children) {
+  const flat = [];
+  const walk = (c) =>
+    Children.forEach(c, (x) => {
+      if (isValidElement(x) && x.type === Fragment) walk(x.props.children);
+      else if (x != null && x !== false) flat.push(x);
+    });
+  walk(children);
+  const out = [];
+  let run = [];
+  const flush = () => {
+    if (!run.length) return;
+    out.push(
+      <div key={`g${out.length}`} className={`${CARD} divide-y divide-white/[0.06] overflow-hidden`}>
+        {run.map((r, i) => cloneElement(r, { grouped: true, key: r.key ?? i }))}
+      </div>
+    );
+    run = [];
+  };
+  for (const x of flat) {
+    if (isValidElement(x) && x.type === Row) run.push(x);
+    else {
+      flush();
+      out.push(x);
+    }
+  }
+  flush();
+  return out;
+}
+
 function Page({ title, subtitle, children }) {
   const icon = SECTIONS.find((x) => x.label === title)?.icon;
   return (
@@ -176,7 +208,7 @@ function Page({ title, subtitle, children }) {
           {subtitle && <p className="mt-0.5 text-sm text-white/40">{subtitle}</p>}
         </div>
       </div>
-      <div className="mt-5">{children}</div>
+      <div className="mt-5">{groupRows(children)}</div>
     </div>
   );
 }
@@ -1233,7 +1265,7 @@ function SocialButton({ id, label, url }) {
 function Developer({ icon }) {
   return (
     <Page title="Desarrollador" subtitle="La persona detrás de Noki.">
-      <div className="mt-2 flex items-center gap-5 rounded-2xl bg-white/5 p-5">
+      <div className="mb-2.5 flex items-center gap-5 rounded-2xl bg-white/[0.04] p-5 ring-1 ring-white/[0.06]">
         <NokiLogo size={72} variant={icon} />
         <div className="min-w-0">
           <div className="text-lg font-semibold">{DEV.name}</div>
