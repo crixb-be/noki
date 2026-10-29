@@ -48,7 +48,7 @@ const ROW_ICONS = {
   "Idioma de la interfaz": "🌐", "Mostrar el notch": "👁️", "Iniciar con Windows": "🚀", "Ocultar en pantalla completa": "🖥️",
   "Pantalla principal del notch": "🖥️", "Monitor": "🖥️", "Abrir al": "👆", "Retraso al abrir": "⏳", "Retraso al cerrar": "⌛",
   "Personaje en el notch": "😊", "Transparencia del notch con tema": "💧", "Transparencia de la franja con tema": "💧",
-  "Mismo tema para todo": "🎭", "Tu cumpleaños": "🎂", "Ancho (compacto)": "↔️", "Alto (compacto)": "↕️",
+  "Mismo tema para todo": "🎭", "Grabar voz": "🎙", "No molestar": "🔕", "Nueva tarea rápida": "✅", "Ir directo a una pestaña": "🔢", "Tu cumpleaños": "🎂", "Compartir mi apariencia": "🎁", "Ancho (compacto)": "↔️", "Alto (compacto)": "↕️",
   "Ancho (expandido)": "↔️", "Alto (expandido)": "↕️", "Desplazamiento horizontal": "⇄", "Opacidad del fondo": "💧",
   "Color automático": "🪄", "Color": "🎨", "Imagen": "🖼️", "Oscurecer imagen": "🌓", "Fondo de la franja": "🎨",
   "Color de la franja": "🎨", "Imagen de la franja": "🖼️", "Opacidad de la franja": "💧", "Hora": "🕐", "Fecha": "📅",
@@ -373,7 +373,7 @@ function IconPicker({ value, onChange }) {
 }
 
 /** Selector de tema para una parte (cara, notch o franja), con vista previa de cada opción. */
-function ThemePicker({ title, hint, value, birthday, kind, onChange }) {
+function ThemePicker({ title, hint, value, birthday, events, kind, onChange }) {
   return (
     <div className={`${CARD} px-4 py-3`}>
       <div className="flex items-center gap-3">
@@ -385,7 +385,7 @@ function ThemePicker({ title, hint, value, birthday, kind, onChange }) {
       </div>
       <div className="mt-3 flex flex-wrap gap-3">
         {THEME_CHOICES.map(([id, label]) => {
-          const shown = id === "auto" ? resolveTheme("auto", birthday) : id;
+          const shown = id === "auto" ? resolveTheme("auto", birthday, events) : id;
           const t = THEMES[shown];
           return (
             <button
@@ -417,6 +417,104 @@ function ThemePicker({ title, hint, value, birthday, kind, onChange }) {
   );
 }
 
+const DAYS = Array.from({ length: 31 }, (_, i) => [String(i + 1), String(i + 1)]);
+const MONTHS = () => Array.from({ length: 12 }, (_, i) => [String(i + 1), new Date(2000, i, 1).toLocaleDateString(locale(), { month: "long" })]);
+
+/** Día + mes de una fecha "MM-DD". */
+function DayMonth({ value, onChange }) {
+  const [m, d] = value.split("-").map(Number);
+  const mk = (mm, dd) => `${String(mm).padStart(2, "0")}-${String(dd).padStart(2, "0")}`;
+  return (
+    <span className="flex gap-1">
+      <Select value={String(d)} options={DAYS} onChange={(v) => onChange(mk(m, v))} />
+      <Select value={String(m)} options={MONTHS()} onChange={(v) => onChange(mk(v, d))} />
+    </span>
+  );
+}
+
+/** Fechas propias que activan un tema (aniversario, Fiestas Patrias, San Valentín…). */
+function ThemeEvents({ events, onChange }) {
+  const patch = (i, p) => onChange(events.map((e, j) => (j === i ? { ...e, ...p } : e)));
+  return (
+    <div className={`${CARD} px-4 py-3`}>
+      <div className="flex items-center gap-3">
+        <IconTile icon="📆" />
+        <div className="min-w-0 flex-1">
+          <div className="text-sm">Fechas propias para un tema</div>
+          <div className="mt-0.5 text-xs leading-snug text-white/40">Entre esas fechas, «Automático» usará el tema que elijas (por ejemplo un aniversario o Fiestas Patrias).</div>
+        </div>
+        <button className={button} onClick={() => events.length < 12 && onChange([...events, { name: "", from: "07-28", to: "07-29", theme: "birthday" }])}>＋ Añadir</button>
+      </div>
+      {events.map((e, i) => (
+        <div key={i} className="mt-3 flex flex-wrap items-center gap-2 rounded-xl bg-black/20 p-2.5">
+          <input
+            value={e.name}
+            maxLength={40}
+            placeholder="Nombre (opcional)"
+            onChange={(ev) => patch(i, { name: ev.target.value })}
+            className="w-40 rounded-lg border border-white/10 bg-zinc-900 px-3 py-1.5 text-sm outline-none focus:border-white/30"
+          />
+          <span className="text-xs text-white/40">del</span>
+          <DayMonth value={e.from} onChange={(v) => patch(i, { from: v })} />
+          <span className="text-xs text-white/40">al</span>
+          <DayMonth value={e.to} onChange={(v) => patch(i, { to: v })} />
+          <Select value={e.theme} onChange={(v) => patch(i, { theme: v })} options={Object.entries(THEMES).map(([id, t]) => [id, t.label])} />
+          <button onClick={() => onChange(events.filter((_, j) => j !== i))} className="ml-auto text-xs text-white/40 hover:text-red-300" aria-label="Quitar">✕ Quitar</button>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+/** Solo lo visual: nada personal (cumpleaños) ni rutas de tu equipo (imágenes). */
+const SHARE_KEYS = [
+  "collapsedW", "collapsedH", "expandedW", "expandedH", "offsetX", "opacity", "notchColor", "notchAuto", "notchDim", "barMode", "barColor",
+  "barDim", "barOpacity", "mascot", "mascotTheme", "notchTheme", "barTheme", "notchThemeOpacity", "barThemeOpacity", "themeEvents",
+  "showClock", "showDate", "showTasks", "showHabits", "showWeather", "showBattery", "showActivity", "clock24", "visualizer",
+];
+
+function ShareAppearance({ a, ap }) {
+  const [msg, setMsg] = useState(null);
+  const done = (ok, text) => {
+    setMsg({ ok, text });
+    setTimeout(() => setMsg(null), 4000);
+  };
+  const exportLook = async () => {
+    try {
+      const path = await save({ defaultPath: "noki-apariencia.json", filters: [{ name: "Apariencia de Noki", extensions: ["json"] }] });
+      if (!path) return;
+      const out = Object.fromEntries(SHARE_KEYS.filter((k) => a[k] !== undefined).map((k) => [k, a[k]]));
+      await invoke("save_text", { path, text: JSON.stringify({ noki: "appearance", version: 1, appearance: out }, null, 2) });
+      done(true, "Apariencia exportada.");
+    } catch (e) {
+      done(false, String(e));
+    }
+  };
+  const importLook = async () => {
+    try {
+      const path = await open({ multiple: false, title: "Apariencia de Noki", filters: [{ name: "Apariencia de Noki", extensions: ["json"] }] });
+      if (!path) return;
+      const data = JSON.parse(await invoke("read_text", { path }));
+      if (data?.noki !== "appearance" || typeof data.appearance !== "object") throw new Error("Ese archivo no es una apariencia de Noki.");
+      ap(Object.fromEntries(SHARE_KEYS.filter((k) => data.appearance[k] !== undefined).map((k) => [k, data.appearance[k]])));
+      done(true, "Apariencia importada.");
+    } catch (e) {
+      done(false, String(e?.message ?? e));
+    }
+  };
+  return (
+    <>
+      <Row title="Compartir mi apariencia" hint="Guarda colores, temas y tamaños en un archivo para otro equipo o para un amigo. No incluye tu cumpleaños ni tus imágenes.">
+        <div className="flex gap-2">
+          <button className={button} onClick={exportLook}>Exportar…</button>
+          <button className={button} onClick={importLook}>Importar…</button>
+        </div>
+      </Row>
+      {msg && <div className={`mb-2.5 rounded-lg p-3 text-sm ${msg.ok ? "bg-emerald-500/10 text-emerald-300" : "bg-amber-500/10 text-amber-300"}`}>{msg.text}</div>}
+    </>
+  );
+}
+
 function Appearance({ s, set }) {
   const a = s.appearance;
   const ap = (patch) => set({ appearance: patch });
@@ -433,6 +531,7 @@ function Appearance({ s, set }) {
             hint="Disfraz del personaje: gorro de bruja, de Papá Noel, de fiesta u ojitos de corazón."
             value={a.mascotTheme}
             birthday={a.birthday}
+            events={a.themeEvents}
             kind="face"
             onChange={(v) => ap({ mascotTheme: v })}
           />
@@ -441,6 +540,7 @@ function Appearance({ s, set }) {
             hint="Color y adornos del notch. «Ninguno» usa tus colores o imagen de Ajustes."
             value={a.notchTheme}
             birthday={a.birthday}
+            events={a.themeEvents}
             kind="notch"
             onChange={(v) => ap({ notchTheme: v })}
           />
@@ -452,6 +552,7 @@ function Appearance({ s, set }) {
             hint="La barra a los lados del notch. «Ninguno» usa tu configuración."
             value={a.barTheme}
             birthday={a.birthday}
+            events={a.themeEvents}
             kind="bar"
             onChange={(v) => ap({ barTheme: v })}
           />
@@ -489,8 +590,10 @@ function Appearance({ s, set }) {
               )}
             </div>
           </Row>
+          <ThemeEvents events={a.themeEvents ?? []} onChange={(v) => ap({ themeEvents: v })} />
         </>
       )}
+      <ShareAppearance a={a} ap={ap} />
       <Row title="Ancho (compacto)">
         <Slider value={a.collapsedW} min={120} max={600} step={2} unit=" px" onChange={(v) => ap({ collapsedW: v })} />
       </Row>
@@ -793,13 +896,34 @@ function ShortcutRecorder({ value, onChange }) {
   );
 }
 
+const SHORTCUT_ROWS = [
+  ["toggle", "Abrir / cerrar el notch", "Se cierra con el mismo atajo, con Esc o haciendo clic fuera."],
+  ["record", "Grabar voz", "Empieza y detiene una grabación desde cualquier programa; el notch muestra un punto rojo mientras graba."],
+  ["dnd", "No molestar", "Activa o desactiva los avisos y sonidos de Noki."],
+  ["addTask", "Nueva tarea rápida", "Abre el notch con el cursor listo para escribir una tarea."],
+];
+const TAB_MODS = ["Alt", "Ctrl", "Ctrl+Alt", "Ctrl+Shift", "Alt+Shift"];
+
 function Shortcuts({ s, set, warning }) {
+  const sc = s.shortcuts;
+  const cap = (id) => id[0].toUpperCase() + id.slice(1);
   return (
-    <Page title="Atajos" subtitle="Atajos globales: funcionan aunque otra app tenga el foco.">
-      <Row title="Abrir / cerrar el notch" hint="Se cierra con el mismo atajo, con Esc o haciendo clic fuera.">
-        <ShortcutRecorder value={s.shortcuts.toggle} onChange={(v) => set({ shortcuts: { toggle: v } })} />
+    <Page title="Atajos" subtitle="Atajos globales: funcionan aunque otra app tenga el foco. Apaga los que choquen con otros programas.">
+      {SHORTCUT_ROWS.map(([id, title, hint]) => (
+        <Row key={id} title={title} hint={hint}>
+          <div className={`flex items-center gap-3 ${sc[`${id}Enabled`] ? "" : "opacity-50"}`}>
+            <ShortcutRecorder value={sc[id]} onChange={(v) => set({ shortcuts: { [id]: v } })} />
+            <Toggle checked={sc[`${id}Enabled`]} onChange={(v) => set({ shortcuts: { [`${id}Enabled`]: v } })} />
+          </div>
+        </Row>
+      ))}
+      <Row title="Ir directo a una pestaña" hint={`${sc.tabsModifier}+1 … ${sc.tabsModifier}+9 abren la pestaña 1…9, en el orden que elegiste en Módulos.`}>
+        <div className="flex items-center gap-3">
+          <Select value={sc.tabsModifier} native onChange={(v) => set({ shortcuts: { tabsModifier: v } })} options={TAB_MODS.map((m) => [m, m])} />
+          <Toggle checked={sc.tabsEnabled} onChange={(v) => set({ shortcuts: { tabsEnabled: v } })} />
+        </div>
       </Row>
-      {warning && <div className="mt-4 rounded-lg bg-amber-500/10 p-3 text-sm text-amber-300">{warning}</div>}
+      {warning && <div className="mt-2 rounded-lg bg-amber-500/10 p-3 text-sm text-amber-300">{warning}</div>}
     </Page>
   );
 }
@@ -1211,7 +1335,7 @@ function About({ reset, s, set }) {
       <UpdatesBlock s={s} set={set} version={version} />
       <Row
         title="Copia de seguridad"
-        hint="Guarda ajustes y datos (tareas, notas, agua, chat…) en un archivo, o restáuralos en otro equipo. No incluye las claves de API."
+        hint="Guarda ajustes y datos (tareas, notas, agua, chat…) en un archivo, o restáuralos en otro equipo. No incluye las claves de API ni los audios de la grabadora (expórtalos desde Agenda → Grabadora)."
       >
         <div className="flex gap-2">
           <button className={button} onClick={exportBackup}>Exportar…</button>

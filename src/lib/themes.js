@@ -51,12 +51,21 @@ export const THEME_CHOICES = [
 
 const md = (m, d) => `${String(m).padStart(2, "0")}-${String(d).padStart(2, "0")}`;
 
-/** `birthday` es "MM-DD" (o vacío). Devuelve el id del tema que toca ahora: "none" o una clave de THEMES. */
-export function resolveTheme(setting, birthday, now = new Date()) {
+/** ¿`md` ("MM-DD") cae entre `from` y `to`? Si `from` > `to`, el rango cruza el fin de año. */
+const inRange = (md, from, to) => (from <= to ? md >= from && md <= to : md >= from || md <= to);
+
+/**
+ * `birthday` es "MM-DD" (o vacío) y `events` las fechas propias `{ from, to, theme }`.
+ * Devuelve el id del tema que toca ahora: "none" o una clave de THEMES.
+ */
+export function resolveTheme(setting, birthday, events = [], now = new Date()) {
   if (setting && setting !== "auto") return setting;
   const month = now.getMonth() + 1;
   const day = now.getDate();
-  if (birthday && birthday === md(month, day)) return "birthday";
+  const today = md(month, day);
+  if (birthday && birthday === today) return "birthday";
+  const own = events.find((e) => THEMES[e.theme] && inRange(today, e.from, e.to));
+  if (own) return own.theme;
   if ((month === 10 && day >= 24) || (month === 11 && day <= 2)) return "halloween";
   if (month === 12 && day <= 26) return "christmas";
   if (month === 2 && day >= 7 && day <= 14) return "love";

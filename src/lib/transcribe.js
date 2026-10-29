@@ -35,11 +35,11 @@ async function decode(blob) {
 }
 
 /** Transcribe un audio grabado. `onProgress(pct)` informa la descarga del modelo (solo la primera vez); null = transcribiendo. */
-export async function transcribe(blob, language, onProgress) {
+export async function transcribe(blob, language, onProgress, model = "tiny") {
   const audio = await decode(blob);
   const id = ++seq;
   return new Promise((resolve, reject) => {
     pending.set(id, { resolve, reject, onProgress });
-    getWorker().postMessage({ id, audio, language }, [audio.buffer]);
+    getWorker().postMessage({ id, audio, language, model }, [audio.buffer]);
   });
 }

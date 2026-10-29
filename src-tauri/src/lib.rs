@@ -60,7 +60,7 @@ fn commit_settings(app: &AppHandle, mut new: Settings) -> Result<Option<String>,
     state.dirty.store(true, SeqCst);
 
     let mut warning = None;
-    if new.shortcuts.toggle != prev.shortcuts.toggle {
+    if new.shortcuts != prev.shortcuts {
         warning = apply_shortcut(app, &new);
     }
     if new.general.autostart != prev.general.autostart {
@@ -88,16 +88,83 @@ fn reset_settings(app: AppHandle) -> Result<Option<String>, String> {
     commit_settings(&app, Settings::default())
 }
 
+/// Atajos activos como (combinación, acción). Las pestañas son «tab:0»…«tab:8».
+fn shortcut_list(sc: &settings::Shortcuts) -> Vec<(String, String)> {
+    let mut v = Vec::new();
+    for (on, key, action) in [
+        (sc.toggle_enabled, &sc.toggle, "toggle"),
+        (sc.record_enabled, &sc.record, "record"),
+        (sc.dnd_enabled, &sc.dnd, "dnd"),
+        (sc.add_task_enabled, &sc.add_task, "addTask"),
+    ] {
+        if on {
+            v.push((key.clone(), action.to_string()));
+        }
+    }
+    if sc.tabs_enabled {
+        for i in 1..=9 {
+            v.push((format!("{}+{i}", sc.tabs_modifier), format!("tab:{}", i - 1)));
+        }
+    }
+    v
+}
+
 fn apply_shortcut(app: &AppHandle, s: &Settings) -> Option<String> {
     let gs = app.global_shortcut();
     let _ = gs.unregister_all();
-    match s.shortcuts.toggle.parse::<Shortcut>() {
-        Ok(sc) => gs
-            .register(sc)
-            .err()
-            .map(|e| format!("No se pudo registrar el atajo «{}»: {e}", s.shortcuts.toggle)),
-        Err(e) => Some(format!("Atajo no válido «{}»: {e}", s.shortcuts.toggle)),
+    let mut problems: Vec<String> = Vec::new();
+    for (key, _) in shortcut_list(&s.shortcuts) {
+        match key.parse::<Shortcut>() {
+            Ok(sc) => {
+                if let Err(e) = gs.register(sc) {
+                    problems.push(format!("«{key}»: {e}"));
+                }
+            }
+            Err(e) => problems.push(format!("«{key}» no es válido: {e}")),
+        }
     }
+    (!problems.is_empty()).then(|| format!("No se pudo registrar el atajo {}", problems.join("; ")))
+}
+
+/// Ejecuta la acción de un atajo. «toggle» lo resuelve Rust; el resto lo atiende la ventana de JS que corresponda.
+fn run_shortcut(app: &AppHandle, action: &str) {
+    match action {
+        "toggle" => notch::toggle(app),
+        // Estado global (grabación, «No molestar»): lo gestiona la ventana principal.
+        "record" | "dnd" => {
+            let _ = app.emit("shortcut-action", serde_json::json!({ "label": "main", "action": action }));
+        }
+        // Abrir una pestaña o la tarea rápida: antes se abre el notch de la pantalla del cursor.
+        _ => {
+            if let Some(label) = notch::open_here(app) {
+                let _ = app.emit("shortcut-action", serde_json::json!({ "label": label, "action": action }));
+            }
+        }
+    }
+}
+
+/// Guarda texto en un archivo elegido por el usuario (exportar transcripciones, apariencia…).
+#[tauri::command]
+fn save_text(path: String, text: String) -> Result<(), String> {
+    std::fs::write(path, text).map_err(|e| e.to_string())
+}
+
+/// Guarda bytes (en base64) en un archivo elegido por el usuario (exportar audios).
+#[tauri::command]
+fn save_bytes(path: String, data: String) -> Result<(), String> {
+    use base64::Engine;
+    let bytes = base64::engine::general_purpose::STANDARD.decode(data).map_err(|e| e.to_string())?;
+    std::fs::write(path, bytes).map_err(|e| e.to_string())
+}
+
+/// Lee un archivo de texto pequeño elegido por el usuario (importar apariencia).
+#[tauri::command]
+fn read_text(path: String) -> Result<String, String> {
+    let m = std::fs::metadata(&path).map_err(|e| e.to_string())?;
+    if m.len() > 1_000_000 {
+        return Err("El archivo es demasiado grande.".into());
+    }
+    std::fs::read_to_string(path).map_err(|e| e.to_string())
 }
 
 fn apply_autostart(app: &AppHandle, enable: bool) -> Result<(), String> {
@@ -552,9 +619,14 @@ pub fn run() {
         .plugin(tauri_plugin_autostart::init(MacosLauncher::LaunchAgent, None))
         .plugin(
             tauri_plugin_global_shortcut::Builder::new()
-                .with_handler(|app, _shortcut, event| {
-                    if event.state() == ShortcutState::Pressed {
-                        notch::toggle(app);
+                .with_handler(|app, shortcut, event| {
+                    if event.state() != ShortcutState::Pressed {
+                        return;
+                    }
+                    let list = shortcut_list(&app.state::<notch::NotchState>().settings.lock().unwrap().shortcuts);
+                    let hit = list.into_iter().find(|(key, _)| key.parse::<Shortcut>().map(|k| &k == shortcut).unwrap_or(false));
+                    if let Some((_, action)) = hit {
+                        run_shortcut(app, &action);
                     }
                 })
                 .build(),
@@ -579,6 +651,9 @@ pub fn run() {
             open_settings,
             quit_app,
             file_size,
+            save_text,
+            save_bytes,
+            read_text,
             ai::ai_chat,
             ai::ai_cancel,
             updates::update_check,

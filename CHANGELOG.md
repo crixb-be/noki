@@ -2,6 +2,12 @@
 
 ## Unreleased
 
+- **Customizable shortcuts**: each one can be turned on/off and rebound — open/close, record voice, do not disturb, quick task, and jump to tab (Alt+1…9). /
+  **Atajos personalizables**: cada uno se enciende/apaga y se cambia — abrir/cerrar, grabar voz, no molestar, tarea rápida e ir a una pestaña (Alt+1…9).
+- **Recorder**: search, export audio/text, send a transcript to Notes or Tasks, choose microphone and transcription quality; recording keeps going with the notch closed (red dot). /
+  **Grabadora**: búsqueda, exportar audio/texto, pasar una transcripción a Notas o Tareas, elegir micrófono y calidad; sigue grabando con el notch cerrado (punto rojo).
+- **Personalization**: your own theme dates, export/import your appearance, and a first-run welcome. / **Personalización**: fechas propias para temas, exportar/importar tu apariencia y una bienvenida la primera vez.
+- **Lighter app**: removed ~27 MB of unused transcription engine files. / **App más ligera**: se quitaron ~27 MB de archivos sin uso del motor de transcripción.
 - **Seasonal themes**: Halloween, Christmas, Birthday and Love, chosen separately for Noki's face, the center notch and the side strip, with decorations (pumpkins, reindeer, hearts…); automatic by date or chosen in Settings → Appearance. /
   **Temas de temporada**: Halloween, Navidad, Cumpleaños y Amor, a elegir por separado para la cara de Noki, el notch central y la franja de los costados, con adornos (calabazas, renos, corazones…); automáticos por fecha o a elegir en Ajustes → Apariencia.
 - **Reorder tabs** in Settings → Modules. / **Reordena las pestañas** en Ajustes → Módulos y dentro de Agenda (botón ⇄).

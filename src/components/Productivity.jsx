@@ -151,7 +151,7 @@ function TasksView() {
     <div className="flex h-full flex-col gap-2 rounded-3xl bg-white/5 p-3">
       <form onSubmit={add} className="flex shrink-0 flex-col gap-1.5">
         <div className="flex items-center gap-1.5">
-          <input value={text} onChange={(e) => setText(e.target.value)} placeholder="Escribe una tarea…" className={`${inputCls} h-10 min-w-0 flex-1 rounded-xl`} />
+          <input data-task-input value={text} onChange={(e) => setText(e.target.value)} placeholder="Escribe una tarea…" className={`${inputCls} h-10 min-w-0 flex-1 rounded-xl`} />
           <button type="button" onMouseDown={() => !showSchedule && invoke("request_open", { open: true, sticky: true }).catch(() => {})} onClick={toggleSchedule} title="Programar fecha y hora" aria-label="Programar fecha y hora" className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-xl text-lg transition-colors ${showSchedule ? "bg-sky-400/25 text-sky-100 ring-1 ring-sky-400/60" : "bg-white/10 text-white/70 hover:bg-white/15"}`}>◷</button>
           <button className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-white/10 text-lg text-white/70 transition-colors hover:bg-white/15" aria-label="Agregar">＋</button>
         </div>

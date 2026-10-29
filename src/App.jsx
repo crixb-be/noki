@@ -10,6 +10,7 @@ import { useLook, useMascotMood } from "./components/Mascot.jsx";
 import PeekContent, { peekSize } from "./components/Peek.jsx";
 import { useCalendar } from "./hooks/useCalendar.js";
 import { useWeather } from "./hooks/useWeather.js";
+import { isRecording, toggleRecording, useRecorder } from "./lib/recorder.js";
 import { useStore, useStoreReady } from "./hooks/useStore.js";
 import { useReminders } from "./hooks/useReminders.js";
 import { usePomodoro } from "./hooks/usePomodoro.js";
@@ -125,6 +126,28 @@ function Notch({ settings, update }) {
     setGreeted(now.getFullYear());
   }, [leader, settings.appearance.birthday]); // eslint-disable-line react-hooks/exhaustive-deps
 
+  // Atajos globales que Rust reenvía a esta ventana (grabar, «No molestar», tarea rápida, ir a una pestaña).
+  const [, setWorkTab] = useStore("workTab", "tasks");
+  const tabsRef = useRef([]);
+  useTauriEvent("shortcut-action", async (p) => {
+    if (p.label !== LABEL) return;
+    if (p.action === "record") {
+      const was = isRecording();
+      await toggleRecording();
+      show(was ? { kind: "text", icon: "✅", text: "Grabación guardada" } : { kind: "text", icon: "🔴", text: "Grabando… (el mismo atajo la detiene)" }, 2200);
+    } else if (p.action === "dnd") {
+      update({ general: { dnd: !dnd } });
+      show({ kind: "text", icon: dnd ? "🔔" : "🔕", text: dnd ? "No molestar desactivado" : "No molestar activado" }, 1800);
+    } else if (p.action === "addTask") {
+      setTab("work");
+      setWorkTab("tasks");
+      setTimeout(() => document.querySelector("[data-task-input]")?.focus(), 380);
+    } else if (p.action.startsWith("tab:")) {
+      const t = tabsRef.current[Number(p.action.slice(4))];
+      if (t) setTab(t.id);
+    }
+  });
+
   // Esc cierra el notch (útil cuando se abrió con el atajo).
   useEffect(() => {
     const onKey = (e) => e.key === "Escape" && invoke("request_open", { open: false, sticky: false }).catch(() => {});
@@ -169,11 +192,13 @@ function Notch({ settings, update }) {
   }, [expanded, setHold]);
 
   const { appearance: ap, modules } = settings;
+  const rec = useRecorder();
   const rank = (id) => {
     const i = modules.order?.indexOf(id) ?? -1;
     return i < 0 ? TABS.length : i;
   };
   const tabs = TABS.filter((t) => modules[t.id]).sort((a, b) => rank(a.id) - rank(b.id));
+  tabsRef.current = tabs;
   const activeTab = tabs.some((t) => t.id === tab) ? tab : tabs[0]?.id;
 
   // Agenda y Calendario contienen selectores nativos que pueden abrirse fuera de la
@@ -195,7 +220,7 @@ function Notch({ settings, update }) {
   const [tint, setTint] = useState(null); // color bajo la franja en modo automático (lo mide Rust)
   useTauriEvent("bar-tint", (p) => p.label === LABEL && setTint(p.color), ap.barMode === "auto" || ap.notchAuto);
   // Temas de temporada, cada parte el suyo: personaje, notch central y franja de los costados. No tocan tus colores guardados.
-  const themeFor = (setting) => resolveTheme(setting, ap.birthday);
+  const themeFor = (setting) => resolveTheme(setting, ap.birthday, ap.themeEvents);
   const notchTheme = THEMES[themeFor(ap.notchTheme)] ?? null;
   const barTheme = THEMES[themeFor(ap.barTheme)] ?? null;
   const notchImg = useBgImage(ap.notchAuto || notchTheme ? "" : ap.notchImage);
@@ -229,6 +254,7 @@ function Notch({ settings, update }) {
     unpinTimer.current = setTimeout(() => invoke("set_pinned", { pinned: false }).catch(() => {}), 700);
   };
 
+  const [welcomed, setWelcomed] = useStore("welcomed", false);
   const mascotState = { mood, look, poke, skin: themeFor(ap.mascotTheme) };
   const habitStats = { done: habitsDone, total: activeHabits.length };
 
@@ -267,6 +293,7 @@ function Notch({ settings, update }) {
               data={{ battery, media, pomo, cal, weather, files, setFiles, dragging, aiChat }}
               mascot={mascotState}
               banner={banner}
+              welcome={!welcomed ? { shortcuts: settings.shortcuts, done: () => setWelcomed(true) } : null}
             />
           ) : peek ? (
             <div className="relative h-full animate-[peekIn_240ms_cubic-bezier(0.2,0.8,0.2,1)_both]">
@@ -277,7 +304,7 @@ function Notch({ settings, update }) {
               ap={ap}
               modules={modules}
               mascot={mascotState}
-              indicator={{ cal, calendarOn: modules.calendar, pomo, media, dnd }}
+              indicator={{ cal, calendarOn: modules.calendar, pomo, media, dnd, rec }}
               pending={pendingTasks}
               habits={habitStats}
               weatherNow={weatherNow}

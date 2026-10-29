@@ -14,7 +14,33 @@ import ScreenTime from "../ScreenTime.jsx";
 import Mascot from "../Mascot.jsx";
 
 /** Notch abierto: cabecera (reloj, batería, mascota, pestañas), la vista activa y el aviso flotante. */
-export default function ExpandedView({ tabs, activeTab, setTab, settings, update, data, mascot, banner }) {
+/** Primera vez: un vistazo rápido a lo esencial. */
+function Welcome({ shortcuts, done }) {
+  const tips = [
+    ["🖱️", "Pasa el cursor por el notch (o pulsa " + (shortcuts.toggleEnabled ? shortcuts.toggle : "el atajo") + ") para abrirlo."],
+    ["🎙", shortcuts.recordEnabled ? `${shortcuts.record} graba tu voz desde cualquier lugar.` : "En Agenda → Grabadora guardas tu voz y la transcribes."],
+    ["⚙", "Cambia colores, temas, módulos y atajos en Ajustes (el engranaje)."],
+    ["🎭", "Prueba los temas de temporada en Ajustes → Apariencia."],
+  ];
+  return (
+    <div className="absolute inset-0 z-20 flex animate-[fadeIn_250ms_ease-out_both] items-center justify-center bg-black/80 p-6 backdrop-blur-sm">
+      <div className="flex max-w-sm flex-col gap-3">
+        <div className="text-base font-semibold">¡Hola, soy Noki! 👋</div>
+        <ul className="flex flex-col gap-2 text-xs text-white/75">
+          {tips.map(([icon, text]) => (
+            <li key={text} className="flex items-start gap-2.5">
+              <span className="text-base leading-none">{icon}</span>
+              <span>{text}</span>
+            </li>
+          ))}
+        </ul>
+        <button onClick={done} className="self-start rounded-full bg-white/15 px-4 py-1.5 text-xs font-medium transition-all hover:bg-white/25 active:scale-95">Empezar</button>
+      </div>
+    </div>
+  );
+}
+
+export default function ExpandedView({ tabs, activeTab, setTab, settings, update, data, mascot, banner, welcome }) {
   const { appearance: ap, modules } = settings;
   const { battery, media, pomo, cal, weather, files, setFiles, dragging, aiChat } = data;
   return (
@@ -70,6 +96,7 @@ export default function ExpandedView({ tabs, activeTab, setTab, settings, update
         {activeTab === "ai" && <AIChat ai={settings.ai} chat={aiChat} />}
         {activeTab === "tools" && <ToolsView clip={settings.clipboard} update={update} />}
       </div>
+      {welcome && <Welcome {...welcome} />}
       {banner && (
         <div
           className={`pointer-events-none absolute bottom-3 left-1/2 flex max-w-[90%] -translate-x-1/2 animate-[bannerIn_320ms_cubic-bezier(0.34,1.56,0.64,1)_both] items-center gap-2 rounded-full px-4 py-1.5 text-xs font-medium shadow-lg ring-1 ${

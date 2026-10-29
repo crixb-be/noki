@@ -26,7 +26,14 @@ async function tx(mode, fn) {
   });
 }
 
-const notify = () => listeners.forEach((fn) => fn());
+// Con un notch por pantalla hay varias ventanas: se avisan entre sí de los cambios.
+const channel = typeof BroadcastChannel !== "undefined" ? new BroadcastChannel("noki-recordings") : null;
+const local = () => listeners.forEach((fn) => fn());
+if (channel) channel.onmessage = local;
+const notify = () => {
+  local();
+  channel?.postMessage(1);
+};
 
 export const saveRecording = (rec) => tx("readwrite", (s) => s.put(rec)).then(notify);
 export const deleteRecording = (id) => tx("readwrite", (s) => s.delete(id)).then(notify);

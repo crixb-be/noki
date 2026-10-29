@@ -5,7 +5,15 @@ import Mascot from "../Mascot.jsx";
 import { fmtTime } from "../../hooks/usePomodoro.js";
 
 /** Indicador discreto del estado compacto: reunión inminente > temporizador > canción > no molestar. */
-function Indicator({ cal, calendarOn, pomo, media, visualizer, dnd }) {
+function Indicator({ cal, calendarOn, pomo, media, visualizer, dnd, rec }) {
+  if (rec?.recording) {
+    return (
+      <span className="flex items-center gap-1.5 text-xs tabular-nums text-rose-300" aria-label="Grabando">
+        <span className="h-2 w-2 animate-pulse rounded-full bg-rose-500" />
+        {Math.floor(rec.secs / 60)}:{String(Math.floor(rec.secs % 60)).padStart(2, "0")}
+      </span>
+    );
+  }
   const soon =
     calendarOn &&
     (cal.ongoing

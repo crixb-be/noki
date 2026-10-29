@@ -414,8 +414,15 @@ pub fn toggle(app: &AppHandle) {
         }
         return;
     }
+    open_here(app);
+}
+
+/// Abre (de forma «pegajosa») el notch de la pantalla donde está el cursor y devuelve su etiqueta.
+pub fn open_here(app: &AppHandle) -> Option<String> {
+    let st = app.state::<NotchState>();
+    let wins = st.all();
     if !st.settings.lock().unwrap().general.visible {
-        return;
+        return None;
     }
     let cur = cursor();
     let target = wins
@@ -423,13 +430,13 @@ pub fn toggle(app: &AppHandle) {
         .find(|(_, w)| w.monitor.lock().unwrap().map(|m| m.contains(cur)).unwrap_or(false))
         .map(|(l, _)| l.clone())
         .unwrap_or_else(|| "main".to_string());
-    if let Some(win) = st.win(&target) {
-        win.sticky.store(true, SeqCst);
-        set_open(app, &target, true);
-        if let Some(w) = app.get_webview_window(&target) {
-            let _ = w.set_focus();
-        }
+    let win = st.win(&target)?;
+    win.sticky.store(true, SeqCst);
+    set_open(app, &target, true);
+    if let Some(w) = app.get_webview_window(&target) {
+        let _ = w.set_focus();
     }
+    Some(target)
 }
 
 // ───────────────────────────── ventanas ─────────────────────────────

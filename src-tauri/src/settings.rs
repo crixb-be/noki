@@ -95,6 +95,8 @@ pub struct Appearance {
     pub bar_theme_opacity: i32,
     /// Cumpleaños de quien usa Noki, "MM-DD" (vacío si no se indica). Solo se usa en este equipo.
     pub birthday: String,
+    /// Fechas propias que activan un tema (p. ej. un aniversario) además de las de siempre.
+    pub theme_events: Vec<ThemeEvent>,
     /// Año de nacimiento (0 = no indicado); solo sirve para decir tu edad el día del cumpleaños.
     pub birth_year: i32,
 }
@@ -135,8 +137,25 @@ impl Default for Appearance {
             bar_theme_opacity: 90,
             birthday: String::new(),
             birth_year: 0,
+            theme_events: Vec::new(),
         }
     }
+}
+
+/// Un tema que se activa solo entre dos fechas ("MM-DD"; si `from` > `to` cruza el fin de año).
+#[derive(Serialize, Deserialize, Clone, Debug, Default, PartialEq)]
+#[serde(default, rename_all = "camelCase")]
+pub struct ThemeEvent {
+    pub name: String,
+    pub from: String,
+    pub to: String,
+    pub theme: String,
+}
+
+fn valid_md(v: &str) -> bool {
+    v.split_once('-').is_some_and(|(m, d)| {
+        m.len() == 2 && d.len() == 2 && matches!(m.parse::<u32>(), Ok(1..=12)) && matches!(d.parse::<u32>(), Ok(1..=31))
+    })
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq)]
@@ -195,14 +214,41 @@ impl Default for Modules {
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq)]
 #[serde(default, rename_all = "camelCase")]
 pub struct Shortcuts {
+    /// Abrir / cerrar el notch.
     pub toggle: String,
+    pub toggle_enabled: bool,
+    /// Empezar / detener una grabación de voz.
+    pub record: String,
+    pub record_enabled: bool,
+    /// Activar / desactivar «No molestar».
+    pub dnd: String,
+    pub dnd_enabled: bool,
+    /// Abrir el notch listo para escribir una tarea.
+    pub add_task: String,
+    pub add_task_enabled: bool,
+    /// Ir directo a una pestaña con <modificador>+1…9.
+    pub tabs_enabled: bool,
+    pub tabs_modifier: String,
 }
 
 impl Default for Shortcuts {
     fn default() -> Self {
-        Self { toggle: "Alt+N".into() }
+        Self {
+            toggle: "Alt+N".into(),
+            toggle_enabled: true,
+            record: "Alt+R".into(),
+            record_enabled: true,
+            dnd: "Alt+D".into(),
+            dnd_enabled: false,
+            add_task: "Alt+T".into(),
+            add_task_enabled: false,
+            tabs_enabled: false,
+            tabs_modifier: "Alt".into(),
+        }
     }
 }
+
+pub const TAB_MODIFIERS: [&str; 5] = ["Alt", "Ctrl", "Ctrl+Alt", "Ctrl+Shift", "Alt+Shift"];
 
 /// Configuración de un proveedor de IA. `base_url` vacío = el servidor oficial.
 #[derive(Serialize, Deserialize, Clone, Debug, Default, PartialEq)]
@@ -485,12 +531,12 @@ impl Settings {
                 *t = "auto".into();
             }
         }
-        let valid_birthday = a.birthday.split_once('-').is_some_and(|(m, d)| {
-            m.len() == 2
-                && d.len() == 2
-                && matches!(m.parse::<u32>(), Ok(1..=12))
-                && matches!(d.parse::<u32>(), Ok(1..=31))
-        });
+        let valid_birthday = valid_md(&a.birthday);
+        a.theme_events.retain(|e| valid_md(&e.from) && valid_md(&e.to) && ["halloween", "christmas", "birthday", "love"].contains(&e.theme.as_str()));
+        a.theme_events.truncate(12);
+        for e in &mut a.theme_events {
+            e.name = e.name.trim().chars().take(40).collect();
+        }
         if a.birth_year != 0 && !(1900..=2100).contains(&a.birth_year) {
             a.birth_year = 0;
         }
@@ -576,6 +622,19 @@ impl Settings {
             self.updates.url = DEFAULT_UPDATE_URL.into();
         }
 
+        let sc = Shortcuts::default();
+        for (cur, def) in [
+            (&mut self.shortcuts.record, &sc.record),
+            (&mut self.shortcuts.dnd, &sc.dnd),
+            (&mut self.shortcuts.add_task, &sc.add_task),
+        ] {
+            if cur.trim().is_empty() {
+                *cur = def.clone();
+            }
+        }
+        if !TAB_MODIFIERS.contains(&self.shortcuts.tabs_modifier.as_str()) {
+            self.shortcuts.tabs_modifier = sc.tabs_modifier.clone();
+        }
         if self.shortcuts.toggle.trim().is_empty() {
             self.shortcuts.toggle = Shortcuts::default().toggle;
         }
