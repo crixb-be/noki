@@ -143,7 +143,14 @@ pub struct Modules {
     pub habits: bool,
     /// "last" recuerda la última pestaña; o el id de un módulo.
     pub default_tab: String,
+    /// Orden de las pestañas del notch (ids de módulo).
+    pub order: Vec<String>,
 }
+
+/// Pestañas del notch en su orden original.
+pub const TAB_IDS: [&str; 10] = [
+    "panel", "media", "work", "habits", "files", "calendar", "ai", "system", "screentime", "tools",
+];
 
 impl Default for Modules {
     fn default() -> Self {
@@ -161,6 +168,7 @@ impl Default for Modules {
             screentime: false,
             habits: true,
             default_tab: "last".into(),
+            order: TAB_IDS.iter().map(|s| s.to_string()).collect(),
         }
     }
 }
@@ -414,6 +422,19 @@ pub struct Settings {
 impl Settings {
     /// Mantiene los valores dentro de rangos que el diseño soporta.
     pub fn clamp(&mut self) {
+        // Orden de pestañas: sin repetidas ni desconocidas, y las que falten (p. ej. módulos nuevos) al final.
+        let mut seen: Vec<String> = Vec::new();
+        for id in self.modules.order.drain(..) {
+            if TAB_IDS.contains(&id.as_str()) && !seen.contains(&id) {
+                seen.push(id);
+            }
+        }
+        for id in TAB_IDS {
+            if !seen.iter().any(|s| s == id) {
+                seen.push(id.to_string());
+            }
+        }
+        self.modules.order = seen;
         let g = &mut self.general;
         if g.trigger != "notch" && g.trigger != "edge" {
             g.trigger = "notch".into();

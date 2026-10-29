@@ -163,6 +163,8 @@ export const EN = {
   "Anterior": "Previous",
   "Siguiente": "Next",
 
+  "Subir": "Move up",
+  "Bajar": "Move down",
   // grabadora
   "Grabadora": "Recorder",
   "Grabar": "Record",
@@ -335,7 +337,7 @@ export const EN = {
   "Elegir": "Choose",
 
   // ajustes · módulos
-  "Elige qué pestañas aparecen en el notch.": "Choose which tabs appear on the notch.",
+  "Elige qué pestañas aparecen en el notch y en qué orden.": "Choose which tabs appear on the notch and in what order.",
   "Interruptores (Wi-Fi, Bluetooth, mantener activo, modo oscuro…), clima y favoritos.": "Toggles (Wi-Fi, Bluetooth, keep awake, dark mode…), weather and favorites.",
   "Reproductor y controles multimedia.": "Player and media controls.",
   "Tareas, notas y enfoque.": "Tasks, notes and focus.",

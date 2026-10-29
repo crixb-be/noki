@@ -155,7 +155,11 @@ function Notch({ settings, update }) {
   }, [expanded, setHold]);
 
   const { appearance: ap, modules } = settings;
-  const tabs = TABS.filter((t) => modules[t.id]);
+  const rank = (id) => {
+    const i = modules.order?.indexOf(id) ?? -1;
+    return i < 0 ? TABS.length : i;
+  };
+  const tabs = TABS.filter((t) => modules[t.id]).sort((a, b) => rank(a.id) - rank(b.id));
   const activeTab = tabs.some((t) => t.id === tab) ? tab : tabs[0]?.id;
 
   // Agenda y Calendario contienen selectores nativos que pueden abrirse fuera de la

@@ -382,11 +382,41 @@ function Modules({ s, set }) {
     ["tools", "🧰 Herramientas", "Lanzador de apps y portapapeles."],
   ];
   const enabled = items.filter(([id]) => m[id]);
+  // Orden elegido: Rust garantiza una lista completa; «Clima» no es pestaña propia, va dentro del Panel.
+  const rank = (id) => (m.order?.indexOf(id) ?? -1) >= 0 ? m.order.indexOf(id) : 99;
+  const sorted = [...items].sort((a, b) => rank(a[0]) - rank(b[0]));
+  const tabIds = sorted.map(([id]) => id).filter((id) => id !== "weather");
+  const move = (id, dir) => {
+    const i = tabIds.indexOf(id);
+    const j = i + dir;
+    if (j < 0 || j >= tabIds.length) return;
+    const next = [...tabIds];
+    [next[i], next[j]] = [next[j], next[i]];
+    set({ modules: { order: next } });
+  };
   return (
-    <Page title="Módulos" subtitle="Elige qué pestañas aparecen en el notch.">
-      {items.map(([id, label, hint]) => (
+    <Page title="Módulos" subtitle="Elige qué pestañas aparecen en el notch y en qué orden.">
+      {sorted.map(([id, label, hint]) => (
         <Row key={id} title={label} hint={hint}>
-          <Toggle checked={m[id]} onChange={(v) => set({ modules: { [id]: v } })} />
+          <div className="flex items-center gap-3">
+            {id !== "weather" && (
+              <div className="flex gap-1">
+                {[[-1, "▲", "Subir"], [1, "▼", "Bajar"]].map(([dir, glyph, tip]) => (
+                  <button
+                    key={dir}
+                    onClick={() => move(id, dir)}
+                    disabled={tabIds.indexOf(id) + dir < 0 || tabIds.indexOf(id) + dir >= tabIds.length}
+                    title={tip}
+                    aria-label={tip}
+                    className="rounded-md bg-white/10 px-1.5 py-0.5 text-[10px] transition-colors hover:bg-white/20 disabled:opacity-25"
+                  >
+                    {glyph}
+                  </button>
+                ))}
+              </div>
+            )}
+            <Toggle checked={m[id]} onChange={(v) => set({ modules: { [id]: v } })} />
+          </div>
         </Row>
       ))}
       <Row title="🎤 Letras en el reproductor" hint="Botón de letra sincronizada (LRCLIB) dentro de la pestaña de música.">
