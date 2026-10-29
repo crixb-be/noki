@@ -2,8 +2,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import { getCurrentWindow } from "@tauri-apps/api/window";
-import Clock from "./components/Clock.jsx";
-import Battery, { useBattery } from "./components/Battery.jsx";
+import { useBattery } from "./components/Battery.jsx";
 import MediaPlayer from "./components/MediaPlayer.jsx";
 import Productivity from "./components/Productivity.jsx";
 import FileShelf, { addPaths, useNativeDrop } from "./components/FileShelf.jsx";
@@ -14,24 +13,25 @@ import ToolsView from "./components/ToolsView.jsx";
 import HabitsView from "./components/HabitsView.jsx";
 import SystemView from "./components/SystemView.jsx";
 import ScreenTime from "./components/ScreenTime.jsx";
-import Visualizer from "./components/Visualizer.jsx";
+import Ear from "./components/notch/Ear.jsx";
+import CompactBar from "./components/notch/CompactBar.jsx";
+import ExpandedView from "./components/notch/ExpandedView.jsx";
 import PeekContent, { peekSize } from "./components/Peek.jsx";
 import { useCalendar } from "./hooks/useCalendar.js";
 import { useWeather } from "./hooks/useWeather.js";
 import { useStore, useStoreReady } from "./hooks/useStore.js";
 import { useReminders } from "./hooks/useReminders.js";
-import { usePomodoro, fmtTime } from "./hooks/usePomodoro.js";
+import { usePomodoro } from "./hooks/usePomodoro.js";
 import { useMedia } from "./hooks/useMedia.js";
 import { useSettings } from "./hooks/useSettings.js";
 import { usePeeks } from "./hooks/usePeeks.js";
 import { useAiChat } from "./hooks/useAiChat.js";
+import { useNotchOpen } from "./hooks/useNotchOpen.js";
 import { EMPTY_HABITS, countOn, useHabits } from "./hooks/useHabits.js";
 import { fillFor, rgba, useBgImage } from "./lib/background.js";
 import { weatherInfo } from "./lib/wmo.js";
+import { NOTCH_EASE, NOTCH_MS, compactWidth, notchRadius } from "./lib/notchGeometry.js";
 import { presetLanguage, useLanguage } from "./lib/i18n.js";
-
-// Deben coincidir con EAR y SHADOW en src-tauri/src/notch.rs
-const EAR = 16;
 
 /** Etiqueta de esta ventana: "main" o "main-1", "main-2"… (un notch por pantalla). */
 const LABEL = getCurrentWindow().label;
@@ -52,38 +52,6 @@ const TABS = [
 const isTextField = (el) =>
   el?.tagName === "TEXTAREA" || (el?.tagName === "INPUT" && !["range", "checkbox"].includes(el.type));
 
-/** Rust decide cuándo abrir/cerrar (hover, atajo, clic fuera); aquí solo se refleja. */
-function useNotchOpen() {
-  const [open, setOpen] = useState(false);
-  useEffect(() => {
-    let unlisten;
-    let cancelled = false;
-    invoke("notch_state").then((o) => !cancelled && setOpen(o)).catch(() => {});
-    listen("notch-open", (e) => e.payload.label === LABEL && setOpen(e.payload.open)).then((fn) => (cancelled ? fn() : (unlisten = fn)));
-    return () => {
-      cancelled = true;
-      unlisten?.();
-    };
-  }, []);
-  return open;
-}
-
-/** Orejas cóncavas que unen el notch con el borde superior de la pantalla. */
-function Ear({ side, bg }) {
-  const left = side === "left";
-  return (
-    <div
-      className="absolute top-0"
-      style={{
-        width: EAR,
-        height: EAR,
-        [left ? "right" : "left"]: "100%",
-        background: `radial-gradient(circle at ${left ? "0" : "100%"} 100%, transparent ${EAR - 1}px, ${bg} ${EAR - 0.5}px)`,
-      }}
-    />
-  );
-}
-
 /** Espera a tener ajustes y datos cargados para montar el notch con todo disponible. */
 export default function App() {
   const { settings, update } = useSettings();
@@ -95,7 +63,7 @@ export default function App() {
 }
 
 function Notch({ settings, update }) {
-  const expanded = useNotchOpen();
+  const expanded = useNotchOpen(LABEL);
   const [tab, setTab] = useState("media");
   const prod = settings.productivity;
 
@@ -184,13 +152,9 @@ function Notch({ settings, update }) {
 
   const peek = expanded ? null : rawPeek;
   const banner = expanded && rawPeek?.kind === "text" ? rawPeek : null;
-  const peekDims = peek ? peekSize(peek, settings.appearance.collapsedW, settings.appearance.collapsedH) : null;
-  // El notch cerrado se ensancha lo justo para que quepa lo que elegiste mostrar (hora, fecha, tareas, temperatura, batería).
   const apx = settings.appearance;
-  const compactItems = [apx.showClock, apx.showDate, apx.showTasks, apx.showHabits, apx.showWeather, apx.showBattery].filter(Boolean).length;
-  const compactNeeded =
-    32 + (apx.showClock ? 46 : 0) + (apx.showDate ? 78 : 0) + (apx.showTasks ? 34 : 0) + (apx.showHabits ? 44 : 0) + (apx.showWeather ? 54 : 0) + (apx.showBattery ? 66 : 0) + (apx.showActivity ? 36 : 0) + 8 * compactItems;
-  const compactW = Math.min(Math.max(apx.collapsedW, compactNeeded), apx.expandedW);
+  const peekDims = peek ? peekSize(peek, settings.appearance.collapsedW, settings.appearance.collapsedH) : null;
+  const compactW = compactWidth(apx);
 
   // Rust necesita saber el tamaño del aviso para que su zona reciba clics (slider de volumen/brillo).
   useEffect(() => {
@@ -247,44 +211,6 @@ function Notch({ settings, update }) {
             ? rgba(ap.barColor, ap.barOpacity)
             : fillFor({ color: ap.barColor, opacity: ap.barOpacity, image: barImg, dim: ap.barDim });
 
-  // Indicador discreto del estado compacto: reunión inminente > temporizador > canción.
-  const soon = modules.calendar && (cal.ongoing ? { text: "Ahora", ms: 0 } : cal.next && cal.next.start - cal.now <= 15 * 60000 ? { text: `${Math.max(1, Math.round((cal.next.start - cal.now) / 60000))} min`, ms: 1 } : null);
-  let indicator = null;
-  if (soon) {
-    indicator = (
-      <span className="max-w-[110px] truncate text-xs text-amber-300" title={(cal.ongoing ?? cal.next).title}>
-        📅 {soon.text}
-      </span>
-    );
-  } else if (pomo.running) {
-    indicator = (
-      <span className={`text-xs tabular-nums ${pomo.phase === "work" ? "text-rose-400" : "text-emerald-400"}`}>
-        ⏱ {fmtTime(pomo.left)}
-      </span>
-    );
-  } else if (media.available && media.playing) {
-    indicator = (
-      <span className="flex items-center gap-1.5" aria-label="Reproduciendo">
-        {media.track.art && <img src={media.track.art} alt="" className="h-5 w-5 rounded-md object-cover" draggable={false} />}
-        {ap.visualizer ? (
-          <Visualizer bars={6} className="h-3.5 w-9" />
-        ) : (
-          <span className="flex h-3 items-end gap-[2px]">
-            {[0, 1, 2].map((i) => (
-              <span
-                key={i}
-                className="w-[3px] animate-bounce rounded-full bg-fuchsia-400"
-                style={{ height: "100%", animationDelay: `${i * 150}ms`, animationDuration: "700ms" }}
-              />
-            ))}
-          </span>
-        )}
-      </span>
-    );
-  } else if (dnd) {
-    indicator = <span className="text-xs text-white/50" title="No molestar activado">🔕</span>;
-  }
-
   const onFocus = (e) => {
     if (!isTextField(e.target)) return;
     clearTimeout(unpinTimer.current);
@@ -307,7 +233,7 @@ function Notch({ settings, update }) {
         style={{
           width: expanded ? ap.expandedW : peekDims?.w ?? compactW,
           height: expanded ? ap.expandedH : peekDims?.h ?? ap.collapsedH,
-          transition: "width 300ms cubic-bezier(0.32, 0.72, 0, 1), height 300ms cubic-bezier(0.32, 0.72, 0, 1)",
+          transition: `width ${NOTCH_MS}ms ${NOTCH_EASE}, height ${NOTCH_MS}ms ${NOTCH_EASE}`,
         }}
       >
         {!notchImg && <Ear side="left" bg={bg} />}
@@ -318,95 +244,42 @@ function Notch({ settings, update }) {
           } ${dragging ? "ring-2 ring-sky-400" : ""}`}
           style={{
             background: notchFill,
-            borderRadius: expanded ? "0 0 28px 28px" : peek ? "0 0 20px 20px" : "0 0 16px 16px",
+            borderRadius: notchRadius(expanded, peek),
             boxShadow: expanded ? "0 14px 36px rgba(0,0,0,0.55)" : "none",
           }}
         >
           {expanded ? (
-            <div className="flex h-full animate-[fadeIn_300ms_ease-out_both] flex-col gap-3 p-4">
-              <div className="flex shrink-0 items-center justify-between">
-                <div className="flex items-center gap-3">
-                  <Clock withDate={tabs.length < 6} hour12={!ap.clock24} />
-                  {tabs.length < 8 && <Battery info={battery} />}
-                </div>
-                <nav className="flex gap-0.5 rounded-full bg-white/10 p-1">
-                  {tabs.map((t) => (
-                    <button
-                      key={t.id}
-                      onClick={() => setTab(t.id)}
-                      title={t.label}
-                      aria-label={t.label}
-                      className={`rounded-full py-1 text-sm transition-all duration-300 ${tabs.length >= 10 ? "px-1.5" : "px-2"} ${
-                        activeTab === t.id ? "bg-white/20" : "opacity-50 hover:opacity-100"
-                      }`}
-                    >
-                      {t.icon}
-                    </button>
-                  ))}
-                  <button
-                    onClick={() => invoke("open_settings", {})}
-                    title="Ajustes"
-                    aria-label="Ajustes"
-                    className="rounded-full px-2 py-1 text-sm opacity-50 transition-all duration-300 hover:opacity-100"
-                  >
-                    ⚙
-                  </button>
-                </nav>
-              </div>
-              <div className="min-h-0 flex-1">
-                {tabs.length === 0 && (
-                  <div className="flex h-full flex-col items-center justify-center gap-2 text-xs text-white/40">
-                    Todos los módulos están desactivados.
-                    <button onClick={() => invoke("open_settings", { section: "modules" })} className="text-sky-300 underline">
-                      Abrir ajustes
-                    </button>
-                  </div>
-                )}
-                {activeTab === "panel" && <PanelView weather={weather} units={settings.weather.units} city={settings.weather.city} dnd={dnd} update={update} />}
-                {activeTab === "media" && <MediaPlayer media={media} lyricsAvailable={modules.lyrics} visualizer={ap.visualizer} />}
-                {activeTab === "work" && <Productivity pomo={pomo} prod={prod} />}
-                {activeTab === "habits" && <HabitsView />}
-                {activeTab === "system" && <SystemView />}
-                {activeTab === "screentime" && <ScreenTime />}
-                {activeTab === "files" && <FileShelf files={files} setFiles={setFiles} dragging={dragging} />}
-                {activeTab === "calendar" && <CalendarView cal={cal} />}
-                {activeTab === "ai" && <AIChat ai={settings.ai} chat={aiChat} />}
-                {activeTab === "tools" && <ToolsView clip={settings.clipboard} update={update} />}
-              </div>
-              {banner && (
-                <div
-                  className={`pointer-events-none absolute bottom-3 left-1/2 flex max-w-[90%] -translate-x-1/2 animate-[fadeIn_200ms_ease-out_both] items-center gap-2 rounded-full px-4 py-1.5 text-xs font-medium shadow-lg ring-1 ${
-                    banner.tone === "alert" ? "bg-amber-400/20 text-amber-100 ring-amber-400/50" : "bg-white/15 text-white ring-white/20"
-                  }`}
-                >
-                  <span>{banner.icon}</span>
-                  <span className="truncate">{banner.text}</span>
-                </div>
-              )}
-            </div>
+            <ExpandedView ap={ap} tabs={tabs} activeTab={activeTab} onTab={setTab} battery={battery} banner={banner}>
+              {activeTab === "panel" && <PanelView weather={weather} units={settings.weather.units} city={settings.weather.city} dnd={dnd} update={update} />}
+              {activeTab === "media" && <MediaPlayer media={media} lyricsAvailable={modules.lyrics} visualizer={ap.visualizer} />}
+              {activeTab === "work" && <Productivity pomo={pomo} prod={prod} />}
+              {activeTab === "habits" && <HabitsView />}
+              {activeTab === "system" && <SystemView />}
+              {activeTab === "screentime" && <ScreenTime />}
+              {activeTab === "files" && <FileShelf files={files} setFiles={setFiles} dragging={dragging} />}
+              {activeTab === "calendar" && <CalendarView cal={cal} />}
+              {activeTab === "ai" && <AIChat ai={settings.ai} chat={aiChat} />}
+              {activeTab === "tools" && <ToolsView clip={settings.clipboard} update={update} />}
+            </ExpandedView>
           ) : peek ? (
-            <div className="h-full animate-[fadeIn_200ms_ease-out_both]">
+            <div className="h-full animate-[contentIn_220ms_ease-out_both]">
               <PeekContent peek={peek} setHold={setHold} />
             </div>
           ) : (
-            <div className="flex h-full items-center justify-between gap-2 px-4">
-              <div className="flex shrink-0 items-center gap-2">
-                {(ap.showClock || ap.showDate) && <Clock showTime={ap.showClock} withDate={ap.showDate} hour12={!ap.clock24} />}
-              </div>
-              <div className="flex min-w-0 flex-1 justify-center">{ap.showActivity ? indicator : null}</div>
-              <div className="flex shrink-0 items-center gap-2 text-xs tabular-nums">
-                {ap.showTasks && (
-                  <span className="text-white/80" title={`${pendingTasks} tarea${pendingTasks === 1 ? "" : "s"} pendiente${pendingTasks === 1 ? "" : "s"}`}>✓ {pendingTasks}</span>
-                )}
-                {ap.showHabits && modules.habits && activeHabits.length > 0 && (
-                  <span className="text-white/80" title="Hábitos completados hoy">🎯 {habitsDone}/{activeHabits.length}</span>
-                )}
-                {ap.showWeather && weatherNow && (
-                  <span className="text-white/80" title={weatherNow.text}>{weatherNow.icon} {Math.round(weather.data.current.temperature_2m)}°</span>
-                )}
-                {ap.showBattery && <Battery info={battery} />}
-              </div>
-            </div>
+            <CompactBar
+              ap={ap}
+              modules={modules}
+              dnd={dnd}
+              cal={cal}
+              pomo={pomo}
+              media={media}
+              battery={battery}
+              pendingTasks={pendingTasks}
+              activeHabits={activeHabits}
+              habitsDone={habitsDone}
+              weatherNow={weatherNow}
+              temperature={weather.data?.current?.temperature_2m}
+            />
           )}
         </div>
       </div>

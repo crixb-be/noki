@@ -1,5 +1,12 @@
 # Changelog
 
+## Unreleased
+
+- Smoother notch animations: content fades in as the notch grows, tab changes slide in, the ears follow the notch colour, and "reduce motion" in Windows is respected. /
+  Animaciones del notch más fluidas: el contenido aparece mientras crece, las pestañas entran deslizando, las orejas siguen el color del notch y se respeta «reducir movimiento» de Windows.
+- Internal: the notch UI in `App.jsx` was split into `components/notch/*`, `hooks/useNotchOpen.js` and `lib/notchGeometry.js`. /
+  Interno: la interfaz del notch de `App.jsx` se dividió en `components/notch/*`, `hooks/useNotchOpen.js` y `lib/notchGeometry.js`.
+
 ## 1.0.2 — App icons / Iconos de apps
 
 - App icons now retry when Windows fails to provide them the first time, instead of staying as a letter until restart. /

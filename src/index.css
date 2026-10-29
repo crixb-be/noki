@@ -34,3 +34,13 @@ html, body, #root {
 [data-view="notch"] ::-webkit-scrollbar-button { display: none; }
 .no-scrollbar { scrollbar-width: none; }
 .no-scrollbar::-webkit-scrollbar { display: none; }
+
+/* Respeta «reducir movimiento» de Windows: sin animaciones ni transiciones en el notch. */
+@media (prefers-reduced-motion: reduce) {
+  [data-view="notch"] *, [data-view="notch"] *::before, [data-view="notch"] *::after {
+    animation-duration: 1ms !important;
+    animation-delay: 0ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 1ms !important;
+  }
+}
