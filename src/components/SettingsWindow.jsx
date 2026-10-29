@@ -72,6 +72,22 @@ function splitTitle(title) {
   return { icon: ROW_ICONS[title] ?? "⚙️", text: title };
 }
 
+/** Foto del desarrollador (public/yo.jpeg). Si falta, se ve el icono de siempre. */
+function Avatar({ size, className = "" }) {
+  const [failed, setFailed] = useState(false);
+  if (failed) return <span aria-hidden="true">👤</span>;
+  return (
+    <img
+      src="/yo.jpeg"
+      alt={DEV.name}
+      draggable={false}
+      onError={() => setFailed(true)}
+      className={`rounded-full object-cover object-[50%_20%] ring-1 ring-white/20 ${className}`}
+      style={{ width: size, height: size }}
+    />
+  );
+}
+
 const IconTile = ({ icon, size = "h-9 w-9 text-lg" }) => (
   <span className={`flex shrink-0 items-center justify-center rounded-xl bg-white/[0.07] ${size}`} aria-hidden="true">{icon}</span>
 );
@@ -80,7 +96,7 @@ const IconTile = ({ icon, size = "h-9 w-9 text-lg" }) => (
 function Row({ title, hint, children, grouped = false }) {
   const { icon, text } = splitTitle(title);
   return (
-    <div className={`${grouped ? "" : CARD} flex items-center justify-between gap-4 px-4 py-3`}>
+    <div className={`${grouped ? "" : CARD} flex items-center justify-between gap-4 px-4 ${grouped ? "py-2.5 first:pt-3.5 last:pb-3.5" : "py-3"}`}>
       <div className="flex min-w-0 items-center gap-3">
         <IconTile icon={icon} />
         <div className="min-w-0">
@@ -180,7 +196,7 @@ function groupRows(children) {
   const flush = () => {
     if (!run.length) return;
     out.push(
-      <div key={`g${out.length}`} className={`${CARD} divide-y divide-white/[0.06] overflow-hidden`}>
+      <div key={`g${out.length}`} className={`${CARD} overflow-hidden`}>
         {run.map((r, i) => cloneElement(r, { grouped: true, key: r.key ?? i }))}
       </div>
     );
@@ -198,11 +214,12 @@ function groupRows(children) {
 }
 
 function Page({ title, subtitle, children }) {
-  const icon = SECTIONS.find((x) => x.label === title)?.icon;
+  const section = SECTIONS.find((x) => x.label === title);
+  const icon = section?.id === "developer" ? <Avatar size={44} /> : section?.icon;
   return (
     <div>
       <div className="flex items-center gap-3">
-        {icon && <IconTile icon={icon} size="h-11 w-11 text-2xl" />}
+        {icon && (section?.id === "developer" ? icon : <IconTile icon={icon} size="h-11 w-11 text-2xl" />)}
         <div>
           <h1 className="text-xl font-semibold">{title}</h1>
           {subtitle && <p className="mt-0.5 text-sm text-white/40">{subtitle}</p>}
@@ -1339,7 +1356,7 @@ export default function SettingsWindow() {
               section === x.id ? "bg-white/10 text-white" : "text-white/55 hover:bg-white/5 hover:text-white"
             }`}
           >
-            <span className="w-5 text-center">{x.icon}</span>
+            <span className="flex w-5 items-center justify-center">{x.id === "developer" ? <Avatar size={20} /> : x.icon}</span>
             {x.label}
           </button>
         ))}
