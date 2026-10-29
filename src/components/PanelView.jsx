@@ -96,44 +96,38 @@ function WeatherCard({ weather, units, city }) {
 
   return (
     <div className={`${card} gap-1.5`}>
-      <div className="flex min-h-0 flex-1 gap-3">
-        <div className="flex min-w-0 flex-1 flex-col gap-1.5">
-          <div className={`${heading} !mb-0`}>
-            <span>📍</span>
-            <span className="truncate">{place}</span>
-          </div>
-          <div className="flex shrink-0 items-center gap-2">
-            <span className="text-[30px] leading-none">{info.icon}</span>
-            <span className="text-[30px] font-semibold leading-none tabular-nums">{deg(cur.temperature_2m)}</span>
-            <div className="min-w-0 pl-1">
-              <div className="truncate text-[11px] font-medium">{info.text}</div>
-              <div className="truncate text-[9px] tabular-nums text-white/45" title={`Viento ${wind}`}>Sens. {deg(cur.apparent_temperature)} · 💧 {cur.relative_humidity_2m}%</div>
-            </div>
-          </div>
-          <div className="flex shrink-0 justify-between border-t border-white/10 pt-1.5">
-            {hours.map((h, i) => (
-              <div key={i} className="flex w-[34px] flex-col items-center gap-0.5 text-[9px]">
-                <span className="text-white/40">{h.label}</span>
-                <span className="text-sm leading-none">{h.icon}</span>
-                <span className="tabular-nums">{deg(h.temp)}</span>
-                <span className="tabular-nums text-sky-300">{rainText(h.rain)}</span>
-              </div>
-            ))}
-          </div>
+      <div className={`${heading} !mb-0`}>
+        <span>📍</span>
+        <span className="truncate">{place}</span>
+      </div>
+      <div className="flex shrink-0 items-center gap-2">
+        <span className="text-[30px] leading-none">{info.icon}</span>
+        <span className="text-[30px] font-semibold leading-none tabular-nums">{deg(cur.temperature_2m)}</span>
+        <div className="min-w-0 pl-1">
+          <div className="truncate text-[11px] font-medium">{info.text}</div>
+          <div className="truncate text-[9px] tabular-nums text-white/45" title={`Viento ${wind}`}>Sens. {deg(cur.apparent_temperature)} · 💧 {cur.relative_humidity_2m}%</div>
         </div>
-        <div className="flex shrink-0 flex-col justify-end border-l border-white/10 pl-3">
-          <div className="flex gap-1">
-            {days.map((d, i) => (
-              <div key={i} className="flex w-[38px] flex-col items-center gap-0.5 text-[9px]">
-                <span className="capitalize text-white/40">{d.label}</span>
-                <span className="text-sm leading-none">{d.icon}</span>
-                <span className="tabular-nums">{deg(d.max)}</span>
-                <span className="tabular-nums text-white/35">{deg(d.min)}</span>
-                <span className="tabular-nums text-sky-300">{rainText(d.rain)}</span>
-              </div>
-            ))}
+      </div>
+      <div className="flex shrink-0 justify-between border-t border-white/10 pt-1.5">
+        {hours.map((h, i) => (
+          <div key={i} className="flex w-[34px] flex-col items-center gap-0.5 text-[9px]">
+            <span className="text-white/40">{h.label}</span>
+            <span className="text-sm leading-none">{h.icon}</span>
+            <span className="tabular-nums">{deg(h.temp)}</span>
+            <span className="tabular-nums text-sky-300">{rainText(h.rain)}</span>
           </div>
-        </div>
+        ))}
+      </div>
+      <div className="flex shrink-0 justify-between border-t border-white/10 pt-1.5">
+        {days.map((d, i) => (
+          <div key={i} className="flex w-[40px] flex-col items-center gap-0.5 text-[9px]">
+            <span className="capitalize text-white/40">{d.label}</span>
+            <span className="text-sm leading-none">{d.icon}</span>
+            <span className="tabular-nums">{deg(d.max)}</span>
+            <span className="tabular-nums text-white/35">{deg(d.min)}</span>
+            <span className="tabular-nums text-sky-300">{rainText(d.rain)}</span>
+          </div>
+        ))}
       </div>
     </div>
   );
@@ -157,7 +151,7 @@ function AppsCard() {
   return (
     <div className={card}>
       <div className={`${heading} !mb-1.5`}><span>🚀</span><span>Apps</span></div>
-      <div className="flex items-start gap-3">
+      <div className="flex flex-wrap content-start items-start gap-x-2 gap-y-2">
         {list.map((f) => (
           <button key={f.path} onClick={() => launch(f)} title={f.name} className="group flex w-14 min-w-0 flex-col items-center gap-1 active:scale-95">
             <AppIcon app={f} size={30} className="transition-transform group-hover:scale-110" />
@@ -218,15 +212,14 @@ export default function PanelView({ weather, units, city, dnd, update }) {
 
   const act = (a) => invoke("quick_action", { kind: a.id }).then(() => a.id === "screenshot" && invoke("request_open", { open: false, sticky: false })).catch((e) => flash(String(e)));
 
-  const tile = "flex h-10 min-w-0 flex-1 items-center justify-center rounded-2xl transition-all duration-300 active:scale-95 disabled:opacity-30";
+  const tile = "flex h-10 min-w-0 items-center justify-center rounded-2xl transition-all duration-300 active:scale-95 disabled:opacity-30";
 
   return (
-    <div className="flex h-full min-h-0 flex-col gap-2">
-      <div className="flex min-h-0 flex-1 flex-col [&>*]:flex-1">
-        <WeatherCard weather={weather} units={units} city={city} />
-      </div>
-      <div className={`${card} shrink-0 !py-2`}>
-        <div className="flex shrink-0 gap-1.5">
+    <div className="grid h-full min-h-0 grid-cols-[1.25fr_1fr] gap-2">
+      <WeatherCard weather={weather} units={units} city={city} />
+      <div className="flex min-h-0 min-w-0 flex-col gap-2">
+      <div className={`${card} shrink-0 justify-center`}>
+        <div className="grid grid-cols-5 gap-1.5">
           {TOGGLES.map((t) => {
             const v = t.id === "dnd" ? dnd : state?.[t.state];
             const available = t.id === "dnd" || v != null;
@@ -255,7 +248,8 @@ export default function PanelView({ weather, units, city, dnd, update }) {
         </div>
         {msg && <div className="mt-1 rounded-xl bg-amber-500/10 px-2 py-1 text-[10px] text-amber-300">{msg}</div>}
       </div>
-      <div className="shrink-0 [&>*]:h-full"><AppsCard /></div>
+      <div className="min-h-0 flex-1 [&>*]:h-full"><AppsCard /></div>
+      </div>
     </div>
   );
 }

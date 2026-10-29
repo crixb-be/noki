@@ -268,27 +268,32 @@ function Appearance({ s, set }) {
       </Row>
       {a.mascot && (
         <>
-          <Row title="Disfraz de Noki" hint="«Automático» lo viste de Halloween (24 oct–2 nov), de Navidad (1–26 dic) y de cumpleaños el día que indiques abajo.">
-            <div className="flex flex-wrap justify-end gap-2">
+          <div className="border-b border-white/5 pb-4 pt-3.5">
+            <div className="text-sm">Disfraz de Noki</div>
+            <div className="mt-0.5 text-xs leading-snug text-white/40">
+              «Automático» lo viste de Halloween (24 oct–2 nov), de Navidad (1–26 dic) y de cumpleaños el día que indiques abajo.
+            </div>
+            <div className="mt-3 flex flex-wrap gap-3">
               {SKINS.map(([id, label]) => {
                 const shown = id === "auto" ? resolveSkin("auto", a.birthday) : id;
                 return (
                   <button
                     key={id}
                     onClick={() => ap({ mascotSkin: id })}
-                    className={`flex w-24 flex-col items-center gap-1.5 rounded-xl border px-2 py-2 text-[11px] transition-colors ${
-                      a.mascotSkin === id ? "border-emerald-400 bg-white/10" : "border-white/10 hover:bg-white/5"
+                    aria-pressed={a.mascotSkin === id}
+                    className={`flex w-24 flex-col items-center gap-1.5 rounded-2xl p-2.5 text-xs transition-all duration-200 ${
+                      a.mascotSkin === id ? "bg-white/15 ring-2 ring-white/60" : "bg-white/5 hover:bg-white/10"
                     }`}
                   >
-                    <span className="flex h-9 w-full items-center justify-center rounded-lg bg-black">
-                      <Mascot size={26} skin={shown} />
+                    <span className="flex h-12 w-full items-center justify-center rounded-xl bg-black">
+                      <Mascot size={28} skin={shown} />
                     </span>
-                    {label}
+                    <span className="text-center leading-tight text-white/75">{label}</span>
                   </button>
                 );
               })}
             </div>
-          </Row>
+          </div>
           <Row title="Tu cumpleaños" hint="Solo día y mes; se guarda únicamente en este equipo. Ese día Noki lleva gorro de fiesta.">
             <div className="flex items-center gap-2">
               <input

@@ -179,6 +179,11 @@ export const EN = {
   "Tu cumpleaños": "Your birthday",
   "Solo día y mes; se guarda únicamente en este equipo. Ese día Noki lleva gorro de fiesta.": "Day and month only; stored only on this PC. On that day Noki wears a party hat.",
   "Quitar": "Remove",
+  "Grabar un audio": "Record audio",
+  "Transcrita": "Transcribed",
+  "✨ Transcribir": "✨ Transcribe",
+  "Pausar": "Pause",
+  "Reproducir": "Play",
   // grabadora
   "Grabadora": "Recorder",
   "Grabar": "Record",
