@@ -165,6 +165,10 @@ export const EN = {
 
   "Subir": "Move up",
   "Bajar": "Move down",
+  "Mover a la izquierda": "Move left",
+  "Mover a la derecha": "Move right",
+  "Reordenar pestañas": "Reorder tabs",
+  "Listo": "Done",
   // grabadora
   "Grabadora": "Recorder",
   "Grabar": "Record",

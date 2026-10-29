@@ -232,18 +232,48 @@ const SUBTABS = [
 
 export default function Productivity({ pomo, prod }) {
   const [sub, setSub] = useStore("workTab", "tasks");
+  const [order, setOrder] = useStore("workOrder", SUBTABS.map((t) => t.id));
+  const [editing, setEditing] = useState(false);
+  const tabs = SUBTABS.map((t) => t).sort((a, b) => {
+    const rank = (id) => (order.includes(id) ? order.indexOf(id) : order.length);
+    return rank(a.id) - rank(b.id);
+  });
+  const move = (id, dir) => {
+    const ids = tabs.map((t) => t.id);
+    const i = ids.indexOf(id);
+    const j = i + dir;
+    if (j < 0 || j >= ids.length) return;
+    [ids[i], ids[j]] = [ids[j], ids[i]];
+    setOrder(ids);
+  };
+  const arrow = "rounded-full px-1 text-[10px] text-white/50 transition-colors hover:text-white disabled:opacity-20";
   return (
     <div className="flex h-full flex-col gap-2">
-      <div className="flex shrink-0 gap-1">
-        {SUBTABS.map((t) => (
-          <button
-            key={t.id}
-            onClick={() => setSub(t.id)}
-            className={`rounded-full px-3 py-1 text-[11px] transition-all duration-300 ${sub === t.id ? "bg-white/20" : "text-white/45 hover:text-white/80"}`}
-          >
-            {t.icon} {t.label}
-          </button>
+      <div className="flex shrink-0 items-center gap-1">
+        {tabs.map((t, i) => (
+          <div key={t.id} className={`flex items-center rounded-full transition-all duration-300 ${sub === t.id ? "bg-white/20" : ""}`}>
+            {editing && (
+              <button className={arrow} onClick={() => move(t.id, -1)} disabled={i === 0} aria-label="Mover a la izquierda" title="Mover a la izquierda">◀</button>
+            )}
+            <button
+              onClick={() => setSub(t.id)}
+              className={`rounded-full px-3 py-1 text-[11px] transition-all duration-300 ${sub === t.id ? "" : "text-white/45 hover:text-white/80"}`}
+            >
+              {t.icon} {t.label}
+            </button>
+            {editing && (
+              <button className={arrow} onClick={() => move(t.id, 1)} disabled={i === tabs.length - 1} aria-label="Mover a la derecha" title="Mover a la derecha">▶</button>
+            )}
+          </div>
         ))}
+        <button
+          onClick={() => setEditing(!editing)}
+          className={`ml-auto rounded-full px-2 py-1 text-[11px] transition-all duration-300 ${editing ? "bg-white/20" : "text-white/35 hover:text-white/70"}`}
+          title={editing ? "Listo" : "Reordenar pestañas"}
+          aria-label={editing ? "Listo" : "Reordenar pestañas"}
+        >
+          {editing ? "✓" : "⇄"}
+        </button>
       </div>
       <div className="min-h-0 flex-1">
         {sub === "focus" && <FocusView pomo={pomo} prod={prod} />}
