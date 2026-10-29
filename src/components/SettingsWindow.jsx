@@ -72,13 +72,13 @@ function splitTitle(title) {
   return { icon: ROW_ICONS[title] ?? "⚙️", text: title };
 }
 
-/** Foto del desarrollador (public/yo.jpeg). Si falta, se ve el icono de siempre. */
+/** Foto del desarrollador (public/Crixb.jpeg). Si falta, se ve el icono de siempre. */
 function Avatar({ size, className = "" }) {
   const [failed, setFailed] = useState(false);
   if (failed) return <span aria-hidden="true">👤</span>;
   return (
     <img
-      src="/yo.jpeg"
+      src="/Crixb.jpeg"
       alt={DEV.name}
       draggable={false}
       onError={() => setFailed(true)}
