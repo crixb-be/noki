@@ -1,25 +1,6 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" width="1024" height="1024">
-  <defs>
-    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
-      <stop offset="0" stop-color="#34D6B6"/>
-      <stop offset="1" stop-color="#3B9CF5"/>
-    </linearGradient>
-    <clipPath id="tile"><rect width="1024" height="1024" rx="232"/></clipPath>
-  </defs>
-  <!-- Fondo: baldosa redondeada con degradado -->
+  <defs><linearGradient id="bg" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#020025"/><stop offset="0.125" stop-color="#040442"/><stop offset="0.25" stop-color="#06085f"/><stop offset="0.375" stop-color="#09107b"/><stop offset="0.5" stop-color="#083696"/><stop offset="0.625" stop-color="#065bae"/><stop offset="0.75" stop-color="#0281c6"/><stop offset="0.875" stop-color="#01a7e1"/><stop offset="1" stop-color="#00cdfa"/></linearGradient><clipPath id="tile"><rect width="1024" height="1024" rx="232"/></clipPath></defs>
   <rect width="1024" height="1024" rx="232" fill="url(#bg)"/>
-  <g clip-path="url(#tile)">
-    <!-- El «notch»: cuelga del borde superior y es la cara de Noki -->
-    <path d="M214 -10 H810 V400 a160 160 0 0 1 -160 160 H374 a160 160 0 0 1 -160 -160 Z" fill="#0C0C12"/>
-    <!-- mejillas -->
-    <ellipse cx="338" cy="420" rx="34" ry="24" fill="#FF8FB1" opacity="0.8"/>
-    <ellipse cx="686" cy="420" rx="34" ry="24" fill="#FF8FB1" opacity="0.8"/>
-    <!-- ojos -->
-    <ellipse cx="406" cy="332" rx="52" ry="68" fill="#FFFFFF"/>
-    <ellipse cx="618" cy="332" rx="52" ry="68" fill="#FFFFFF"/>
-    <circle cx="420" cy="310" r="16" fill="#0C0C12"/>
-    <circle cx="632" cy="310" r="16" fill="#0C0C12"/>
-    <!-- sonrisa -->
-    <path d="M452 440 Q512 494 572 440" fill="none" stroke="#FFFFFF" stroke-width="24" stroke-linecap="round"/>
-  </g>
-</svg>
+  <g clip-path="url(#tile)"><path d="M214 -10 H810 V400 a160 160 0 0 1 -160 160 H374 a160 160 0 0 1 -160 -160 Z" fill="#0C0C12"/><path d="M372 350 Q418 290 464 350" fill="none" stroke="#FFFFFF" stroke-width="22" stroke-linecap="round"/>
+   <path d="M560 350 Q606 290 652 350" fill="none" stroke="#FFFFFF" stroke-width="22" stroke-linecap="round"/>
+   <path d="M474 424 Q512 462 550 424" fill="none" stroke="#FFFFFF" stroke-width="18" stroke-linecap="round"/></g></svg>
