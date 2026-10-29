@@ -9,6 +9,9 @@ export default {
         expandIn: { from: { opacity: 0, transform: "scale(0.96)" }, to: { opacity: 1, transform: "scale(1)" } },
         dropIn: { from: { opacity: 0, transform: "translateY(-8px)" }, to: { opacity: 1, transform: "translateY(0)" } },
         tabIn: { from: { opacity: 0, transform: "translateY(8px)" }, to: { opacity: 1, transform: "translateY(0)" } },
+        // Adornos de los temas: unos se mecen, otros flotan.
+        themeBob: { "0%, 100%": { marginTop: "0px" }, "50%": { marginTop: "-3px" } },
+        themeFloat: { "0%, 100%": { marginTop: "0px", marginLeft: "0px" }, "50%": { marginTop: "-5px", marginLeft: "3px" } },
         // Notch cerrado y avisos.
         compactIn: { from: { opacity: 0, transform: "scale(0.94)" }, to: { opacity: 1, transform: "scale(1)" } },
         peekIn: { from: { opacity: 0, transform: "scale(0.96)" }, to: { opacity: 1, transform: "scale(1)" } },

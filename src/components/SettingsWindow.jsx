@@ -257,6 +257,46 @@ function IconPicker({ value, onChange }) {
   );
 }
 
+/** Selector de tema para una parte (cara, notch o franja), con vista previa de cada opción. */
+function ThemePicker({ title, hint, value, birthday, kind, onChange }) {
+  return (
+    <div className="border-b border-white/5 pb-4 pt-3.5">
+      <div className="text-sm">{title}</div>
+      <div className="mt-0.5 text-xs leading-snug text-white/40">{hint}</div>
+      <div className="mt-3 flex flex-wrap gap-3">
+        {THEME_CHOICES.map(([id, label]) => {
+          const shown = id === "auto" ? resolveTheme("auto", birthday) : id;
+          const t = THEMES[shown];
+          return (
+            <button
+              key={id}
+              onClick={() => onChange(id)}
+              aria-pressed={value === id}
+              className={`flex w-24 flex-col items-center gap-1.5 rounded-2xl p-2.5 text-xs transition-all duration-200 ${
+                value === id ? "bg-white/15 ring-2 ring-white/60" : "bg-white/5 hover:bg-white/10"
+              }`}
+            >
+              <span
+                className="relative flex h-12 w-full items-center justify-center overflow-hidden rounded-xl"
+                style={{ background: kind === "face" ? "#000" : kind === "notch" ? t?.notch ?? "#000" : t?.bar ?? "#27272a" }}
+              >
+                {kind === "face" && <Mascot size={26} skin={shown} />}
+                {kind === "notch" && t && t.decor.slice(0, 3).map((d, i) => (
+                  <span key={i} className="absolute text-base leading-none opacity-80" style={{ left: `${[14, 46, 76][i]}%`, top: `${[48, 20, 52][i]}%` }}>{d.e}</span>
+                ))}
+                {kind === "bar" && (
+                  <span className="flex w-full justify-around text-sm leading-none">{(t?.strip ?? []).slice(0, 4).map((e, i) => <span key={i}>{e}</span>)}</span>
+                )}
+              </span>
+              <span className="text-center leading-tight text-white/75">{label}</span>
+            </button>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
 function Appearance({ s, set }) {
   const a = s.appearance;
   const ap = (patch) => set({ appearance: patch });
@@ -268,41 +308,36 @@ function Appearance({ s, set }) {
       </Row>
       {(
         <>
-          <div className="border-b border-white/5 pb-4 pt-3.5">
-            <div className="text-sm">Tema de temporada</div>
-            <div className="mt-0.5 text-xs leading-snug text-white/40">
-              «Automático» pone Halloween (24 oct–2 nov), Navidad (1–26 dic), Amor (7–14 feb) y Cumpleaños el día que indiques abajo.
-            </div>
-            <div className="mt-3 flex flex-wrap gap-3">
-              {THEME_CHOICES.map(([id, label]) => {
-                const shown = id === "auto" ? resolveTheme("auto", a.birthday) : id;
-                const t = THEMES[shown];
-                return (
-                  <button
-                    key={id}
-                    onClick={() => ap({ theme: id })}
-                    aria-pressed={a.theme === id}
-                    className={`flex w-24 flex-col items-center gap-1.5 rounded-2xl p-2.5 text-xs transition-all duration-200 ${
-                      a.theme === id ? "bg-white/15 ring-2 ring-white/60" : "bg-white/5 hover:bg-white/10"
-                    }`}
-                  >
-                    <span
-                      className="flex h-12 w-full items-center justify-center overflow-hidden rounded-xl border-t-4"
-                      style={{ background: a.themeColors && t ? t.notch : "#000", borderColor: a.themeColors && t ? t.bar : "transparent" }}
-                    >
-                      {a.themeMascot ? <Mascot size={26} skin={shown} /> : <Mascot size={26} />}
-                    </span>
-                    <span className="text-center leading-tight text-white/75">{label}</span>
-                  </button>
-                );
-              })}
-            </div>
-          </div>
-          <Row title="Vestir al personaje" hint="Gorro de bruja, de Papá Noel, de fiesta o ojitos de corazón.">
-            <Toggle checked={a.themeMascot} onChange={(v) => ap({ themeMascot: v })} />
-          </Row>
-          <Row title="Colores del notch y los costados" hint="Pinta el notch y la franja lateral con los colores del tema. Tus colores e imagen guardados no se pierden: al desactivarlo vuelven.">
-            <Toggle checked={a.themeColors} onChange={(v) => ap({ themeColors: v })} />
+          <ThemePicker
+            title="Cara de Noki"
+            hint="Disfraz del personaje: gorro de bruja, de Papá Noel, de fiesta u ojitos de corazón."
+            value={a.mascotTheme}
+            birthday={a.birthday}
+            kind="face"
+            onChange={(v) => ap({ mascotTheme: v })}
+          />
+          <ThemePicker
+            title="Notch central"
+            hint="Color y adornos del notch. «Ninguno» usa tus colores o imagen de Ajustes."
+            value={a.notchTheme}
+            birthday={a.birthday}
+            kind="notch"
+            onChange={(v) => ap({ notchTheme: v })}
+          />
+          <ThemePicker
+            title="Franja de los costados"
+            hint="La barra a los lados del notch. «Ninguno» usa tu configuración."
+            value={a.barTheme}
+            birthday={a.birthday}
+            kind="bar"
+            onChange={(v) => ap({ barTheme: v })}
+          />
+          <Row title="Mismo tema para todo" hint="«Automático» pone Halloween (24 oct–2 nov), Navidad (1–26 dic), Amor (7–14 feb) y Cumpleaños el día que indiques abajo.">
+            <Select
+              value=""
+              onChange={(v) => v && ap({ mascotTheme: v, notchTheme: v, barTheme: v })}
+              options={[["", "Elegir…"], ...THEME_CHOICES]}
+            />
           </Row>
           <Row title="Tu cumpleaños" hint="Solo día y mes; se guarda únicamente en este equipo. Ese día se activa el tema de cumpleaños.">
             <div className="flex items-center gap-2">

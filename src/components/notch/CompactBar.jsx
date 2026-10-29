@@ -54,7 +54,7 @@ function Indicator({ cal, calendarOn, pomo, media, visualizer, dnd }) {
 /** Contenido del notch cerrado: reloj, mascota/indicador y los datos que elegiste mostrar. */
 export default function CompactBar({ ap, modules, mascot, indicator, pending, habits, weatherNow, temperature, battery }) {
   return (
-    <div className="flex h-full animate-[compactIn_260ms_cubic-bezier(0.2,0.8,0.2,1)_both] items-center justify-between gap-2 px-4">
+    <div className="relative flex h-full animate-[compactIn_260ms_cubic-bezier(0.2,0.8,0.2,1)_both] items-center justify-between gap-2 px-4">
       <div className="flex shrink-0 items-center gap-2">
         {(ap.showClock || ap.showDate) && <Clock showTime={ap.showClock} withDate={ap.showDate} hour12={!ap.clock24} />}
       </div>

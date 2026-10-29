@@ -85,12 +85,11 @@ pub struct Appearance {
     pub app_icon: String,
     /// La carita animada de Noki dentro del notch.
     pub mascot: bool,
-    /// Tema de temporada: "auto" (según la fecha), "none", "halloween", "christmas", "birthday" o "love".
-    pub theme: String,
-    /// El tema viste al personaje.
-    pub theme_mascot: bool,
-    /// El tema pinta el notch y la franja de los costados (sin tocar tus colores guardados).
-    pub theme_colors: bool,
+    /// Tema del personaje, del notch central y de la franja de los costados, cada uno por separado:
+    /// "auto" (según la fecha), "none" (tus ajustes), "halloween", "christmas", "birthday" o "love".
+    pub mascot_theme: String,
+    pub notch_theme: String,
+    pub bar_theme: String,
     /// Cumpleaños de quien usa Noki, "MM-DD" (vacío si no se indica). Solo se usa en este equipo.
     pub birthday: String,
 }
@@ -124,9 +123,9 @@ impl Default for Appearance {
             bar_opacity: 100,
             app_icon: crate::appicon::DEFAULT.into(),
             mascot: true,
-            theme: "auto".into(),
-            theme_mascot: true,
-            theme_colors: true,
+            mascot_theme: "auto".into(),
+            notch_theme: "auto".into(),
+            bar_theme: "auto".into(),
             birthday: String::new(),
         }
     }
@@ -471,8 +470,10 @@ impl Settings {
             a.app_icon = crate::appicon::DEFAULT.into();
         }
         a.bar_opacity = a.bar_opacity.clamp(0, 100);
-        if !["auto", "none", "halloween", "christmas", "birthday", "love"].contains(&a.theme.as_str()) {
-            a.theme = "auto".into();
+        for t in [&mut a.mascot_theme, &mut a.notch_theme, &mut a.bar_theme] {
+            if !["auto", "none", "halloween", "christmas", "birthday", "love"].contains(&t.as_str()) {
+                *t = "auto".into();
+            }
         }
         let valid_birthday = a.birthday.split_once('-').is_some_and(|(m, d)| {
             m.len() == 2

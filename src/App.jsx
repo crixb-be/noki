@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { useBattery } from "./components/Battery.jsx";
 import { addPaths, useNativeDrop } from "./components/FileShelf.jsx";
+import { NotchDecor, StripDecor } from "./components/notch/ThemeDecor.jsx";
 import Ear from "./components/notch/Ear.jsx";
 import CompactBar from "./components/notch/CompactBar.jsx";
 import ExpandedView from "./components/notch/ExpandedView.jsx";
@@ -181,16 +182,17 @@ function Notch({ settings, update }) {
   const weatherNow = weather.data?.current ? weatherInfo(weather.data.current.weather_code, weather.data.current.is_day) : null;
   const [tint, setTint] = useState(null); // color bajo la franja en modo automático (lo mide Rust)
   useTauriEvent("bar-tint", (p) => p.label === LABEL && setTint(p.color), ap.barMode === "auto" || ap.notchAuto);
-  // Tema de temporada: pinta el notch y la franja sin tocar los colores que guardaste en Ajustes.
-  const themeId = resolveTheme(ap.theme, ap.birthday);
-  const theme = ap.themeColors ? THEMES[themeId] : null;
-  const notchImg = useBgImage(ap.notchAuto || theme ? "" : ap.notchImage);
+  // Temas de temporada, cada parte el suyo: personaje, notch central y franja de los costados. No tocan tus colores guardados.
+  const themeFor = (setting) => resolveTheme(setting, ap.birthday);
+  const notchTheme = THEMES[themeFor(ap.notchTheme)] ?? null;
+  const barTheme = THEMES[themeFor(ap.barTheme)] ?? null;
+  const notchImg = useBgImage(ap.notchAuto || notchTheme ? "" : ap.notchImage);
   const barImg = useBgImage(ap.barMode === "image" ? ap.barImage : "");
-  const notchColor = theme ? theme.notch : ap.notchAuto ? tint ?? ap.notchColor : ap.notchColor;
+  const notchColor = notchTheme ? notchTheme.notch : ap.notchAuto ? tint ?? ap.notchColor : ap.notchColor;
   const bg = rgba(notchColor, ap.opacity); // color plano: también lo usan las «orejas»
   const notchFill = fillFor({ color: notchColor, opacity: ap.opacity, image: notchImg, dim: ap.notchDim });
-  const barFill = theme
-    ? rgba(theme.bar, Math.max(ap.barOpacity, 85))
+  const barFill = barTheme
+    ? rgba(barTheme.bar, Math.max(ap.barOpacity, 85))
     : ap.barMode === "none"
       ? null
       : ap.barMode === "match"
@@ -214,12 +216,12 @@ function Notch({ settings, update }) {
     unpinTimer.current = setTimeout(() => invoke("set_pinned", { pinned: false }).catch(() => {}), 700);
   };
 
-  const mascotState = { mood, look, poke, skin: ap.themeMascot ? themeId : "none" };
+  const mascotState = { mood, look, poke, skin: themeFor(ap.mascotTheme) };
   const habitStats = { done: habitsDone, total: activeHabits.length };
 
   return (
     <div className="relative h-full w-full" onFocus={onFocus} onBlur={onBlur}>
-      {barFill && <div className="pointer-events-none absolute left-0 right-0 top-0" style={{ height: ap.collapsedH, background: barFill, transition: "background-color 350ms ease" }} />}
+      {barFill && <div className="pointer-events-none absolute left-0 right-0 top-0" style={{ height: ap.collapsedH, background: barFill, transition: "background-color 350ms ease" }}>{barTheme && <StripDecor theme={barTheme} height={ap.collapsedH} />}</div>}
       <div className="flex h-full w-full items-start justify-center" style={{ transform: `translateX(${ap.offsetX}px)` }}>
       <div
         className="relative"
@@ -241,6 +243,7 @@ function Notch({ settings, update }) {
             boxShadow: expanded ? "0 14px 36px rgba(0,0,0,0.55)" : "none",
           }}
         >
+          {notchTheme && !peek && <NotchDecor theme={notchTheme} compact={!expanded} />}
           {expanded ? (
             <ExpandedView
               tabs={tabs}
@@ -253,7 +256,7 @@ function Notch({ settings, update }) {
               banner={banner}
             />
           ) : peek ? (
-            <div className="h-full animate-[peekIn_240ms_cubic-bezier(0.2,0.8,0.2,1)_both]">
+            <div className="relative h-full animate-[peekIn_240ms_cubic-bezier(0.2,0.8,0.2,1)_both]">
               <PeekContent peek={peek} setHold={setHold} />
             </div>
           ) : (

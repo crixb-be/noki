@@ -18,7 +18,7 @@ export default function ExpandedView({ tabs, activeTab, setTab, settings, update
   const { appearance: ap, modules } = settings;
   const { battery, media, pomo, cal, weather, files, setFiles, dragging, aiChat } = data;
   return (
-    <div className="flex h-full animate-[expandIn_320ms_cubic-bezier(0.2,0.8,0.2,1)_both] flex-col gap-3 p-4">
+    <div className="relative flex h-full animate-[expandIn_320ms_cubic-bezier(0.2,0.8,0.2,1)_both] flex-col gap-3 p-4">
       <div className="flex shrink-0 animate-[dropIn_360ms_cubic-bezier(0.2,0.8,0.2,1)_60ms_both] items-center justify-between">
         <div className="flex items-center gap-3">
           <Clock withDate={tabs.length < 6} hour12={!ap.clock24} />
