@@ -132,6 +132,7 @@ En **Ajustes → Apariencia** puedes:
 - Rellenar la **franja a los costados** del notch para que parezca una sola pieza (igual que el notch, transparente, un color, una imagen o automática).
 - Decidir **qué se ve cuando está cerrado**: hora, fecha, tareas pendientes, hábitos del día, temperatura, batería y lo que suena.
 - Ajustar tamaños, posición, opacidad y reloj de 12 o 24 horas.
+- Poner un **tema de temporada** (Halloween, Navidad, Cumpleaños o Amor), por separado en la cara de Noki, el notch central y la franja de los costados. Con «Automático» se activan solos según la fecha.
 
 <table>
 <tr>
@@ -143,6 +144,27 @@ En **Ajustes → Apariencia** puedes:
 <td align="center" width="50%"><img src="docs/screenshots/es-closed.png" width="420" alt="Noki cerrado" /><br /><sub><b>Cerrado</b> · hora, tareas, hábitos, clima, batería y lo que suena</sub></td>
 </tr>
 </table>
+
+### 🎭 Temas de temporada
+
+Cada tema viste a Noki, pinta el notch y llena la franja de los costados con sus adornos. Eliges **por separado** la cara, el notch central y la franja (por ejemplo Noki de Amor, notch de Halloween y costados de Navidad), la transparencia del color y puedes añadir tus **propias fechas**. Con **Automático** cambian solos: Halloween (24 oct–2 nov), Navidad (1–26 dic), Amor (7–14 feb) y Cumpleaños el día que indiques. También puedes **exportar e importar** tu apariencia en un archivo.
+
+<table>
+<tr>
+<td align="center" width="50%"><img src="docs/screenshots/es-theme-halloween.png" width="420" alt="Tema de Halloween" /><br /><sub><b>Halloween</b> · bruja, calabazas, murciélagos, telarañas y calaveras</sub></td>
+<td align="center" width="50%"><img src="docs/screenshots/es-theme-christmas.png" width="420" alt="Tema de Navidad" /><br /><sub><b>Navidad</b> · gorro de Papá Noel, renos, duendes y copos</sub></td>
+</tr>
+<tr>
+<td align="center" width="50%"><img src="docs/screenshots/es-theme-birthday.png" width="420" alt="Tema de cumpleaños" /><br /><sub><b>Cumpleaños</b> · gorro de fiesta, globos, tarta y confeti</sub></td>
+<td align="center" width="50%"><img src="docs/screenshots/es-theme-love.png" width="420" alt="Tema de Amor" /><br /><sub><b>Amor</b> · ojitos de corazón, corazones y rosas</sub></td>
+</tr>
+<tr>
+<td align="center" width="50%"><img src="docs/screenshots/es-theme-mix.png" width="420" alt="Temas combinados" /><br /><sub><b>Mezclados</b> · cara de Amor, notch de Halloween y costados de Navidad</sub></td>
+<td align="center" width="50%"><img src="docs/screenshots/es-theme-closed.png" width="420" alt="Temas con el notch cerrado" /><br /><sub><b>Cerrado</b> · los cuatro temas con el notch cerrado</sub></td>
+</tr>
+</table>
+
+> Las imágenes de esta sección son ilustraciones generadas con los mismos componentes de la app; el aspecto real puede variar un poco según tu pantalla y fondo.
 
 ## 🔌 Y mucho más
 

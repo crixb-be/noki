@@ -132,6 +132,7 @@ In **Settings → Appearance** you can:
 - Fill the **strip beside the notch** so it looks like a single piece (same as the notch, transparent, a color, an image or automatic).
 - Decide **what shows when it's closed**: time, date, pending tasks, today's habits, temperature, battery and what's playing.
 - Adjust sizes, position, opacity and a 12 or 24-hour clock.
+- Apply a **seasonal theme** (Halloween, Christmas, Birthday or Love), separately for Noki's face, the center notch and the side strip. With “Automatic” they turn on by themselves according to the date.
 
 <table>
 <tr>
@@ -143,6 +144,27 @@ In **Settings → Appearance** you can:
 <td align="center" width="50%"><img src="docs/screenshots/en-closed.png" width="420" alt="Noki closed" /><br /><sub><b>Closed</b> · time, tasks, habits, weather, battery and what's playing</sub></td>
 </tr>
 </table>
+
+### 🎭 Seasonal themes
+
+Each theme dresses Noki, paints the notch and fills the side strip with its decorations. You choose the face, the center notch and the strip **separately** (for example a Love Noki, a Halloween notch and Christmas sides), the color's transparency, and you can add **your own dates**. With **Automatic** they switch by themselves: Halloween (Oct 24–Nov 2), Christmas (Dec 1–26), Love (Feb 7–14) and Birthday on the day you set. You can also **export and import** your appearance as a file.
+
+<table>
+<tr>
+<td align="center" width="50%"><img src="docs/screenshots/en-theme-halloween.png" width="420" alt="Halloween theme" /><br /><sub><b>Halloween</b> · witch hat, pumpkins, bats, cobwebs and skulls</sub></td>
+<td align="center" width="50%"><img src="docs/screenshots/en-theme-christmas.png" width="420" alt="Christmas theme" /><br /><sub><b>Christmas</b> · Santa hat, reindeer, elves and snowflakes</sub></td>
+</tr>
+<tr>
+<td align="center" width="50%"><img src="docs/screenshots/en-theme-birthday.png" width="420" alt="Birthday theme" /><br /><sub><b>Birthday</b> · party hat, balloons, cake and confetti</sub></td>
+<td align="center" width="50%"><img src="docs/screenshots/en-theme-love.png" width="420" alt="Love theme" /><br /><sub><b>Love</b> · heart eyes, hearts and roses</sub></td>
+</tr>
+<tr>
+<td align="center" width="50%"><img src="docs/screenshots/en-theme-mix.png" width="420" alt="Mixed themes" /><br /><sub><b>Mixed</b> · Love face, Halloween notch and Christmas sides</sub></td>
+<td align="center" width="50%"><img src="docs/screenshots/en-theme-closed.png" width="420" alt="Themes with the notch closed" /><br /><sub><b>Closed</b> · the four themes with the notch closed</sub></td>
+</tr>
+</table>
+
+> The images in this section are illustrations generated with the app's own components; the real look may vary slightly with your screen and wallpaper.
 
 ## 🔌 And much more
 
