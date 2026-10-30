@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 1.2.0 — Themes, recorder and shortcuts / Temas, grabadora y atajos
 
 - **Customizable shortcuts**: each one can be turned on/off and rebound — open/close, record voice, do not disturb, quick task, and jump to tab (Alt+1…9). /
   **Atajos personalizables**: cada uno se enciende/apaga y se cambia — abrir/cerrar, grabar voz, no molestar, tarea rápida e ir a una pestaña (Alt+1…9).
