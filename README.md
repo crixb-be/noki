@@ -29,7 +29,7 @@
 Es **gratis, de código abierto y funciona por completo en tu PC**: sin cuentas, sin telemetría.
 
 <div align="center">
-<img src="docs/screenshots/es-panel.png" alt="El panel de Noki con el clima, los interruptores rápidos y tus apps" width="640" />
+<img src="docs/screenshots/es-panel.jpg" alt="El panel de Noki con el clima, los interruptores rápidos y tus apps" width="640" />
 </div>
 
 ## ✨ ¿Por qué Noki?
@@ -47,7 +47,7 @@ Es **gratis, de código abierto y funciona por completo en tu PC**: sin cuentas,
 
 <table>
 <tr>
-<td align="center" width="50%"><img src="docs/screenshots/es-planner.png" width="420" alt="Agenda" /><br /><sub><b>Agenda</b> · tareas con fecha y categoría</sub></td>
+<td align="center" width="50%"><img src="docs/screenshots/es-planner.jpg" width="420" alt="Agenda" /><br /><sub><b>Agenda</b> · tareas con fecha y categoría</sub></td>
 <td align="center" width="50%"><img src="docs/screenshots/es-habits.png" width="420" alt="Hábitos" /><br /><sub><b>Hábitos</b> · metas, rachas y recordatorios</sub></td>
 </tr>
 <tr>
@@ -56,7 +56,7 @@ Es **gratis, de código abierto y funciona por completo en tu PC**: sin cuentas,
 </tr>
 <tr>
 <td align="center" width="50%"><img src="docs/screenshots/es-files.png" width="420" alt="Archivos" /><br /><sub><b>Archivos</b> · suéltalos, arrástralos, comprime y más</sub></td>
-<td align="center" width="50%"><img src="docs/screenshots/es-calendar.png" width="420" alt="Calendario" /><br /><sub><b>Calendario</b> · tus tareas y eventos del mes</sub></td>
+<td align="center" width="50%"><img src="docs/screenshots/es-calendar.jpg" width="420" alt="Calendario" /><br /><sub><b>Calendario</b> · tus tareas y eventos del mes</sub></td>
 </tr>
 <tr>
 <td align="center" width="50%"><img src="docs/screenshots/es-system.png" width="420" alt="Sistema" /><br /><sub><b>Sistema</b> · CPU, RAM, discos y red</sub></td>
@@ -141,7 +141,7 @@ En **Ajustes → Apariencia** puedes:
 </tr>
 <tr>
 <td align="center" width="50%"><img src="docs/screenshots/es-look-strip.png" width="420" alt="Franja de otro color" /><br /><sub><b>La franja a tu gusto</b> · los costados del notch pueden ser de otro color, una imagen o transparentes</sub></td>
-<td align="center" width="50%"><img src="docs/screenshots/es-closed.png" width="420" alt="Noki cerrado" /><br /><sub><b>Cerrado</b> · hora, tareas, hábitos, clima, batería y lo que suena</sub></td>
+<td align="center" width="50%"><img src="docs/screenshots/es-closed.jpg" width="420" alt="Noki cerrado" /><br /><sub><b>Cerrado</b> · hora, tareas, hábitos, clima, batería y lo que suena</sub></td>
 </tr>
 </table>
 
@@ -151,20 +151,49 @@ Cada tema viste a Noki, pinta el notch y llena la franja de los costados con sus
 
 <table>
 <tr>
-<td align="center" width="50%"><img src="docs/screenshots/es-theme-halloween.png" width="420" alt="Tema de Halloween" /><br /><sub><b>Halloween</b> · bruja, calabazas, murciélagos, telarañas y calaveras</sub></td>
-<td align="center" width="50%"><img src="docs/screenshots/es-theme-christmas.png" width="420" alt="Tema de Navidad" /><br /><sub><b>Navidad</b> · gorro de Papá Noel, renos, duendes y copos</sub></td>
+<td align="center" width="50%"><img src="docs/screenshots/es-theme-halloween.jpg" width="420" alt="Tema de Halloween" /><br /><sub><b>Halloween</b> · bruja, calabazas, murciélagos, telarañas y calaveras</sub></td>
+<td align="center" width="50%"><img src="docs/screenshots/es-theme-christmas.jpg" width="420" alt="Tema de Navidad" /><br /><sub><b>Navidad</b> · gorro de Papá Noel, renos, duendes y copos</sub></td>
 </tr>
 <tr>
-<td align="center" width="50%"><img src="docs/screenshots/es-theme-birthday.png" width="420" alt="Tema de cumpleaños" /><br /><sub><b>Cumpleaños</b> · gorro de fiesta, globos, tarta y confeti</sub></td>
-<td align="center" width="50%"><img src="docs/screenshots/es-theme-love.png" width="420" alt="Tema de Amor" /><br /><sub><b>Amor</b> · ojitos de corazón, corazones y rosas</sub></td>
+<td align="center" width="50%"><img src="docs/screenshots/es-theme-birthday.jpg" width="420" alt="Tema de cumpleaños" /><br /><sub><b>Cumpleaños</b> · gorro de fiesta, globos, tarta y confeti</sub></td>
+<td align="center" width="50%"><img src="docs/screenshots/es-theme-love.jpg" width="420" alt="Tema de Amor" /><br /><sub><b>Amor</b> · ojitos de corazón, corazones y rosas</sub></td>
 </tr>
 <tr>
-<td align="center" width="50%"><img src="docs/screenshots/es-theme-mix.png" width="420" alt="Temas combinados" /><br /><sub><b>Mezclados</b> · cara de Amor, notch de Halloween y costados de Navidad</sub></td>
-<td align="center" width="50%"><img src="docs/screenshots/es-theme-closed.png" width="420" alt="Temas con el notch cerrado" /><br /><sub><b>Cerrado</b> · los cuatro temas con el notch cerrado</sub></td>
+<td align="center" width="50%"><img src="docs/screenshots/es-theme-mix.jpg" width="420" alt="Temas combinados" /><br /><sub><b>Mezclados</b> · cara de Amor, notch de Halloween y costados de Navidad</sub></td>
+<td align="center" width="50%"><img src="docs/screenshots/es-themes.jpg" width="420" alt="Comparativa de temas" /><br /><sub><b>Comparativa</b> · los cuatro temas con el notch cerrado</sub></td>
 </tr>
 </table>
 
 > Las imágenes de esta sección son ilustraciones generadas con los mismos componentes de la app; el aspecto real puede variar un poco según tu pantalla y fondo.
+
+### 🎙 Grabadora de voz
+
+En **Agenda → Grabadora** grabas tu voz y los audios se quedan guardados **solo en tu PC**. Puedes buscar dentro de los nombres y de las transcripciones, **transcribir** un audio de forma local y gratis (modelo Whisper, se descarga una vez), pasar el texto a **Notas** o **Tareas**, y exportar el audio o el texto. Elige micrófono y calidad con el engranaje ⚙. Con el atajo `Alt+R` empiezas y detienes la grabación desde cualquier programa, y el notch cerrado muestra un punto rojo con el tiempo.
+
+<table>
+<tr>
+<td align="center" width="50%"><img src="docs/screenshots/es-recorder.jpg" width="420" alt="Grabando" /><br /><sub><b>Grabando</b> · cronómetro y onda en vivo</sub></td>
+<td align="center" width="50%"><img src="docs/screenshots/es-recorder-text.jpg" width="420" alt="Transcripción" /><br /><sub><b>Transcripción</b> · reproduce, copia, exporta o pásala a Notas y Tareas</sub></td>
+</tr>
+<tr>
+<td align="center" width="50%"><img src="docs/screenshots/es-closed-recording.jpg" width="420" alt="Notch cerrado grabando" /><br /><sub><b>Con el notch cerrado</b> · un punto rojo y el tiempo</sub></td>
+<td align="center" width="50%"><img src="docs/screenshots/es-welcome-app.jpg" width="420" alt="Bienvenida" /><br /><sub><b>Bienvenida</b> · Noki se presenta la primera vez</sub></td>
+</tr>
+</table>
+
+### ⌨️ Atajos configurables
+
+En **Ajustes → Atajos** cada atajo global se puede **cambiar y encender o apagar** para que no choque con otros programas: abrir/cerrar el notch (`Alt+N`), grabar voz (`Alt+R`), No molestar, tarea rápida y saltar directo a una pestaña (`Alt+1…9`).
+
+<div align="center">
+<img src="docs/screenshots/es-shortcuts.jpg" width="640" alt="Ajustes de atajos" />
+</div>
+
+### 🧩 Widgets a un gesto
+
+<div align="center">
+<img src="docs/screenshots/es-widgets.jpg" width="640" alt="Clima, tareas y calendario" />
+</div>
 
 ## 🔌 Y mucho más
 

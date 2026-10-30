@@ -29,7 +29,7 @@
 It is **free, open source and runs fully on your PC**: no accounts, no telemetry.
 
 <div align="center">
-<img src="docs/screenshots/en-panel.png" alt="The Noki panel with weather, quick toggles and your apps" width="640" />
+<img src="docs/screenshots/en-panel.jpg" alt="The Noki panel with weather, quick toggles and your apps" width="640" />
 </div>
 
 ## ✨ Why Noki?
@@ -47,7 +47,7 @@ It is **free, open source and runs fully on your PC**: no accounts, no telemetry
 
 <table>
 <tr>
-<td align="center" width="50%"><img src="docs/screenshots/en-planner.png" width="420" alt="Planner" /><br /><sub><b>Planner</b> · tasks with date and category</sub></td>
+<td align="center" width="50%"><img src="docs/screenshots/en-planner.jpg" width="420" alt="Planner" /><br /><sub><b>Planner</b> · tasks with date and category</sub></td>
 <td align="center" width="50%"><img src="docs/screenshots/en-habits.png" width="420" alt="Habits" /><br /><sub><b>Habits</b> · goals, streaks and reminders</sub></td>
 </tr>
 <tr>
@@ -56,7 +56,7 @@ It is **free, open source and runs fully on your PC**: no accounts, no telemetry
 </tr>
 <tr>
 <td align="center" width="50%"><img src="docs/screenshots/en-files.png" width="420" alt="Files" /><br /><sub><b>Files</b> · drop, drag out, compress and more</sub></td>
-<td align="center" width="50%"><img src="docs/screenshots/en-calendar.png" width="420" alt="Calendar" /><br /><sub><b>Calendar</b> · your tasks and events for the month</sub></td>
+<td align="center" width="50%"><img src="docs/screenshots/en-calendar.jpg" width="420" alt="Calendar" /><br /><sub><b>Calendar</b> · your tasks and events for the month</sub></td>
 </tr>
 <tr>
 <td align="center" width="50%"><img src="docs/screenshots/en-system.png" width="420" alt="System" /><br /><sub><b>System</b> · CPU, RAM, disks and network</sub></td>
@@ -141,7 +141,7 @@ In **Settings → Appearance** you can:
 </tr>
 <tr>
 <td align="center" width="50%"><img src="docs/screenshots/en-look-strip.png" width="420" alt="Strip in another color" /><br /><sub><b>The strip your way</b> · the sides of the notch can be another color, an image or transparent</sub></td>
-<td align="center" width="50%"><img src="docs/screenshots/en-closed.png" width="420" alt="Noki closed" /><br /><sub><b>Closed</b> · time, tasks, habits, weather, battery and what's playing</sub></td>
+<td align="center" width="50%"><img src="docs/screenshots/en-closed.jpg" width="420" alt="Noki closed" /><br /><sub><b>Closed</b> · time, tasks, habits, weather, battery and what's playing</sub></td>
 </tr>
 </table>
 
@@ -151,20 +151,49 @@ Each theme dresses Noki, paints the notch and fills the side strip with its deco
 
 <table>
 <tr>
-<td align="center" width="50%"><img src="docs/screenshots/en-theme-halloween.png" width="420" alt="Halloween theme" /><br /><sub><b>Halloween</b> · witch hat, pumpkins, bats, cobwebs and skulls</sub></td>
-<td align="center" width="50%"><img src="docs/screenshots/en-theme-christmas.png" width="420" alt="Christmas theme" /><br /><sub><b>Christmas</b> · Santa hat, reindeer, elves and snowflakes</sub></td>
+<td align="center" width="50%"><img src="docs/screenshots/en-theme-halloween.jpg" width="420" alt="Halloween theme" /><br /><sub><b>Halloween</b> · witch hat, pumpkins, bats, cobwebs and skulls</sub></td>
+<td align="center" width="50%"><img src="docs/screenshots/en-theme-christmas.jpg" width="420" alt="Christmas theme" /><br /><sub><b>Christmas</b> · Santa hat, reindeer, elves and snowflakes</sub></td>
 </tr>
 <tr>
-<td align="center" width="50%"><img src="docs/screenshots/en-theme-birthday.png" width="420" alt="Birthday theme" /><br /><sub><b>Birthday</b> · party hat, balloons, cake and confetti</sub></td>
-<td align="center" width="50%"><img src="docs/screenshots/en-theme-love.png" width="420" alt="Love theme" /><br /><sub><b>Love</b> · heart eyes, hearts and roses</sub></td>
+<td align="center" width="50%"><img src="docs/screenshots/en-theme-birthday.jpg" width="420" alt="Birthday theme" /><br /><sub><b>Birthday</b> · party hat, balloons, cake and confetti</sub></td>
+<td align="center" width="50%"><img src="docs/screenshots/en-theme-love.jpg" width="420" alt="Love theme" /><br /><sub><b>Love</b> · heart eyes, hearts and roses</sub></td>
 </tr>
 <tr>
-<td align="center" width="50%"><img src="docs/screenshots/en-theme-mix.png" width="420" alt="Mixed themes" /><br /><sub><b>Mixed</b> · Love face, Halloween notch and Christmas sides</sub></td>
-<td align="center" width="50%"><img src="docs/screenshots/en-theme-closed.png" width="420" alt="Themes with the notch closed" /><br /><sub><b>Closed</b> · the four themes with the notch closed</sub></td>
+<td align="center" width="50%"><img src="docs/screenshots/en-theme-mix.jpg" width="420" alt="Mixed themes" /><br /><sub><b>Mixed</b> · Love face, Halloween notch and Christmas sides</sub></td>
+<td align="center" width="50%"><img src="docs/screenshots/en-themes.jpg" width="420" alt="Theme comparison" /><br /><sub><b>Comparison</b> · the four themes with the notch closed</sub></td>
 </tr>
 </table>
 
 > The images in this section are illustrations generated with the app's own components; the real look may vary slightly with your screen and wallpaper.
+
+### 🎙 Voice recorder
+
+In **Planner → Recorder** you record your voice and the audio stays saved **only on your PC**. You can search names and transcripts, **transcribe** an audio locally and for free (Whisper model, downloaded once), send the text to **Notes** or **Tasks**, and export the audio or the text. Pick the microphone and quality with the ⚙ gear. With the `Alt+R` shortcut you start and stop recording from any program, and the closed notch shows a red dot with the time.
+
+<table>
+<tr>
+<td align="center" width="50%"><img src="docs/screenshots/en-recorder.jpg" width="420" alt="Recording" /><br /><sub><b>Recording</b> · timer and live waveform</sub></td>
+<td align="center" width="50%"><img src="docs/screenshots/en-recorder-text.jpg" width="420" alt="Transcript" /><br /><sub><b>Transcript</b> · play, copy, export or send it to Notes and Tasks</sub></td>
+</tr>
+<tr>
+<td align="center" width="50%"><img src="docs/screenshots/en-closed-recording.jpg" width="420" alt="Closed notch recording" /><br /><sub><b>With the notch closed</b> · a red dot and the time</sub></td>
+<td align="center" width="50%"><img src="docs/screenshots/en-welcome-app.jpg" width="420" alt="Welcome" /><br /><sub><b>Welcome</b> · Noki introduces itself the first time</sub></td>
+</tr>
+</table>
+
+### ⌨️ Configurable shortcuts
+
+In **Settings → Shortcuts** every global shortcut can be **changed and turned on or off** so it never clashes with other programs: open/close the notch (`Alt+N`), record voice (`Alt+R`), Do not disturb, quick task, and jump straight to a tab (`Alt+1…9`).
+
+<div align="center">
+<img src="docs/screenshots/en-shortcuts.jpg" width="640" alt="Shortcuts settings" />
+</div>
+
+### 🧩 Widgets one gesture away
+
+<div align="center">
+<img src="docs/screenshots/en-widgets.jpg" width="640" alt="Weather, tasks and calendar" />
+</div>
 
 ## 🔌 And much more
 
