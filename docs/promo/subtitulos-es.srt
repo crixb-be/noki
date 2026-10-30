@@ -71,49 +71,57 @@ con la letra sincronizada.
 Pulsas un atajo, grabas tu voz
 
 19
-00:00:25,767 --> 00:00:26,633
-y con un clic
+00:00:25,767 --> 00:00:27,100
+y Noki la transcribe
 
 20
-00:00:26,683 --> 00:00:27,950
-Noki la transcribe.
+00:00:27,150 --> 00:00:27,950
+al instante.
 
 21
-00:00:28,000 --> 00:00:28,386
-Y más:
+00:00:28,000 --> 00:00:29,516
+También puedes fijar archivos
 
 22
-00:00:28,436 --> 00:00:29,725
-estante de archivos,
+00:00:29,566 --> 00:00:30,873
+para compartirlos rápido,
 
 23
-00:00:29,775 --> 00:00:30,419
-traductor,
+00:00:30,923 --> 00:00:31,864
+usar su traductor,
 
 24
-00:00:30,469 --> 00:00:31,950
-chat con IA y Pomodoro.
+00:00:31,914 --> 00:00:32,489
+chat con IA
 
 25
-00:00:32,000 --> 00:00:32,658
-Todo tuyo:
+00:00:32,539 --> 00:00:33,950
+o el temporizador Pomodoro.
 
 26
-00:00:32,708 --> 00:00:33,957
-temas de temporada,
+00:00:34,000 --> 00:00:35,318
+Personalízalo a tu gusto
 
 27
-00:00:34,007 --> 00:00:35,519
-tus colores e imágenes,
+00:00:35,368 --> 00:00:36,631
+con temas de temporada,
 
 28
-00:00:35,569 --> 00:00:36,950
-y atajos a tu medida.
+00:00:36,681 --> 00:00:38,383
+tus propias imágenes o colores,
 
 29
-00:00:37,000 --> 00:00:37,630
-Noki:
+00:00:38,433 --> 00:00:39,641
+y configura los atajos
 
 30
-00:00:37,680 --> 00:00:39,950
+00:00:39,691 --> 00:00:40,350
+a tu medida.
+
+31
+00:00:40,400 --> 00:00:41,030
+Noki:
+
+32
+00:00:41,080 --> 00:00:43,350
 descárgalo gratis.

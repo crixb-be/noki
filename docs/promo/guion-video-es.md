@@ -1,11 +1,11 @@
 # Noki 1.2.0 · Vídeo promocional vertical (9:16) · guion definitivo
 
-**Duración:** ~40 s · **Idioma:** español · **Tono:** juvenil, enérgico, directo · **Ritmo:** ~2,8 palabras por segundo.
+**Duración:** ~43 s · **Idioma:** español · **Tono:** juvenil, enérgico, directo · **Ritmo:** ~2,8 palabras por segundo.
 Relacionados: [`subtitulos-es.srt`](subtitulos-es.srt) · [`recortes-capcut.md`](recortes-capcut.md) · imágenes en [`assets/promo/`](../../assets/promo/).
 
-## Texto completo para ElevenLabs (112 palabras)
+## Texto completo para ElevenLabs (123 palabras)
 
-> ¿Y si tu PC tuviera un notch como el de un Mac… pero que de verdad sirva? Te presento a Noki: gratis, de código abierto, y vive arriba de tu pantalla. Pasas el cursor y se abre: clima, wifi, el monitor de tu PC y tus hábitos. Tus notas, tus tareas y tus calendarios como de Google e iOS. Control multimedia para vídeos y música con la letra sincronizada. ¿Lo mejor? Pulsas un atajo, grabas tu voz y con un clic Noki la transcribe. Y más: estante de archivos, traductor, chat con IA y Pomodoro. Todo tuyo: temas de temporada, tus colores e imágenes, y atajos a tu medida. Noki: descárgalo gratis.
+> ¿Y si tu PC tuviera un notch como el de un Mac… pero que de verdad sirva? Te presento a Noki: gratis, de código abierto, y vive arriba de tu pantalla. Pasas el cursor y se abre: clima, wifi, el monitor de tu PC y tus hábitos. Tus notas, tus tareas y tus calendarios como de Google e iOS. Control multimedia para vídeos y música con la letra sincronizada. ¿Lo mejor? Pulsas un atajo, grabas tu voz y Noki la transcribe al instante. También puedes fijar archivos para compartirlos rápido, usar su traductor, chat con IA o el temporizador Pomodoro. Personalízalo a tu gusto con temas de temporada, tus propias imágenes o colores, y configura los atajos a tu medida. Noki: descárgalo gratis.
 
 ## Guion plano por plano
 
@@ -16,10 +16,10 @@ Relacionados: [`subtitulos-es.srt`](subtitulos-es.srt) · [`recortes-capcut.md`]
 | **0:10,6–0:15,6** | «Pasas el cursor y se abre: **clima, wifi,** el **monitor de tu PC** y tus **hábitos**.» | **C** · `panel` (10,6–12,4) → **D** · `system` (12,4–14,0) → **E** · `habits` (14,0–15,6). | Una palabra por golpe: **CLIMA 🌤 · WIFI 📶 · MONITOR 📊 · HÁBITOS 💧**. |
 | **0:15,6–0:19,4** | «Tus **notas**, tus **tareas** y tus **calendarios** como de Google e iOS.» | **F** · `notes` (15,6–16,9) → **G** · `planner` (16,9–18,1) → **H** · `calendar` (18,1–19,4). | **NOTAS 📝 · TAREAS ✅ · CALENDARIOS 📅**; al final, en texto, **«Google · iOS»**. |
 | **0:19,4–0:23,0** | «**Control multimedia** para vídeos y música con la **letra sincronizada**.» | **I** · `music-lyrics`: notch → carátula y controles → letra. | **«CONTROL MULTIMEDIA 🎵»** y luego **«+ LETRA EN SINCRONÍA»**; la línea activa resalta. |
-| **0:23,0–0:28,0** | «¿Lo mejor? Pulsas un **atajo**, grabas tu voz y con un clic Noki la **transcribe**.» | **J** · clip real 2 (23,0–25,0) → **K** · `closed-recording` (25,0–26,2) → **L** · `recorder-text` (26,2–28,0). | **«ALT + R»** (tecla que se hunde + *beep*) → **«🔴 REC»** → **«TRANSCRIBE ✨ con un clic»**. |
-| **0:28,0–0:32,0** | «Y más: **estante de archivos**, **traductor**, **chat con IA** y **Pomodoro**.» | **M** · `files` (28,0–29,4) → **N** · `translator` (29,4–30,4) → **O** · `ai` (30,4–31,3) → **P** · `pomodoro` (31,3–32,0). | Cuatro etiquetas con *pop*, una por plano: **ARCHIVOS 📁 · TRADUCTOR 🌐 · IA ✨ · POMODORO 🍅**. |
-| **0:32,0–0:37,0** | «**Todo tuyo**: temas de temporada, tus colores e imágenes, y **atajos** a tu medida.» | **Q** · `themes` (32,0–34,0) → **R** · `look-color` (34,0–34,9) → **S** · `look-image` (34,9–35,8) → **T** · `shortcuts` (35,8–37,0). | **TEMAS 🎃🎅🎂💖** → **«TUS COLORES · TUS IMÁGENES 🎨»** → **«TUS ATAJOS ⌨️»**. |
-| **0:37,0–0:40,0** | «**Noki**: descárgalo gratis.» | **U** · `welcome`: la carita sonriendo, luego se abre. | **«NOKI 1.2 · GRATIS»**; debajo **«github.com/crixb-be/noki»**. Flecha **⬇** que parpadea. |
+| **0:23,0–0:28,0** | «¿Lo mejor? Pulsas un **atajo**, grabas tu voz y Noki la **transcribe** al instante.» | **J** · clip real 2 (23,0–25,0) → **K** · `closed-recording` (25,0–26,2) → **L** · `recorder-text` (26,2–28,0). | **«ALT + R»** (tecla que se hunde + *beep*) → **«🔴 REC»** → **«TRANSCRIBE ✨»**. |
+| **0:28,0–0:34,0** | «También puedes **fijar archivos** para compartirlos rápido, usar su **traductor**, **chat con IA** o el temporizador **Pomodoro**.» | **M** · `files` (28,0–30,2) → **N** · `translator` (30,2–31,6) → **O** · `ai` (31,6–32,8) → **P** · `pomodoro` (32,8–34,0). | Cuatro etiquetas con *pop*, una por plano: **ARCHIVOS 📁 · TRADUCTOR 🌐 · IA ✨ · POMODORO 🍅**. |
+| **0:34,0–0:40,4** | «**Personalízalo** a tu gusto con temas de temporada, tus propias imágenes o colores, y configura los **atajos** a tu medida.» | **Q** · `themes` (34,0–36,2) → **R** · `look-image` (36,2–37,3) → **S** · `look-color` (37,3–38,3) → **T** · `shortcuts` (38,3–40,4). | **TEMAS 🎃🎅🎂💖** → **«TUS IMÁGENES · TUS COLORES 🎨»** → **«TUS ATAJOS ⌨️»**. |
+| **0:40,4–0:43,4** | «**Noki**: descárgalo gratis.» | **U** · `welcome`: la carita sonriendo, luego se abre. | **«NOKI 1.2 · GRATIS»**; debajo **«github.com/crixb-be/noki»**. Flecha **⬇** que parpadea. |
 
 **Palabras que se resaltan** en los subtítulos: *notch · Noki · gratis · atajo · transcribe · tuyo*.
 
@@ -43,4 +43,5 @@ Graba con **OBS** (*Captura de pantalla*) o **Recortes** (`Win + Mayús + S`, v�
 - Las capturas son **maquetas** hechas con la propia app (datos, canción, voz y chat de ejemplo; «Luces de neón» y su letra son inventadas).
 - «Calendarios como de Google e iOS»: Noki lee calendarios por **enlace iCal**, en **solo lectura**. Con Google y Outlook está documentado, y el calendario de **iOS/iCloud** lo ha probado el autor (publicado como enlace `webcal://`). No digas «sincronizados» ni que se editan desde Noki.
 - «Control multimedia para vídeos y música con la letra sincronizada»: se deja tal cual. Para que sea fiel, en pantalla enseña la letra con una **canción** (la letra solo aparece con canciones).
-- La transcripción es **con un clic**. La primera vez descarga el modelo (una vez): no digas «sin internet».
+- «Transcribe al instante»: es **una afirmación de rendimiento que no está medida**. La transcripción se lanza **con un clic** (no es automática), depende de la duración del audio y de tu PC, y la primera vez descarga el modelo. Si no la has cronometrado, «con un clic» es lo seguro.
+- «Fijar archivos para compartirlos rápido»: el estante permite soltar, arrastrar fuera para copiar, comprimir, mover y borrar; no «comparte» en línea. Si lo dejas, que se entienda como «tenerlos a mano».
