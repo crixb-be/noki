@@ -52,15 +52,15 @@ Es **gratis, de código abierto y funciona por completo en tu PC**: sin cuentas,
 </tr>
 <tr>
 <td align="center" width="50%"><img src="docs/screenshots/es-music-lyrics.jpg" width="420" alt="Música" /><br /><sub><b>Música</b> · carátula, progreso y letras</sub></td>
-<td align="center" width="50%"><img src="docs/screenshots/es-ai.png" width="420" alt="Chat de IA" /><br /><sub><b>Chat de IA</b> · respuestas rápidas con tu propia clave</sub></td>
+<td align="center" width="50%"><img src="docs/screenshots/es-ai.jpg" width="420" alt="Chat de IA" /><br /><sub><b>Chat de IA</b> · respuestas rápidas con tu propia clave</sub></td>
 </tr>
 <tr>
-<td align="center" width="50%"><img src="docs/screenshots/es-files.png" width="420" alt="Archivos" /><br /><sub><b>Archivos</b> · suéltalos, arrástralos, comprime y más</sub></td>
+<td align="center" width="50%"><img src="docs/screenshots/es-files.jpg" width="420" alt="Archivos" /><br /><sub><b>Archivos</b> · suéltalos, arrástralos, comprime y más</sub></td>
 <td align="center" width="50%"><img src="docs/screenshots/es-calendar.jpg" width="420" alt="Calendario" /><br /><sub><b>Calendario</b> · tus tareas y eventos del mes</sub></td>
 </tr>
 <tr>
 <td align="center" width="50%"><img src="docs/screenshots/es-system.jpg" width="420" alt="Sistema" /><br /><sub><b>Sistema</b> · CPU, RAM, discos y red</sub></td>
-<td align="center" width="50%"><img src="docs/screenshots/es-translator.png" width="420" alt="Traductor" /><br /><sub><b>Traductor</b> · de texto e imágenes, sin clave de API</sub></td>
+<td align="center" width="50%"><img src="docs/screenshots/es-translator.jpg" width="420" alt="Traductor" /><br /><sub><b>Traductor</b> · de texto e imágenes, sin clave de API</sub></td>
 </tr>
 </table>
 

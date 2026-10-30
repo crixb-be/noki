@@ -52,15 +52,15 @@ It is **free, open source and runs fully on your PC**: no accounts, no telemetry
 </tr>
 <tr>
 <td align="center" width="50%"><img src="docs/screenshots/en-music-lyrics.jpg" width="420" alt="Music" /><br /><sub><b>Music</b> · album art, progress and lyrics</sub></td>
-<td align="center" width="50%"><img src="docs/screenshots/en-ai.png" width="420" alt="AI chat" /><br /><sub><b>AI chat</b> · quick answers with your own key</sub></td>
+<td align="center" width="50%"><img src="docs/screenshots/en-ai.jpg" width="420" alt="AI chat" /><br /><sub><b>AI chat</b> · quick answers with your own key</sub></td>
 </tr>
 <tr>
-<td align="center" width="50%"><img src="docs/screenshots/en-files.png" width="420" alt="Files" /><br /><sub><b>Files</b> · drop, drag out, compress and more</sub></td>
+<td align="center" width="50%"><img src="docs/screenshots/en-files.jpg" width="420" alt="Files" /><br /><sub><b>Files</b> · drop, drag out, compress and more</sub></td>
 <td align="center" width="50%"><img src="docs/screenshots/en-calendar.jpg" width="420" alt="Calendar" /><br /><sub><b>Calendar</b> · your tasks and events for the month</sub></td>
 </tr>
 <tr>
 <td align="center" width="50%"><img src="docs/screenshots/en-system.jpg" width="420" alt="System" /><br /><sub><b>System</b> · CPU, RAM, disks and network</sub></td>
-<td align="center" width="50%"><img src="docs/screenshots/en-translator.png" width="420" alt="Translator" /><br /><sub><b>Translator</b> · text and images, no API key</sub></td>
+<td align="center" width="50%"><img src="docs/screenshots/en-translator.jpg" width="420" alt="Translator" /><br /><sub><b>Translator</b> · text and images, no API key</sub></td>
 </tr>
 </table>
 

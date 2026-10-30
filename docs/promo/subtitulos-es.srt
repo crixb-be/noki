@@ -1,103 +1,119 @@
 1
-00:00:00,000 --> 00:00:01,298
+00:00:00,000 --> 00:00:01,512
 ¿Y si tu PC tuviera
 
 2
-00:00:01,348 --> 00:00:03,192
+00:00:01,562 --> 00:00:03,711
 un notch como el de un Mac…
 
 3
-00:00:03,242 --> 00:00:04,950
+00:00:03,761 --> 00:00:05,750
 pero que de verdad sirva?
 
 4
-00:00:05,000 --> 00:00:06,040
+00:00:05,800 --> 00:00:06,994
 Te presento a Noki:
 
 5
-00:00:06,090 --> 00:00:07,513
+00:00:07,044 --> 00:00:08,678
 gratis, de código abierto,
 
 6
-00:00:07,563 --> 00:00:09,150
+00:00:08,728 --> 00:00:10,550
 y vive arriba de tu pantalla.
 
 7
-00:00:09,200 --> 00:00:10,714
+00:00:10,600 --> 00:00:12,358
 Pasas el cursor y se abre:
 
 8
-00:00:10,764 --> 00:00:11,463
+00:00:12,408 --> 00:00:13,219
 clima, wifi,
 
 9
-00:00:11,513 --> 00:00:12,619
+00:00:13,269 --> 00:00:14,554
 el monitor de tu PC
 
 10
-00:00:12,669 --> 00:00:13,950
-y tus hábitos del día.
+00:00:14,604 --> 00:00:15,550
+y tus hábitos.
 
 11
-00:00:14,000 --> 00:00:15,464
-Con tus notas, tus tareas
+00:00:15,600 --> 00:00:16,899
+Tus notas, tus tareas
 
 12
-00:00:15,514 --> 00:00:17,270
-y un calendario que se conecta
+00:00:16,949 --> 00:00:18,001
+y tus calendarios
 
 13
-00:00:17,320 --> 00:00:18,550
-con Google u Outlook.
+00:00:18,051 --> 00:00:19,350
+como de Google e iOS.
 
 14
-00:00:18,600 --> 00:00:20,482
-Si suena música, la controlas
+00:00:19,400 --> 00:00:20,370
+Control multimedia
 
 15
-00:00:20,532 --> 00:00:22,350
-y ves la letra sincronizada.
+00:00:20,420 --> 00:00:21,498
+para vídeos y música
 
 16
-00:00:22,400 --> 00:00:23,088
-¿Lo mejor?
+00:00:21,548 --> 00:00:22,950
+con la letra sincronizada.
 
 17
-00:00:23,138 --> 00:00:25,340
-Pulsas un atajo y grabas tu voz,
+00:00:23,000 --> 00:00:23,667
+¿Lo mejor?
 
 18
-00:00:25,390 --> 00:00:27,661
-y con un clic Noki la transcribe,
+00:00:23,717 --> 00:00:25,717
+Pulsas un atajo, grabas tu voz
 
 19
-00:00:27,711 --> 00:00:28,950
-en tu PC y gratis.
+00:00:25,767 --> 00:00:26,633
+y con un clic
 
 20
-00:00:29,000 --> 00:00:30,173
-Y es todo tuyo:
+00:00:26,683 --> 00:00:27,950
+Noki la transcribe.
 
 21
-00:00:30,223 --> 00:00:32,569
-temas para Halloween, Navidad,
+00:00:28,000 --> 00:00:28,386
+Y más:
 
 22
-00:00:32,619 --> 00:00:34,027
-cumpleaños y amor,
+00:00:28,436 --> 00:00:29,725
+estante de archivos,
 
 23
-00:00:34,077 --> 00:00:36,658
-o tus propios colores e imágenes,
+00:00:29,775 --> 00:00:30,419
+traductor,
 
 24
-00:00:36,708 --> 00:00:38,350
-y atajos a tu medida.
+00:00:30,469 --> 00:00:31,950
+chat con IA y Pomodoro.
 
 25
-00:00:38,400 --> 00:00:41,620
-Noki: descárgalo gratis,
+00:00:32,000 --> 00:00:32,658
+Todo tuyo:
 
 26
-00:00:41,670 --> 00:00:43,950
-enlace en mi bio.
+00:00:32,708 --> 00:00:33,957
+temas de temporada,
+
+27
+00:00:34,007 --> 00:00:35,519
+tus colores e imágenes,
+
+28
+00:00:35,569 --> 00:00:36,950
+y atajos a tu medida.
+
+29
+00:00:37,000 --> 00:00:37,630
+Noki:
+
+30
+00:00:37,680 --> 00:00:39,950
+descárgalo gratis.

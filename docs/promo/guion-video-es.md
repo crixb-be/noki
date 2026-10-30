@@ -1,36 +1,37 @@
 # Noki 1.2.0 · Vídeo promocional vertical (9:16) · guion definitivo
 
-**Duración:** ~44 s · **Idioma:** español · **Tono:** juvenil, enérgico, directo · **Ritmo:** ~2,8 palabras por segundo.
+**Duración:** ~40 s · **Idioma:** español · **Tono:** juvenil, enérgico, directo · **Ritmo:** ~2,8 palabras por segundo.
 Relacionados: [`subtitulos-es.srt`](subtitulos-es.srt) · [`recortes-capcut.md`](recortes-capcut.md) · imágenes en [`assets/promo/`](../../assets/promo/).
 
-## Texto completo para ElevenLabs (124 palabras)
+## Texto completo para ElevenLabs (112 palabras)
 
-> ¿Y si tu PC tuviera un notch como el de un Mac… pero que de verdad sirva? Te presento a Noki: gratis, de código abierto, y vive arriba de tu pantalla. Pasas el cursor y se abre: clima, wifi, el monitor de tu PC y tus hábitos del día. Con tus notas, tus tareas y un calendario que se conecta con Google u Outlook. Si suena música, la controlas y ves la letra sincronizada. ¿Lo mejor? Pulsas un atajo y grabas tu voz, y con un clic Noki la transcribe, en tu PC y gratis. Y es todo tuyo: temas para Halloween, Navidad, cumpleaños y amor, o tus propios colores e imágenes, y atajos a tu medida. Noki: descárgalo gratis, enlace en mi bio.
+> ¿Y si tu PC tuviera un notch como el de un Mac… pero que de verdad sirva? Te presento a Noki: gratis, de código abierto, y vive arriba de tu pantalla. Pasas el cursor y se abre: clima, wifi, el monitor de tu PC y tus hábitos. Tus notas, tus tareas y tus calendarios como de Google e iOS. Control multimedia para vídeos y música con la letra sincronizada. ¿Lo mejor? Pulsas un atajo, grabas tu voz y con un clic Noki la transcribe. Y más: estante de archivos, traductor, chat con IA y Pomodoro. Todo tuyo: temas de temporada, tus colores e imágenes, y atajos a tu medida. Noki: descárgalo gratis.
 
 ## Guion plano por plano
 
 | Tiempo | Voz en off | Plano | Texto en pantalla / efecto |
 |---|---|---|---|
-| **0:00–0:05,0** | «¿Y si tu PC tuviera un **notch** como el de un Mac… pero que de verdad sirva?» | **A** · clip real 1 (0–3,2 s). **B** · `welcome`, zoom a la carita (desde 3,2 s). | **«TU PC CON NOTCH 👀»** (golpe de zoom + *whoosh*). |
-| **0:05,0–0:09,2** | «Te presento a **Noki**: gratis, de código abierto, y vive arriba de tu pantalla.» | **B** · `welcome`: el zoom se abre hasta el título y los chips. | **«NOKI»** en degradado; debajo **«GRATIS · CÓDIGO ABIERTO»**. |
-| **0:09,2–0:14,0** | «Pasas el cursor y se abre: **clima, wifi,** el **monitor de tu PC** y tus **hábitos del día**.» | **C** · `panel` (9,2–11,8) → **D** · `system` (11,8–13,0) → **E** · `habits` (13,0–14,0). | Una palabra por golpe: **CLIMA · WIFI · MONITOR · HÁBITOS** (cada una con su emoji: 🌤 📶 📊 💧). |
-| **0:14,0–0:18,6** | «Con tus **notas**, tus **tareas** y un **calendario** que se conecta con Google u Outlook.» | **F** · `notes` (14,0–15,4) → **G** · `planner` (15,4–16,8) → **H** · `calendar` (16,8–18,6). | **NOTAS 📝 · TAREAS ✅ · CALENDARIO 📅**, y al final, en texto, **«Google · Outlook»**. |
-| **0:18,6–0:22,4** | «Si suena **música**, la controlas y ves la **letra sincronizada**.» | **I** · `music-lyrics`: notch → carátula y controles → letra. | **«MÚSICA 🎵 + LETRA EN SINCRONÍA»**; la línea activa de la letra resalta. |
-| **0:22,4–0:29,0** | «¿Lo mejor? Pulsas un **atajo** y grabas tu voz, y con un clic Noki la **transcribe**, en tu PC y gratis.» | **J** · clip real 2 (22,4–24,4) → **K** · `closed-recording` (24,4–25,8) → **L** · `recorder-text` (25,8–29,0). | **«ALT + R»** (tecla que se hunde + *beep*) → **«🔴 REC»** → **«TRANSCRIBE ✨ · en tu PC · gratis»**. |
-| **0:29,0–0:38,4** | «Y es **todo tuyo**: temas para Halloween, Navidad, cumpleaños y amor, o tus propios colores e imágenes, y **atajos** a tu medida.» | **M** · `themes` (29,0–31,2) → **N** · cortes `theme-halloween/christmas/birthday/love` (31,2–33,8) → **O** · `look-color` y **P** · `look-image` (33,8–36,0) → **Q** · `shortcuts` (36,0–38,4). | **TEMAS 🎃🎅🎂💖** (un emoji por corte) → **«TUS COLORES · TUS IMÁGENES 🎨»** → **«TUS ATAJOS ⌨️»**. |
-| **0:38,4–0:44,0** | «**Noki**: descárgalo gratis, enlace en mi bio.» | **R** · `welcome`: la carita sonriendo, luego se abre. | **«NOKI 1.2 · GRATIS»**; debajo **«github.com/crixb-be/noki»**. Flecha **⬇** que parpadea. |
+| **0:00–0:05,8** | «¿Y si tu PC tuviera un **notch** como el de un Mac… pero que de verdad sirva?» | **A** · clip real 1 (0–3 s). **B** · `welcome`, zoom a la carita (desde 3 s). | **«TU PC CON NOTCH 👀»** (golpe de zoom + *whoosh*). |
+| **0:05,8–0:10,6** | «Te presento a **Noki**: gratis, de código abierto, y vive arriba de tu pantalla.» | **B** · `welcome`: el zoom se abre hasta el título y los chips. | **«NOKI»** en degradado; debajo **«GRATIS · CÓDIGO ABIERTO»**. |
+| **0:10,6–0:15,6** | «Pasas el cursor y se abre: **clima, wifi,** el **monitor de tu PC** y tus **hábitos**.» | **C** · `panel` (10,6–12,4) → **D** · `system` (12,4–14,0) → **E** · `habits` (14,0–15,6). | Una palabra por golpe: **CLIMA 🌤 · WIFI 📶 · MONITOR 📊 · HÁBITOS 💧**. |
+| **0:15,6–0:19,4** | «Tus **notas**, tus **tareas** y tus **calendarios** como de Google e iOS.» | **F** · `notes` (15,6–16,9) → **G** · `planner` (16,9–18,1) → **H** · `calendar` (18,1–19,4). | **NOTAS 📝 · TAREAS ✅ · CALENDARIOS 📅**; al final, en texto, **«Google · iOS»**. |
+| **0:19,4–0:23,0** | «**Control multimedia** para vídeos y música con la **letra sincronizada**.» | **I** · `music-lyrics`: notch → carátula y controles → letra. | **«CONTROL MULTIMEDIA 🎵»** y luego **«+ LETRA EN SINCRONÍA»**; la línea activa resalta. |
+| **0:23,0–0:28,0** | «¿Lo mejor? Pulsas un **atajo**, grabas tu voz y con un clic Noki la **transcribe**.» | **J** · clip real 2 (23,0–25,0) → **K** · `closed-recording` (25,0–26,2) → **L** · `recorder-text` (26,2–28,0). | **«ALT + R»** (tecla que se hunde + *beep*) → **«🔴 REC»** → **«TRANSCRIBE ✨ con un clic»**. |
+| **0:28,0–0:32,0** | «Y más: **estante de archivos**, **traductor**, **chat con IA** y **Pomodoro**.» | **M** · `files` (28,0–29,4) → **N** · `translator` (29,4–30,4) → **O** · `ai` (30,4–31,3) → **P** · `pomodoro` (31,3–32,0). | Cuatro etiquetas con *pop*, una por plano: **ARCHIVOS 📁 · TRADUCTOR 🌐 · IA ✨ · POMODORO 🍅**. |
+| **0:32,0–0:37,0** | «**Todo tuyo**: temas de temporada, tus colores e imágenes, y **atajos** a tu medida.» | **Q** · `themes` (32,0–34,0) → **R** · `look-color` (34,0–34,9) → **S** · `look-image` (34,9–35,8) → **T** · `shortcuts` (35,8–37,0). | **TEMAS 🎃🎅🎂💖** → **«TUS COLORES · TUS IMÁGENES 🎨»** → **«TUS ATAJOS ⌨️»**. |
+| **0:37,0–0:40,0** | «**Noki**: descárgalo gratis.» | **U** · `welcome`: la carita sonriendo, luego se abre. | **«NOKI 1.2 · GRATIS»**; debajo **«github.com/crixb-be/noki»**. Flecha **⬇** que parpadea. |
 
 **Palabras que se resaltan** en los subtítulos: *notch · Noki · gratis · atajo · transcribe · tuyo*.
 
 ## Dirección de voz (ElevenLabs)
-- Voz juvenil en español neutro. **Estabilidad baja (~35–45 %)**, que suene menos plana, y genera 2 o 3 tomas para elegir.
-- Escribe **«wifi»** sin guion. Prueba cómo lee **«notch»** (si dice algo raro, escríbelo «noch») y **«Noki»** («Nóki»).
-- Los puntos y los «…» crean pausas. Sube la energía en «Noki» y «todo tuyo».
+- Voz juvenil en español neutro. **Estabilidad baja (~35–45 %)**, y genera 2 o 3 tomas para elegir.
+- Escribe **«wifi»** sin guion. Prueba cómo lee **«notch»** (si dice algo raro, «noch») y **«Noki»** («Nóki»).
+- Puntos y «…» crean pausas. Sube la energía en «Noki» y «todo tuyo».
 
 ## Sonido y transiciones
 - **Música:** electrónica o lo-fi animada, ~120 BPM, a volumen bajo; el beat marca los cortes.
 - **Efectos:** *whoosh* en los cambios, *pop* en los textos, *beep* en el REC, *clic* suave en los interruptores.
-- **Transiciones:** zoom-through suave y deslizamiento corto; cortes cada 1–3 s. Los 4 cortes de temas van «a golpe», sin transición.
+- **Transiciones:** zoom-through suave y deslizamiento corto; cortes cada 1–3 s.
 
 ## Los dos clips reales que graba el usuario
 Detalle de encuadre en `recortes-capcut.md` (planos **A** y **J**).
@@ -38,6 +39,8 @@ Detalle de encuadre en `recortes-capcut.md` (planos **A** y **J**).
 2. **Clip 2 (≈ 4 s):** notch cerrado → `Alt + R` → punto rojo con el tiempo → `Alt + R` otra vez.
 Graba con **OBS** (*Captura de pantalla*) o **Recortes** (`Win + Mayús + S`, vídeo). **La Barra de juegos no vale.**
 
-## Aviso sobre lo que se ve
-- Las capturas son **maquetas** hechas con la propia app (datos, canción y voz de ejemplo; la canción «Luces de neón» y su letra son inventadas).
-- Afirmaciones prudentes: «gratis y en tu PC» (la primera transcripción descarga el modelo una vez, no digas «sin internet»); el calendario es **solo lectura** por enlace iCal, no una sincronización bidireccional; la transcripción es **con un clic**, no automática.
+## Aviso sobre lo que se ve y se dice
+- Las capturas son **maquetas** hechas con la propia app (datos, canción, voz y chat de ejemplo; «Luces de neón» y su letra son inventadas).
+- «Calendarios como de Google e iOS»: Noki lee calendarios por **enlace iCal**, en **solo lectura**. Está documentado con **Google y Outlook**; el de **iOS/iCloud** funciona solo si lo publicas como enlace `webcal://`, y **no está probado**. Si quieres evitar la duda, di «de Google u Outlook».
+- «Control multimedia para vídeos y música»: la letra solo aparece con **canciones**.
+- La transcripción es **con un clic**. La primera vez descarga el modelo (una vez): no digas «sin internet».
