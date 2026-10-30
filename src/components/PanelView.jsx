@@ -150,16 +150,16 @@ function AppsCard() {
   };
   return (
     <div className={card}>
-      <div className={heading}><span>🚀</span><span>Apps</span></div>
-      <div className="grid grid-cols-2 content-start gap-x-1 gap-y-2.5">
+      <div className={`${heading} !mb-1.5`}><span>🚀</span><span>Apps</span></div>
+      <div className="flex flex-wrap content-start items-start gap-x-2 gap-y-2">
         {list.map((f) => (
-          <button key={f.path} onClick={() => launch(f)} title={f.name} className="group flex min-w-0 flex-col items-center gap-1 active:scale-95">
-            <AppIcon app={f} size={34} className="transition-transform group-hover:scale-110" />
+          <button key={f.path} onClick={() => launch(f)} title={f.name} className="group flex w-14 min-w-0 flex-col items-center gap-1 active:scale-95">
+            <AppIcon app={f} size={30} className="transition-transform group-hover:scale-110" />
             <span className="w-full truncate text-center text-[9px] text-white/60">{f.name}</span>
           </button>
         ))}
       </div>
-      {!favs.length && <div className="mt-auto pt-1 text-[9px] leading-tight text-white/25">Marca ★ en Herramientas → Lanzador para poner aquí tus programas.</div>}
+      {!favs.length && <div className="pt-1 text-[9px] leading-tight text-white/25">Marca ★ en Herramientas → Lanzador para poner aquí tus programas.</div>}
       {error && <div className="mt-1 text-[10px] text-amber-300">{error}</div>}
     </div>
   );
@@ -212,14 +212,14 @@ export default function PanelView({ weather, units, city, dnd, update }) {
 
   const act = (a) => invoke("quick_action", { kind: a.id }).then(() => a.id === "screenshot" && invoke("request_open", { open: false, sticky: false })).catch((e) => flash(String(e)));
 
-  const tile = "flex h-11 items-center justify-center rounded-2xl transition-all duration-300 active:scale-95 disabled:opacity-30";
+  const tile = "flex h-10 min-w-0 items-center justify-center rounded-2xl transition-all duration-300 active:scale-95 disabled:opacity-30";
 
   return (
-    <div className="grid h-full min-h-0 grid-cols-[1.75fr_1fr_0.8fr] gap-2">
+    <div className="grid h-full min-h-0 grid-cols-[1.25fr_1fr] gap-2">
       <WeatherCard weather={weather} units={units} city={city} />
-      <div className={card}>
-        <div className={heading}><span>⚙</span><span>Toggles</span></div>
-        <div className="grid min-h-0 flex-1 grid-cols-3 content-center gap-1.5">
+      <div className="flex min-h-0 min-w-0 flex-col gap-2">
+      <div className={`${card} shrink-0 justify-center`}>
+        <div className="grid grid-cols-5 gap-1.5">
           {TOGGLES.map((t) => {
             const v = t.id === "dnd" ? dnd : state?.[t.state];
             const available = t.id === "dnd" || v != null;
@@ -248,7 +248,8 @@ export default function PanelView({ weather, units, city, dnd, update }) {
         </div>
         {msg && <div className="mt-1 rounded-xl bg-amber-500/10 px-2 py-1 text-[10px] text-amber-300">{msg}</div>}
       </div>
-      <AppsCard />
+      <div className="min-h-0 flex-1 [&>*]:h-full"><AppsCard /></div>
+      </div>
     </div>
   );
 }

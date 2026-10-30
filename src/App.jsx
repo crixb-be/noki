@@ -1,41 +1,34 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
-import { listen } from "@tauri-apps/api/event";
-import { getCurrentWindow } from "@tauri-apps/api/window";
-import Clock from "./components/Clock.jsx";
-import Battery, { useBattery } from "./components/Battery.jsx";
-import MediaPlayer from "./components/MediaPlayer.jsx";
-import Productivity from "./components/Productivity.jsx";
-import FileShelf, { addPaths, useNativeDrop } from "./components/FileShelf.jsx";
-import AIChat from "./components/AIChat.jsx";
-import CalendarView from "./components/CalendarView.jsx";
-import PanelView from "./components/PanelView.jsx";
-import ToolsView from "./components/ToolsView.jsx";
-import HabitsView from "./components/HabitsView.jsx";
-import SystemView from "./components/SystemView.jsx";
-import ScreenTime from "./components/ScreenTime.jsx";
-import Visualizer from "./components/Visualizer.jsx";
-import Mascot, { useLook, useMascotMood } from "./components/Mascot.jsx";
+import { useBattery } from "./components/Battery.jsx";
+import { addPaths, useNativeDrop } from "./components/FileShelf.jsx";
+import { NotchDecor, StripDecor } from "./components/notch/ThemeDecor.jsx";
+import Ear from "./components/notch/Ear.jsx";
+import CompactBar from "./components/notch/CompactBar.jsx";
+import ExpandedView from "./components/notch/ExpandedView.jsx";
+import { useLook, useMascotMood } from "./components/Mascot.jsx";
 import PeekContent, { peekSize } from "./components/Peek.jsx";
 import { useCalendar } from "./hooks/useCalendar.js";
 import { useWeather } from "./hooks/useWeather.js";
+import { isRecording, toggleRecording, useRecorder } from "./lib/recorder.js";
 import { useStore, useStoreReady } from "./hooks/useStore.js";
 import { useReminders } from "./hooks/useReminders.js";
-import { usePomodoro, fmtTime } from "./hooks/usePomodoro.js";
+import { usePomodoro } from "./hooks/usePomodoro.js";
 import { useMedia } from "./hooks/useMedia.js";
 import { useSettings } from "./hooks/useSettings.js";
 import { usePeeks } from "./hooks/usePeeks.js";
+import { useTauriEvent } from "./hooks/useTauriEvent.js";
+import { LABEL, useNotchOpen } from "./hooks/useNotchOpen.js";
 import { useAiChat } from "./hooks/useAiChat.js";
 import { EMPTY_HABITS, countOn, useHabits } from "./hooks/useHabits.js";
 import { fillFor, rgba, useBgImage } from "./lib/background.js";
 import { weatherInfo } from "./lib/wmo.js";
+import { THEMES, resolveTheme } from "./lib/themes.js";
 import { presetLanguage, useLanguage } from "./lib/i18n.js";
 
-// Deben coincidir con EAR y SHADOW en src-tauri/src/notch.rs
-const EAR = 16;
-
-/** Etiqueta de esta ventana: "main" o "main-1", "main-2"… (un notch por pantalla). */
-const LABEL = getCurrentWindow().label;
+// Misma curva y duración para ancho y alto: el notch se abre y cierra como una sola pieza.
+const NOTCH_MS = 340;
+const NOTCH_EASE = "cubic-bezier(0.32, 0.72, 0, 1)";
 
 const TABS = [
   { id: "panel", icon: "🏠", label: "Panel" },
@@ -52,38 +45,6 @@ const TABS = [
 
 const isTextField = (el) =>
   el?.tagName === "TEXTAREA" || (el?.tagName === "INPUT" && !["range", "checkbox"].includes(el.type));
-
-/** Rust decide cuándo abrir/cerrar (hover, atajo, clic fuera); aquí solo se refleja. */
-function useNotchOpen() {
-  const [open, setOpen] = useState(false);
-  useEffect(() => {
-    let unlisten;
-    let cancelled = false;
-    invoke("notch_state").then((o) => !cancelled && setOpen(o)).catch(() => {});
-    listen("notch-open", (e) => e.payload.label === LABEL && setOpen(e.payload.open)).then((fn) => (cancelled ? fn() : (unlisten = fn)));
-    return () => {
-      cancelled = true;
-      unlisten?.();
-    };
-  }, []);
-  return open;
-}
-
-/** Orejas cóncavas que unen el notch con el borde superior de la pantalla. */
-function Ear({ side, bg }) {
-  const left = side === "left";
-  return (
-    <div
-      className="absolute top-0"
-      style={{
-        width: EAR,
-        height: EAR,
-        [left ? "right" : "left"]: "100%",
-        background: `radial-gradient(circle at ${left ? "0" : "100%"} 100%, transparent ${EAR - 1}px, ${bg} ${EAR - 0.5}px)`,
-      }}
-    />
-  );
-}
 
 /** Espera a tener ajustes y datos cargados para montar el notch con todo disponible. */
 export default function App() {
@@ -123,18 +84,7 @@ function Notch({ settings, update }) {
     },
     [prod.sound, dnd]
   );
-  useEffect(() => {
-    let unlisten;
-    let cancelled = false;
-    listen("notch-notify", (e) => {
-      const { ms, ...p } = e.payload;
-      show({ kind: "text", ...p }, ms);
-    }).then((fn) => (cancelled ? fn() : (unlisten = fn)));
-    return () => {
-      cancelled = true;
-      unlisten?.();
-    };
-  }, [show]);
+  useTauriEvent("notch-notify", ({ ms, ...p }) => show({ kind: "text", ...p }, ms));
 
   const pomo = usePomodoro(prod, notify, leader);
   useReminders({ health: settings.health, notify, leader });
@@ -150,18 +100,11 @@ function Notch({ settings, update }) {
   const weather = useWeather({ weather: settings.weather, enabled: settings.modules.weather, leader });
 
   // Aviso cuando la comprobación automática encuentra una versión nueva (nunca se instala sola).
-  useEffect(() => {
-    if (!leader) return;
-    let unlisten;
-    let cancelled = false;
-    listen("update-available", (e) =>
-      notify({ icon: "⬆️", text: `Noki ${e.payload.version} disponible · Ajustes → Acerca de`, ms: 9000, silent: true })
-    ).then((fn) => (cancelled ? fn() : (unlisten = fn)));
-    return () => {
-      cancelled = true;
-      unlisten?.();
-    };
-  }, [notify, leader]);
+  useTauriEvent(
+    "update-available",
+    (p) => notify({ icon: "⬆️", text: `Noki ${p.version} disponible · Ajustes → Acerca de`, ms: 9000, silent: true }),
+    leader
+  );
 
   const dragging = useNativeDrop({
     onEnter: () => {
@@ -169,6 +112,40 @@ function Notch({ settings, update }) {
       invoke("request_open", { open: true, sticky: false }).catch(() => {});
     },
     onDrop: (paths) => addPaths(paths, setFiles),
+  });
+
+  // Felicitación el día del cumpleaños (una vez al año; solo la ventana líder).
+  const [greeted, setGreeted] = useStore("birthdayGreeted", 0);
+  useEffect(() => {
+    if (!leader || !settings.appearance.birthday) return;
+    const now = new Date();
+    if (settings.appearance.birthday !== `${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}`) return;
+    if (greeted === now.getFullYear()) return;
+    const age = settings.appearance.birthYear ? now.getFullYear() - settings.appearance.birthYear : 0;
+    notify({ icon: "🎂", text: age > 0 ? `¡Feliz cumpleaños! Hoy cumples ${age}` : "¡Feliz cumpleaños!", ms: 9000, silent: true });
+    setGreeted(now.getFullYear());
+  }, [leader, settings.appearance.birthday]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Atajos globales que Rust reenvía a esta ventana (grabar, «No molestar», tarea rápida, ir a una pestaña).
+  const [, setWorkTab] = useStore("workTab", "tasks");
+  const tabsRef = useRef([]);
+  useTauriEvent("shortcut-action", async (p) => {
+    if (p.label !== LABEL) return;
+    if (p.action === "record") {
+      const was = isRecording();
+      await toggleRecording();
+      show(was ? { kind: "text", icon: "✅", text: "Grabación guardada" } : { kind: "text", icon: "🔴", text: "Grabando… (el mismo atajo la detiene)" }, 2200);
+    } else if (p.action === "dnd") {
+      update({ general: { dnd: !dnd } });
+      show({ kind: "text", icon: dnd ? "🔔" : "🔕", text: dnd ? "No molestar desactivado" : "No molestar activado" }, 1800);
+    } else if (p.action === "addTask") {
+      setTab("work");
+      setWorkTab("tasks");
+      setTimeout(() => document.querySelector("[data-task-input]")?.focus(), 380);
+    } else if (p.action.startsWith("tab:")) {
+      const t = tabsRef.current[Number(p.action.slice(4))];
+      if (t) setTab(t.id);
+    }
   });
 
   // Esc cierra el notch (útil cuando se abrió con el atajo).
@@ -215,7 +192,13 @@ function Notch({ settings, update }) {
   }, [expanded, setHold]);
 
   const { appearance: ap, modules } = settings;
-  const tabs = TABS.filter((t) => modules[t.id]);
+  const rec = useRecorder();
+  const rank = (id) => {
+    const i = modules.order?.indexOf(id) ?? -1;
+    return i < 0 ? TABS.length : i;
+  };
+  const tabs = TABS.filter((t) => modules[t.id]).sort((a, b) => rank(a.id) - rank(b.id));
+  tabsRef.current = tabs;
   const activeTab = tabs.some((t) => t.id === tab) ? tab : tabs[0]?.id;
 
   // Agenda y Calendario contienen selectores nativos que pueden abrirse fuera de la
@@ -235,23 +218,20 @@ function Notch({ settings, update }) {
   // Fondo del notch y de la franja a sus costados (configurables en Ajustes → Apariencia).
   const weatherNow = weather.data?.current ? weatherInfo(weather.data.current.weather_code, weather.data.current.is_day) : null;
   const [tint, setTint] = useState(null); // color bajo la franja en modo automático (lo mide Rust)
-  useEffect(() => {
-    if (ap.barMode !== "auto" && !ap.notchAuto) return;
-    let unlisten;
-    let cancelled = false;
-    listen("bar-tint", (e) => e.payload.label === LABEL && setTint(e.payload.color)).then((fn) => (cancelled ? fn() : (unlisten = fn)));
-    return () => {
-      cancelled = true;
-      unlisten?.();
-    };
-  }, [ap.barMode, ap.notchAuto]);
-  const notchImg = useBgImage(ap.notchAuto ? "" : ap.notchImage);
+  useTauriEvent("bar-tint", (p) => p.label === LABEL && setTint(p.color), ap.barMode === "auto" || ap.notchAuto);
+  // Temas de temporada, cada parte el suyo: personaje, notch central y franja de los costados. No tocan tus colores guardados.
+  const themeFor = (setting) => resolveTheme(setting, ap.birthday, ap.themeEvents);
+  const notchTheme = THEMES[themeFor(ap.notchTheme)] ?? null;
+  const barTheme = THEMES[themeFor(ap.barTheme)] ?? null;
+  const notchImg = useBgImage(ap.notchAuto || notchTheme ? "" : ap.notchImage);
   const barImg = useBgImage(ap.barMode === "image" ? ap.barImage : "");
-  const notchColor = ap.notchAuto ? tint ?? ap.notchColor : ap.notchColor;
-  const bg = rgba(notchColor, ap.opacity); // color plano: también lo usan las «orejas»
-  const notchFill = fillFor({ color: notchColor, opacity: ap.opacity, image: notchImg, dim: ap.notchDim });
-  const barFill =
-    ap.barMode === "none"
+  const notchColor = notchTheme ? notchTheme.notch : ap.notchAuto ? tint ?? ap.notchColor : ap.notchColor;
+  const notchOpacity = notchTheme ? ap.notchThemeOpacity : ap.opacity;
+  const bg = rgba(notchColor, notchOpacity); // color plano: también lo usan las «orejas»
+  const notchFill = fillFor({ color: notchColor, opacity: notchOpacity, image: notchImg, dim: ap.notchDim });
+  const barFill = barTheme
+    ? rgba(barTheme.bar, ap.barThemeOpacity)
+    : ap.barMode === "none"
       ? null
       : ap.barMode === "match"
         ? bg
@@ -260,44 +240,6 @@ function Notch({ settings, update }) {
           : ap.barMode === "color"
             ? rgba(ap.barColor, ap.barOpacity)
             : fillFor({ color: ap.barColor, opacity: ap.barOpacity, image: barImg, dim: ap.barDim });
-
-  // Indicador discreto del estado compacto: reunión inminente > temporizador > canción.
-  const soon = modules.calendar && (cal.ongoing ? { text: "Ahora", ms: 0 } : cal.next && cal.next.start - cal.now <= 15 * 60000 ? { text: `${Math.max(1, Math.round((cal.next.start - cal.now) / 60000))} min`, ms: 1 } : null);
-  let indicator = null;
-  if (soon) {
-    indicator = (
-      <span className="max-w-[110px] truncate text-xs text-amber-300" title={(cal.ongoing ?? cal.next).title}>
-        📅 {soon.text}
-      </span>
-    );
-  } else if (pomo.running) {
-    indicator = (
-      <span className={`text-xs tabular-nums ${pomo.phase === "work" ? "text-rose-400" : "text-emerald-400"}`}>
-        ⏱ {fmtTime(pomo.left)}
-      </span>
-    );
-  } else if (media.available && media.playing) {
-    indicator = (
-      <span className="flex items-center gap-1.5" aria-label="Reproduciendo">
-        {media.track.art && <img src={media.track.art} alt="" className="h-5 w-5 rounded-md object-cover" draggable={false} />}
-        {ap.visualizer ? (
-          <Visualizer bars={6} className="h-3.5 w-9" />
-        ) : (
-          <span className="flex h-3 items-end gap-[2px]">
-            {[0, 1, 2].map((i) => (
-              <span
-                key={i}
-                className="w-[3px] animate-bounce rounded-full bg-fuchsia-400"
-                style={{ height: "100%", animationDelay: `${i * 150}ms`, animationDuration: "700ms" }}
-              />
-            ))}
-          </span>
-        )}
-      </span>
-    );
-  } else if (dnd) {
-    indicator = <span className="text-xs text-white/50" title="No molestar activado">🔕</span>;
-  }
 
   const onFocus = (e) => {
     if (!isTextField(e.target)) return;
@@ -312,16 +254,20 @@ function Notch({ settings, update }) {
     unpinTimer.current = setTimeout(() => invoke("set_pinned", { pinned: false }).catch(() => {}), 700);
   };
 
+  const [welcomed, setWelcomed] = useStore("welcomed", false);
+  const mascotState = { mood, look, poke, skin: themeFor(ap.mascotTheme) };
+  const habitStats = { done: habitsDone, total: activeHabits.length };
+
   return (
     <div className="relative h-full w-full" onFocus={onFocus} onBlur={onBlur}>
-      {barFill && <div className="pointer-events-none absolute left-0 right-0 top-0" style={{ height: ap.collapsedH, background: barFill, transition: "background-color 350ms ease" }} />}
+      {barFill && <div className="pointer-events-none absolute left-0 right-0 top-0" style={{ height: ap.collapsedH, background: barFill, transition: "background-color 350ms ease" }}>{barTheme && <StripDecor theme={barTheme} height={ap.collapsedH} />}</div>}
       <div className="flex h-full w-full items-start justify-center" style={{ transform: `translateX(${ap.offsetX}px)` }}>
       <div
         className="relative"
         style={{
           width: expanded ? ap.expandedW : peekDims?.w ?? compactW,
           height: expanded ? ap.expandedH : peekDims?.h ?? ap.collapsedH,
-          transition: "width 300ms cubic-bezier(0.32, 0.72, 0, 1), height 300ms cubic-bezier(0.32, 0.72, 0, 1)",
+          transition: `width ${NOTCH_MS}ms ${NOTCH_EASE}, height ${NOTCH_MS}ms ${NOTCH_EASE}`,
         }}
       >
         {!notchImg && <Ear side="left" bg={bg} />}
@@ -336,95 +282,35 @@ function Notch({ settings, update }) {
             boxShadow: expanded ? "0 14px 36px rgba(0,0,0,0.55)" : "none",
           }}
         >
+          {notchTheme && !peek && <NotchDecor theme={notchTheme} compact={!expanded} />}
           {expanded ? (
-            <div className="flex h-full animate-[fadeIn_300ms_ease-out_both] flex-col gap-3 p-4">
-              <div className="flex shrink-0 items-center justify-between">
-                <div className="flex items-center gap-3">
-                  <Clock withDate={tabs.length < 6} hour12={!ap.clock24} />
-                  {tabs.length < 8 && <Battery info={battery} />}
-                  {ap.mascot && tabs.length < 10 && <Mascot size={22} mood={mood} look={look} onPoke={poke} />}
-                </div>
-                <nav className="flex gap-0.5 rounded-full bg-white/10 p-1">
-                  {tabs.map((t) => (
-                    <button
-                      key={t.id}
-                      onClick={() => setTab(t.id)}
-                      title={t.label}
-                      aria-label={t.label}
-                      className={`rounded-full py-1 text-sm transition-all duration-300 ${tabs.length >= 10 ? "px-1.5" : "px-2"} ${
-                        activeTab === t.id ? "bg-white/20" : "opacity-50 hover:opacity-100"
-                      }`}
-                    >
-                      {t.icon}
-                    </button>
-                  ))}
-                  <button
-                    onClick={() => invoke("open_settings", {})}
-                    title="Ajustes"
-                    aria-label="Ajustes"
-                    className="rounded-full px-2 py-1 text-sm opacity-50 transition-all duration-300 hover:opacity-100"
-                  >
-                    ⚙
-                  </button>
-                </nav>
-              </div>
-              <div className="min-h-0 flex-1">
-                {tabs.length === 0 && (
-                  <div className="flex h-full flex-col items-center justify-center gap-2 text-xs text-white/40">
-                    Todos los módulos están desactivados.
-                    <button onClick={() => invoke("open_settings", { section: "modules" })} className="text-sky-300 underline">
-                      Abrir ajustes
-                    </button>
-                  </div>
-                )}
-                {activeTab === "panel" && <PanelView weather={weather} units={settings.weather.units} city={settings.weather.city} dnd={dnd} update={update} />}
-                {activeTab === "media" && <MediaPlayer media={media} lyricsAvailable={modules.lyrics} visualizer={ap.visualizer} />}
-                {activeTab === "work" && <Productivity pomo={pomo} prod={prod} />}
-                {activeTab === "habits" && <HabitsView />}
-                {activeTab === "system" && <SystemView />}
-                {activeTab === "screentime" && <ScreenTime />}
-                {activeTab === "files" && <FileShelf files={files} setFiles={setFiles} dragging={dragging} />}
-                {activeTab === "calendar" && <CalendarView cal={cal} />}
-                {activeTab === "ai" && <AIChat ai={settings.ai} chat={aiChat} />}
-                {activeTab === "tools" && <ToolsView clip={settings.clipboard} update={update} />}
-              </div>
-              {banner && (
-                <div
-                  className={`pointer-events-none absolute bottom-3 left-1/2 flex max-w-[90%] -translate-x-1/2 animate-[fadeIn_200ms_ease-out_both] items-center gap-2 rounded-full px-4 py-1.5 text-xs font-medium shadow-lg ring-1 ${
-                    banner.tone === "alert" ? "bg-amber-400/20 text-amber-100 ring-amber-400/50" : "bg-white/15 text-white ring-white/20"
-                  }`}
-                >
-                  <span>{banner.icon}</span>
-                  <span className="truncate">{banner.text}</span>
-                </div>
-              )}
-            </div>
+            <ExpandedView
+              tabs={tabs}
+              activeTab={activeTab}
+              setTab={setTab}
+              settings={settings}
+              update={update}
+              data={{ battery, media, pomo, cal, weather, files, setFiles, dragging, aiChat }}
+              mascot={mascotState}
+              banner={banner}
+              welcome={!welcomed ? { shortcuts: settings.shortcuts, done: () => setWelcomed(true) } : null}
+            />
           ) : peek ? (
-            <div className="h-full animate-[fadeIn_200ms_ease-out_both]">
+            <div className="relative h-full animate-[peekIn_240ms_cubic-bezier(0.2,0.8,0.2,1)_both]">
               <PeekContent peek={peek} setHold={setHold} />
             </div>
           ) : (
-            <div className="flex h-full items-center justify-between gap-2 px-4">
-              <div className="flex shrink-0 items-center gap-2">
-                {(ap.showClock || ap.showDate) && <Clock showTime={ap.showClock} withDate={ap.showDate} hour12={!ap.clock24} />}
-              </div>
-              <div className="flex min-w-0 flex-1 items-center justify-center gap-2.5">
-                {ap.mascot && <Mascot size={20} mood={mood} look={look} />}
-                {ap.showActivity ? indicator : null}
-              </div>
-              <div className="flex shrink-0 items-center gap-2 text-xs tabular-nums">
-                {ap.showTasks && (
-                  <span className="text-white/80" title={`${pendingTasks} tarea${pendingTasks === 1 ? "" : "s"} pendiente${pendingTasks === 1 ? "" : "s"}`}>✓ {pendingTasks}</span>
-                )}
-                {ap.showHabits && modules.habits && activeHabits.length > 0 && (
-                  <span className="text-white/80" title="Hábitos completados hoy">🎯 {habitsDone}/{activeHabits.length}</span>
-                )}
-                {ap.showWeather && weatherNow && (
-                  <span className="text-white/80" title={weatherNow.text}>{weatherNow.icon} {Math.round(weather.data.current.temperature_2m)}°</span>
-                )}
-                {ap.showBattery && <Battery info={battery} />}
-              </div>
-            </div>
+            <CompactBar
+              ap={ap}
+              modules={modules}
+              mascot={mascotState}
+              indicator={{ cal, calendarOn: modules.calendar, pomo, media, dnd, rec }}
+              pending={pendingTasks}
+              habits={habitStats}
+              weatherNow={weatherNow}
+              temperature={weatherNow ? Math.round(weather.data.current.temperature_2m) : null}
+              battery={battery}
+            />
           )}
         </div>
       </div>

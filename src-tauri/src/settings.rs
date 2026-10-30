@@ -85,6 +85,20 @@ pub struct Appearance {
     pub app_icon: String,
     /// La carita animada de Noki dentro del notch.
     pub mascot: bool,
+    /// Tema del personaje, del notch central y de la franja de los costados, cada uno por separado:
+    /// "auto" (según la fecha), "none" (tus ajustes), "halloween", "christmas", "birthday" o "love".
+    pub mascot_theme: String,
+    pub notch_theme: String,
+    pub bar_theme: String,
+    /// Opacidad (%) del color del tema en el notch central y en la franja de los costados.
+    pub notch_theme_opacity: i32,
+    pub bar_theme_opacity: i32,
+    /// Cumpleaños de quien usa Noki, "MM-DD" (vacío si no se indica). Solo se usa en este equipo.
+    pub birthday: String,
+    /// Fechas propias que activan un tema (p. ej. un aniversario) además de las de siempre.
+    pub theme_events: Vec<ThemeEvent>,
+    /// Año de nacimiento (0 = no indicado); solo sirve para decir tu edad el día del cumpleaños.
+    pub birth_year: i32,
 }
 
 impl Default for Appearance {
@@ -116,8 +130,32 @@ impl Default for Appearance {
             bar_opacity: 100,
             app_icon: crate::appicon::DEFAULT.into(),
             mascot: true,
+            mascot_theme: "auto".into(),
+            notch_theme: "auto".into(),
+            bar_theme: "auto".into(),
+            notch_theme_opacity: 100,
+            bar_theme_opacity: 90,
+            birthday: String::new(),
+            birth_year: 0,
+            theme_events: Vec::new(),
         }
     }
+}
+
+/// Un tema que se activa solo entre dos fechas ("MM-DD"; si `from` > `to` cruza el fin de año).
+#[derive(Serialize, Deserialize, Clone, Debug, Default, PartialEq)]
+#[serde(default, rename_all = "camelCase")]
+pub struct ThemeEvent {
+    pub name: String,
+    pub from: String,
+    pub to: String,
+    pub theme: String,
+}
+
+fn valid_md(v: &str) -> bool {
+    v.split_once('-').is_some_and(|(m, d)| {
+        m.len() == 2 && d.len() == 2 && matches!(m.parse::<u32>(), Ok(1..=12)) && matches!(d.parse::<u32>(), Ok(1..=31))
+    })
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq)]
@@ -143,7 +181,14 @@ pub struct Modules {
     pub habits: bool,
     /// "last" recuerda la última pestaña; o el id de un módulo.
     pub default_tab: String,
+    /// Orden de las pestañas del notch (ids de módulo).
+    pub order: Vec<String>,
 }
+
+/// Pestañas del notch en su orden original.
+pub const TAB_IDS: [&str; 10] = [
+    "panel", "media", "work", "habits", "files", "calendar", "ai", "system", "screentime", "tools",
+];
 
 impl Default for Modules {
     fn default() -> Self {
@@ -161,6 +206,7 @@ impl Default for Modules {
             screentime: false,
             habits: true,
             default_tab: "last".into(),
+            order: TAB_IDS.iter().map(|s| s.to_string()).collect(),
         }
     }
 }
@@ -168,14 +214,41 @@ impl Default for Modules {
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq)]
 #[serde(default, rename_all = "camelCase")]
 pub struct Shortcuts {
+    /// Abrir / cerrar el notch.
     pub toggle: String,
+    pub toggle_enabled: bool,
+    /// Empezar / detener una grabación de voz.
+    pub record: String,
+    pub record_enabled: bool,
+    /// Activar / desactivar «No molestar».
+    pub dnd: String,
+    pub dnd_enabled: bool,
+    /// Abrir el notch listo para escribir una tarea.
+    pub add_task: String,
+    pub add_task_enabled: bool,
+    /// Ir directo a una pestaña con <modificador>+1…9.
+    pub tabs_enabled: bool,
+    pub tabs_modifier: String,
 }
 
 impl Default for Shortcuts {
     fn default() -> Self {
-        Self { toggle: "Alt+N".into() }
+        Self {
+            toggle: "Alt+N".into(),
+            toggle_enabled: true,
+            record: "Alt+R".into(),
+            record_enabled: true,
+            dnd: "Alt+D".into(),
+            dnd_enabled: false,
+            add_task: "Alt+T".into(),
+            add_task_enabled: false,
+            tabs_enabled: false,
+            tabs_modifier: "Alt".into(),
+        }
     }
 }
+
+pub const TAB_MODIFIERS: [&str; 5] = ["Alt", "Ctrl", "Ctrl+Alt", "Ctrl+Shift", "Alt+Shift"];
 
 /// Configuración de un proveedor de IA. `base_url` vacío = el servidor oficial.
 #[derive(Serialize, Deserialize, Clone, Debug, Default, PartialEq)]
@@ -414,6 +487,19 @@ pub struct Settings {
 impl Settings {
     /// Mantiene los valores dentro de rangos que el diseño soporta.
     pub fn clamp(&mut self) {
+        // Orden de pestañas: sin repetidas ni desconocidas, y las que falten (p. ej. módulos nuevos) al final.
+        let mut seen: Vec<String> = Vec::new();
+        for id in self.modules.order.drain(..) {
+            if TAB_IDS.contains(&id.as_str()) && !seen.contains(&id) {
+                seen.push(id);
+            }
+        }
+        for id in TAB_IDS {
+            if !seen.iter().any(|s| s == id) {
+                seen.push(id.to_string());
+            }
+        }
+        self.modules.order = seen;
         let g = &mut self.general;
         if g.trigger != "notch" && g.trigger != "edge" {
             g.trigger = "notch".into();
@@ -438,6 +524,26 @@ impl Settings {
             a.app_icon = crate::appicon::DEFAULT.into();
         }
         a.bar_opacity = a.bar_opacity.clamp(0, 100);
+        a.notch_theme_opacity = a.notch_theme_opacity.clamp(20, 100);
+        a.bar_theme_opacity = a.bar_theme_opacity.clamp(0, 100);
+        for t in [&mut a.mascot_theme, &mut a.notch_theme, &mut a.bar_theme] {
+            if !["auto", "none", "halloween", "christmas", "birthday", "love"].contains(&t.as_str()) {
+                *t = "auto".into();
+            }
+        }
+        let valid_birthday = valid_md(&a.birthday);
+        a.theme_events.retain(|e| valid_md(&e.from) && valid_md(&e.to) && ["halloween", "christmas", "birthday", "love"].contains(&e.theme.as_str()));
+        a.theme_events.truncate(12);
+        for e in &mut a.theme_events {
+            e.name = e.name.trim().chars().take(40).collect();
+        }
+        if a.birth_year != 0 && !(1900..=2100).contains(&a.birth_year) {
+            a.birth_year = 0;
+        }
+        if !valid_birthday {
+            a.birth_year = 0;
+            a.birthday.clear();
+        }
         for c in [&mut a.notch_color, &mut a.bar_color] {
             if !crate::backgrounds::valid_color(c) {
                 *c = "#000000".into();
@@ -516,6 +622,19 @@ impl Settings {
             self.updates.url = DEFAULT_UPDATE_URL.into();
         }
 
+        let sc = Shortcuts::default();
+        for (cur, def) in [
+            (&mut self.shortcuts.record, &sc.record),
+            (&mut self.shortcuts.dnd, &sc.dnd),
+            (&mut self.shortcuts.add_task, &sc.add_task),
+        ] {
+            if cur.trim().is_empty() {
+                *cur = def.clone();
+            }
+        }
+        if !TAB_MODIFIERS.contains(&self.shortcuts.tabs_modifier.as_str()) {
+            self.shortcuts.tabs_modifier = sc.tabs_modifier.clone();
+        }
         if self.shortcuts.toggle.trim().is_empty() {
             self.shortcuts.toggle = Shortcuts::default().toggle;
         }

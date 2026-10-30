@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { listen } from "@tauri-apps/api/event";
-import { getCurrentWindow } from "@tauri-apps/api/window";
+import { LABEL } from "../hooks/useNotchOpen.js";
+import { useTauriEvent } from "../hooks/useTauriEvent.js";
 
 /**
  * La carita de Noki dentro del notch. Parpadea, sigue el cursor con la mirada y reacciona:
@@ -9,27 +9,12 @@ import { getCurrentWindow } from "@tauri-apps/api/window";
  * Está dibujada en código (sin imágenes) para seguir el color y el tamaño del notch.
  */
 
-const LABEL = getCurrentWindow().label;
-
 const STROKE = { fill: "none", stroke: "#FFFFFF", strokeLinecap: "round", strokeLinejoin: "round" };
 
 /** Hacia dónde mira: x e y entre -1 y 1 (el centro del notch es 0, 0). Rust avisa de la posición del cursor. */
 export function useLook(enabled) {
   const [look, setLook] = useState({ x: 0, y: 0 });
-  useEffect(() => {
-    if (!enabled) return;
-    let unlisten;
-    let cancelled = false;
-    listen("mascot-cursor", (e) => {
-      const p = e.payload;
-      if (p.label !== LABEL) return;
-      setLook(p.near ? { x: p.x, y: p.y } : { x: 0, y: 0 });
-    }).then((fn) => (cancelled ? fn() : (unlisten = fn)));
-    return () => {
-      cancelled = true;
-      unlisten?.();
-    };
-  }, [enabled]);
+  useTauriEvent("mascot-cursor", (p) => p.label === LABEL && setLook(p.near ? { x: p.x, y: p.y } : { x: 0, y: 0 }), enabled);
   return look;
 }
 
@@ -106,14 +91,21 @@ export function useMascotMood({ enabled, doneTasks, habitsDone, pomoAlert, playi
   return { mood, poke };
 }
 
-function Eyes({ mood, look }) {
+function Eyes({ mood, look, skin }) {
   const ox = look.x * 3.4;
   const oy = look.y * 2.6;
-  const Dot = ({ cx }) => (
-    <g className="mascot-blink">
-      <ellipse cx={cx + ox} cy={17 + oy} rx="5.2" ry="6.4" fill="#FFFFFF" />
-    </g>
-  );
+  const Heart = ({ cx }) => {
+    const x = cx + ox;
+    const y = 17 + oy;
+    return (
+      <g className="mascot-blink">
+        <path
+          d={`M${x} ${y + 7} C${x - 9} ${y + 1} ${x - 6} ${y - 6} ${x - 3} ${y - 5.4} C${x - 1.4} ${y - 5} ${x} ${y - 3.6} ${x} ${y - 2.6} C${x} ${y - 3.6} ${x + 1.4} ${y - 5} ${x + 3} ${y - 5.4} C${x + 6} ${y - 6} ${x + 9} ${y + 1} ${x} ${y + 7}Z`}
+          fill="#FB7185"
+        />
+      </g>
+    );
+  };
   switch (mood) {
     case "happy":
     case "dance":
@@ -152,11 +144,20 @@ function Eyes({ mood, look }) {
         </g>
       );
     default:
+      if (skin === "love")
+        return (
+          <>
+            <Heart cx={20} />
+            <Heart cx={44} />
+          </>
+        );
       return (
-        <>
-          <Dot cx={20} />
-          <Dot cx={44} />
-        </>
+        <g transform={`translate(${ox} ${oy})`}>
+          <g {...STROKE} strokeWidth="3.4">
+            <path d="M14.5 20 Q20 13 25.5 20" />
+            <path d="M38.5 20 Q44 13 49.5 20" />
+          </g>
+        </g>
       );
   }
 }
@@ -175,24 +176,79 @@ function Mouth({ mood }) {
     case "drop":
       return <ellipse cx="32" cy="32" rx="4.6" ry="5.6" fill="#FFFFFF" />;
     default:
-      return <path {...STROKE} strokeWidth="3" d="M26 30 Q32 35 38 30" />;
+      return <path {...STROKE} strokeWidth="3" d="M28 30.5 Q32 34.5 36 30.5" />;
   }
 }
 
-/** `size` es el alto en píxeles; el ancho sale solo. */
-export default function Mascot({ size = 22, mood = "idle", look = { x: 0, y: 0 }, onPoke, className = "" }) {
+/** Gorros y accesorios (arriba, y 0–17 del lienzo). La cara se reduce un poco para dejarles sitio. */
+function Costume({ skin }) {
+  switch (skin) {
+    case "christmas":
+      return (
+        <g>
+          <path d="M17 17 C19 7 29 2 41 3 C46 3.5 49 7 48 12 L47 17 Z" fill="#E5393B" />
+          <path d="M41 3 C46 3 50 6 49 12" fill="none" stroke="#C62B2E" strokeWidth="1.2" />
+          <rect x="14" y="14.5" width="36" height="5" rx="2.5" fill="#FFFFFF" />
+          <circle cx="49" cy="11.5" r="3.6" fill="#FFFFFF" />
+        </g>
+      );
+    case "halloween":
+      return (
+        <g>
+          <path d="M23 15 L34 1.5 C34.5 1 35.5 1.5 36 2.5 L42 15 Z" fill="#6B3FA0" />
+          <path d="M34 1.5 C37 1 39 3 38 4.5" fill="none" stroke="#6B3FA0" strokeWidth="2.4" strokeLinecap="round" />
+          <path d="M25 12 L41 12 L42 15 L24 15 Z" fill="#FB923C" />
+          <ellipse cx="33" cy="15.8" rx="18" ry="3" fill="#7C4DB8" />
+          <rect x="31.6" y="11.6" width="3.2" height="3.4" rx="0.6" fill="none" stroke="#FDE68A" strokeWidth="1" />
+        </g>
+      );
+    case "love":
+      return (
+        <g>
+          <path d="M32 15 C22 8.5 25 0.8 29.6 2.4 C31 2.9 32 4.2 32 5.4 C32 4.2 33 2.9 34.4 2.4 C39 0.8 42 8.5 32 15Z" fill="#FB7185" />
+          <g className="mascot-confetti" fill="#F9A8D4">
+            <path d="M13 12 C9.5 9.5 10.6 6.6 12.3 7.2 C12.8 7.4 13 7.9 13 8.3 C13 7.9 13.2 7.4 13.7 7.2 C15.4 6.6 16.5 9.5 13 12Z" />
+            <path d="M52 15 C49.5 13.2 50.3 11.1 51.5 11.5 C51.9 11.7 52 12 52 12.3 C52 12 52.2 11.7 52.6 11.5 C53.8 11.1 54.5 13.2 52 15Z" />
+          </g>
+        </g>
+      );
+    case "birthday":
+      return (
+        <g>
+          <path d="M24 17 L32 2.5 L40 17 Z" fill="#F472B6" />
+          <path d="M27.4 11 L36.6 11 M25.7 14 L38.3 14" stroke="#FDE047" strokeWidth="2" strokeLinecap="round" />
+          <circle cx="32" cy="2.4" r="2.6" fill="#38BDF8" />
+          <g className="mascot-confetti">
+            <circle cx="12" cy="9" r="1.4" fill="#FDE047" />
+            <circle cx="52" cy="7" r="1.4" fill="#34D399" />
+            <rect x="48" y="14" width="2.6" height="2.6" rx="0.5" fill="#F472B6" />
+            <rect x="12.5" y="16" width="2.6" height="2.6" rx="0.5" fill="#38BDF8" />
+          </g>
+        </g>
+      );
+    default:
+      return null;
+  }
+}
+
+/** `size` es el alto en píxeles; el ancho sale solo. `skin`: "none" | "halloween" | "christmas" | "birthday". */
+export default function Mascot({ size = 22, mood = "idle", look = { x: 0, y: 0 }, skin = "none", onPoke, className = "" }) {
+  const dressed = skin !== "none";
   return (
     <span
       role={onPoke ? "button" : "img"}
       aria-label="Noki"
       onClick={onPoke}
-      className={`mascot mascot-${mood} inline-flex shrink-0 items-center justify-center ${onPoke ? "cursor-pointer" : ""} ${className}`}
+      className={`mascot mascot-${mood} ${dressed ? `mascot-skin-${skin}` : ""} inline-flex shrink-0 items-center justify-center ${onPoke ? "cursor-pointer" : ""} ${className}`}
       style={{ height: size, width: size * 1.6 }}
     >
       <svg viewBox="0 0 64 40" width={size * 1.6} height={size} overflow="visible">
         <g className="mascot-body">
-          <Eyes mood={mood} look={look} />
-          <Mouth mood={mood} />
+          <g transform={dressed ? "translate(6.4 9.6) scale(0.8)" : undefined}>
+            <Eyes mood={mood} look={look} skin={skin} />
+            <Mouth mood={mood} />
+          </g>
+          {dressed && <Costume skin={skin} />}
         </g>
         {mood === "sleepy" && (
           <g fill="#FFFFFF" fontFamily="Segoe UI, sans-serif" fontWeight="700">
