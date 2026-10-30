@@ -1,0 +1,107 @@
+1
+00:00:00,000 --> 00:00:01,351
+¿Y si tu PC tuviera
+
+2
+00:00:01,401 --> 00:00:03,322
+un notch como el de un Mac…
+
+3
+00:00:03,372 --> 00:00:05,150
+pero que de verdad sirva?
+
+4
+00:00:05,200 --> 00:00:06,291
+Te presento a Noki:
+
+5
+00:00:06,341 --> 00:00:07,834
+gratis, de código abierto,
+
+6
+00:00:07,884 --> 00:00:09,550
+y vive arriba de tu pantalla.
+
+7
+00:00:09,600 --> 00:00:11,156
+Pasas el cursor y se abre:
+
+8
+00:00:11,206 --> 00:00:12,583
+clima, Wi-Fi, Bluetooth
+
+9
+00:00:12,633 --> 00:00:13,950
+y tus apps, a un clic.
+
+10
+00:00:14,000 --> 00:00:15,443
+Tareas con fecha y hora,
+
+11
+00:00:15,493 --> 00:00:17,177
+y un calendario que te avisa
+
+12
+00:00:17,227 --> 00:00:18,550
+antes de cada reunión.
+
+13
+00:00:18,600 --> 00:00:19,252
+¿Lo mejor?
+
+14
+00:00:19,302 --> 00:00:21,322
+Pulsas Alt + R y grabas tu voz,
+
+15
+00:00:21,372 --> 00:00:22,350
+sin abrir nada.
+
+16
+00:00:22,400 --> 00:00:24,306
+Y con un clic lo transcribe,
+
+17
+00:00:24,356 --> 00:00:26,262
+ahí mismo en tu PC y gratis.
+
+18
+00:00:26,312 --> 00:00:28,150
+Lo mandas a Notas o Tareas.
+
+19
+00:00:28,200 --> 00:00:29,139
+Y es todo tuyo:
+
+20
+00:00:29,189 --> 00:00:30,943
+temas de Halloween, Navidad,
+
+21
+00:00:30,993 --> 00:00:32,120
+cumpleaños y amor,
+
+22
+00:00:32,170 --> 00:00:34,550
+para la cara, el notch y los costados.
+
+23
+00:00:34,600 --> 00:00:36,615
+Y los atajos los configuras tú,
+
+24
+00:00:36,665 --> 00:00:38,550
+para que no choquen con nada.
+
+25
+00:00:38,600 --> 00:00:39,265
+Noki 1.2.
+
+26
+00:00:39,315 --> 00:00:40,644
+Descárgalo gratis,
+
+27
+00:00:40,694 --> 00:00:41,950
+enlace en mi bio.
