@@ -184,6 +184,7 @@ Everything stays on your PC. Noki only goes online when you use something that n
 | Weather | [Open-Meteo](https://open-meteo.com) | when a city is set |
 | Text translation | Google Translate web service (unofficial endpoint) | while you translate |
 | Image text (OCR) | Windows built-in OCR, **local** | nothing leaves your PC |
+| Voice transcription (optional) | [Hugging Face](https://huggingface.co): it only **downloads** the Whisper model once; the audio is processed on your PC | the first time you transcribe |
 | Lyrics | [LRCLIB](https://lrclib.net) | when you open lyrics |
 | Detect my city | [ipwho.is](https://ipwho.is) | only when you press the button |
 | AI chat | the provider you choose, with *your* key | when you send a message |

@@ -184,6 +184,7 @@ Todo se queda en tu PC. Noki solo se conecta a internet cuando usas algo que lo 
 | Clima | [Open-Meteo](https://open-meteo.com) | si eliges una ciudad |
 | Traducción de texto | Servicio web de Google Translate (punto de acceso no oficial) | mientras traduces |
 | Texto de imágenes (OCR) | OCR de Windows, **local** | nada sale de tu PC |
+| Transcripción de voz (opcional) | [Hugging Face](https://huggingface.co): solo **descarga** el modelo Whisper una vez; el audio se procesa en tu PC | la primera vez que transcribes |
 | Letras | [LRCLIB](https://lrclib.net) | al abrir las letras |
 | Detectar mi ciudad | [ipwho.is](https://ipwho.is) | solo al pulsar el botón |
 | Chat de IA | el proveedor que elijas, con *tu* clave | al enviar un mensaje |
