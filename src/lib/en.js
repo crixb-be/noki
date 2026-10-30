@@ -252,6 +252,7 @@ export const EN = {
   "Importar…": "Import…",
   // bienvenida
   "¡Hola, soy Noki! 👋": "Hi, I'm Noki! 👋",
+  "Tu notch de escritorio: música, tareas, clima, archivos y mucho más, a un gesto de distancia.": "Your desktop notch: music, tasks, weather, files and much more, one gesture away.",
   "Empezar": "Start",
   "Cambia colores, temas, módulos y atajos en Ajustes (el engranaje).": "Change colors, themes, modules and shortcuts in Settings (the gear).",
   "Prueba los temas de temporada en Ajustes → Apariencia.": "Try the seasonal themes in Settings → Appearance.",

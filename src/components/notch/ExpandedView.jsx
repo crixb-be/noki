@@ -14,27 +14,36 @@ import ScreenTime from "../ScreenTime.jsx";
 import Mascot from "../Mascot.jsx";
 
 /** Notch abierto: cabecera (reloj, batería, mascota, pestañas), la vista activa y el aviso flotante. */
-/** Primera vez: un vistazo rápido a lo esencial. */
+/** Primera vez: Noki se presenta y da un vistazo rápido a lo esencial. */
 function Welcome({ shortcuts, done }) {
   const tips = [
-    ["🖱️", "Pasa el cursor por el notch (o pulsa " + (shortcuts.toggleEnabled ? shortcuts.toggle : "el atajo") + ") para abrirlo."],
+    ["🖱️", `Pasa el cursor por el notch${shortcuts.toggleEnabled ? ` (o pulsa ${shortcuts.toggle})` : ""} para abrirlo.`],
     ["🎙", shortcuts.recordEnabled ? `${shortcuts.record} graba tu voz desde cualquier lugar.` : "En Agenda → Grabadora guardas tu voz y la transcribes."],
     ["⚙", "Cambia colores, temas, módulos y atajos en Ajustes (el engranaje)."],
     ["🎭", "Prueba los temas de temporada en Ajustes → Apariencia."],
   ];
   return (
-    <div className="absolute inset-0 z-20 flex animate-[fadeIn_250ms_ease-out_both] items-center justify-center bg-black/80 p-6 backdrop-blur-sm">
-      <div className="flex max-w-sm flex-col gap-3">
-        <div className="text-base font-semibold">¡Hola, soy Noki! 👋</div>
-        <ul className="flex flex-col gap-2 text-xs text-white/75">
-          {tips.map(([icon, text]) => (
-            <li key={text} className="flex items-start gap-2.5">
-              <span className="text-base leading-none">{icon}</span>
-              <span>{text}</span>
-            </li>
-          ))}
-        </ul>
-        <button onClick={done} className="self-start rounded-full bg-white/15 px-4 py-1.5 text-xs font-medium transition-all hover:bg-white/25 active:scale-95">Empezar</button>
+    <div className="absolute inset-0 z-20 flex animate-[fadeIn_250ms_ease-out_both] items-center justify-center bg-black/85 p-6 backdrop-blur-sm">
+      <div className="flex max-w-lg items-center gap-6">
+        <div className="flex shrink-0 flex-col items-center gap-2">
+          <Mascot size={54} mood="happy" />
+          <span className="text-[10px] font-medium uppercase tracking-widest text-white/35">Noki</span>
+        </div>
+        <div className="flex flex-col gap-2.5">
+          <div>
+            <div className="text-lg font-semibold leading-tight">¡Hola, soy Noki! 👋</div>
+            <div className="mt-1 text-xs text-white/55">Tu notch de escritorio: música, tareas, clima, archivos y mucho más, a un gesto de distancia.</div>
+          </div>
+          <ul className="flex flex-col gap-1.5 text-xs text-white/75">
+            {tips.map(([icon, text]) => (
+              <li key={text} className="flex items-start gap-2.5">
+                <span className="text-sm leading-none">{icon}</span>
+                <span>{text}</span>
+              </li>
+            ))}
+          </ul>
+          <button onClick={done} className="mt-1 self-start rounded-full bg-white/15 px-4 py-1.5 text-xs font-medium transition-all hover:bg-white/25 active:scale-95">Empezar</button>
+        </div>
       </div>
     </div>
   );
