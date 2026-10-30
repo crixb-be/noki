@@ -41,6 +41,6 @@ Graba con **OBS** (*Captura de pantalla*) o **Recortes** (`Win + Mayús + S`, v�
 
 ## Aviso sobre lo que se ve y se dice
 - Las capturas son **maquetas** hechas con la propia app (datos, canción, voz y chat de ejemplo; «Luces de neón» y su letra son inventadas).
-- «Calendarios como de Google e iOS»: Noki lee calendarios por **enlace iCal**, en **solo lectura**. Está documentado con **Google y Outlook**; el de **iOS/iCloud** funciona solo si lo publicas como enlace `webcal://`, y **no está probado**. Si quieres evitar la duda, di «de Google u Outlook».
-- «Control multimedia para vídeos y música»: la letra solo aparece con **canciones**.
+- «Calendarios como de Google e iOS»: Noki lee calendarios por **enlace iCal**, en **solo lectura**. Con Google y Outlook está documentado, y el calendario de **iOS/iCloud** lo ha probado el autor (publicado como enlace `webcal://`). No digas «sincronizados» ni que se editan desde Noki.
+- «Control multimedia para vídeos y música con la letra sincronizada»: se deja tal cual. Para que sea fiel, en pantalla enseña la letra con una **canción** (la letra solo aparece con canciones).
 - La transcripción es **con un clic**. La primera vez descarga el modelo (una vez): no digas «sin internet».
