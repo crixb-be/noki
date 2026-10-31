@@ -239,6 +239,20 @@ function General({ s, set, monitors }) {
       <Row title="Idioma de la interfaz" hint="Español / English. Los cambios se aplican al instante.">
         <Select native value={g.language} onChange={(v) => set({ general: { language: v } })} options={[["es", "Español"], ["en", "English"]]} />
       </Row>
+      <Row title="Tu nombre" hint="Noki te saluda con él al arrancar. Déjalo vacío para un saludo sin nombre.">
+        <input
+          value={g.userName}
+          onChange={(e) => set({ general: { userName: e.target.value.slice(0, 30) } })}
+          placeholder="Tu nombre"
+          maxLength={30}
+          spellCheck={false}
+          autoComplete="off"
+          className={`${input} w-44`}
+        />
+      </Row>
+      <Row title="Saludo de bienvenida al iniciar" hint="Al arrancar Noki, el notch se expande un momento y te saluda según la hora del día.">
+        <Toggle checked={g.welcomeGreeting} onChange={(v) => set({ general: { welcomeGreeting: v } })} />
+      </Row>
       <Row title="Mostrar el notch" hint="También puedes ocultarlo desde el icono de la bandeja.">
         <Toggle checked={g.visible} onChange={(v) => set({ general: { visible: v } })} />
       </Row>

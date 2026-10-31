@@ -24,6 +24,10 @@ pub struct General {
     pub dnd: bool,
     /// Idioma de la interfaz: "es" o "en".
     pub language: String,
+    /// Nombre con el que Noki te saluda al arrancar (vacío = saludo sin nombre).
+    pub user_name: String,
+    /// Saludo de bienvenida (según la hora) al iniciar Noki.
+    pub welcome_greeting: bool,
 }
 
 impl Default for General {
@@ -40,6 +44,8 @@ impl Default for General {
             all_monitors: false,
             dnd: false,
             language: "es".into(),
+            user_name: String::new(),
+            welcome_greeting: true,
         }
     }
 }
@@ -510,6 +516,7 @@ impl Settings {
         if g.language != "en" {
             g.language = "es".into();
         }
+        g.user_name = g.user_name.chars().take(30).collect();
 
         let a = &mut self.appearance;
         a.collapsed_w = a.collapsed_w.clamp(120, 600);

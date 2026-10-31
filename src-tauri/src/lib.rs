@@ -230,6 +230,14 @@ fn set_peek(window: tauri::Window, state: State<NotchState>, width: i32, height:
     }
 }
 
+/// El frontend avisa de que el saludo de bienvenida está visible: Rust vigila Esc y los clics fuera (el notch no suele tener el foco).
+#[tauri::command]
+fn set_greeting(window: tauri::Window, state: State<NotchState>, active: bool) {
+    if let Some(w) = state.win(window.label()) {
+        w.greeting.store(active, SeqCst);
+    }
+}
+
 /// Un aviso (tarea vencida, fin de Pomodoro…) generado por la ventana principal se muestra en TODOS los notch.
 #[tauri::command]
 fn broadcast_notify(app: AppHandle, payload: serde_json::Value) {
@@ -641,6 +649,7 @@ pub fn run() {
             set_pinned,
             request_open,
             set_peek,
+            set_greeting,
             broadcast_notify,
             media_state,
             media_control,

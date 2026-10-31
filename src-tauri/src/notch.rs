@@ -24,7 +24,7 @@ use windows::Win32::{
     Foundation::{HWND, LPARAM, POINT, RECT},
     Graphics::Gdi::{GetDC, GetPixel, ReleaseDC},
     UI::{
-        Input::KeyboardAndMouse::{GetAsyncKeyState, VK_LBUTTON, VK_RBUTTON},
+        Input::KeyboardAndMouse::{GetAsyncKeyState, VK_ESCAPE, VK_LBUTTON, VK_RBUTTON},
         Shell::{
             SHAppBarMessage, SHQueryUserNotificationState, APPBARDATA, QUNS_BUSY, QUNS_PRESENTATION_MODE,
             QUNS_RUNNING_D3D_FULL_SCREEN,
@@ -58,6 +58,8 @@ pub struct Win {
     /// Tamaño (px lógicos) del aviso visible en el notch cerrado; 0 = ninguno. Define la zona que capta clics.
     pub peek_w: AtomicI32,
     pub peek_h: AtomicI32,
+    /// El saludo de bienvenida está visible: Esc o un clic fuera lo cierran (aunque la ventana no tenga el foco).
+    pub greeting: AtomicBool,
     appbar_hwnd: Mutex<Option<isize>>,
     /// Rectángulo de la pantalla donde está este notch (para elegir cuál abre el atajo).
     monitor: Mutex<Option<Rect>>,
@@ -71,6 +73,7 @@ impl Win {
             sticky: AtomicBool::new(false),
             peek_w: AtomicI32::new(0),
             peek_h: AtomicI32::new(0),
+            greeting: AtomicBool::new(false),
             appbar_hwnd: Mutex::new(None),
             monitor: Mutex::new(None),
         }
@@ -720,6 +723,15 @@ fn run_loop(app: AppHandle) {
             // Con el notch ensanchado para mostrar más datos (sin aviso encima), todo su ancho abre al pasar el cursor.
             let on_pill = on_pill || (peek_w > 0 && win.peek_h.load(SeqCst) == 0 && closed_hit.contains(cur));
             let hit = if open { inside_open } else { closed_hit.contains(cur) };
+
+            // Saludo de bienvenida: Esc o un clic fuera lo cierran al instante.
+            if win.greeting.load(SeqCst) {
+                let esc = unsafe { GetAsyncKeyState(VK_ESCAPE.0 as i32) < 0 };
+                if esc || (btn && !closed_hit.contains(cur)) {
+                    win.greeting.store(false, SeqCst);
+                    let _ = app.emit("greeting-dismiss", serde_json::json!({ "label": label }));
+                }
+            }
             if lp.ignoring != Some(!hit) {
                 let _ = window.set_ignore_cursor_events(!hit);
                 hide_from_alt_tab(hwnd);

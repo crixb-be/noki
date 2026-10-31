@@ -6,7 +6,7 @@ import { NotchDecor, StripDecor } from "./components/notch/ThemeDecor.jsx";
 import Ear from "./components/notch/Ear.jsx";
 import CompactBar from "./components/notch/CompactBar.jsx";
 import ExpandedView from "./components/notch/ExpandedView.jsx";
-import { useLook, useMascotMood } from "./components/Mascot.jsx";
+import Mascot, { useLook, useMascotMood } from "./components/Mascot.jsx";
 import PeekContent, { peekSize } from "./components/Peek.jsx";
 import { useCalendar } from "./hooks/useCalendar.js";
 import { useWeather } from "./hooks/useWeather.js";
@@ -17,6 +17,7 @@ import { usePomodoro } from "./hooks/usePomodoro.js";
 import { useMedia } from "./hooks/useMedia.js";
 import { useSettings } from "./hooks/useSettings.js";
 import { usePeeks } from "./hooks/usePeeks.js";
+import { useGreeting } from "./hooks/useGreeting.js";
 import { useTauriEvent } from "./hooks/useTauriEvent.js";
 import { LABEL, useNotchOpen } from "./hooks/useNotchOpen.js";
 import { useAiChat } from "./hooks/useAiChat.js";
@@ -173,9 +174,17 @@ function Notch({ settings, update }) {
     battery,
   });
 
-  const peek = expanded ? null : rawPeek;
+  // Saludo de bienvenida al arrancar: solo la ventana líder, una vez por sesión y sin pisar el notch abierto.
+  const greet = useGreeting({ enabled: leader && settings.general.welcomeGreeting, name: settings.general.userName, busy: expanded });
+  const greeting = expanded ? null : greet.text;
+
+  const peek = expanded || greeting ? null : rawPeek;
   const banner = expanded && rawPeek?.kind === "text" ? rawPeek : null;
-  const peekDims = peek ? peekSize(peek, settings.appearance.collapsedW, settings.appearance.collapsedH) : null;
+  const peekDims = greeting
+    ? { w: Math.round(Math.min(settings.appearance.expandedW, Math.max(settings.appearance.collapsedW + 60, greeting.length * 8 + 110))), h: settings.appearance.collapsedH + 40 }
+    : peek
+      ? peekSize(peek, settings.appearance.collapsedW, settings.appearance.collapsedH)
+      : null;
   // El notch cerrado se ensancha lo justo para que quepa lo que elegiste mostrar (hora, fecha, tareas, temperatura, batería).
   const apx = settings.appearance;
   const compactItems = [apx.showClock, apx.showDate, apx.showTasks, apx.showHabits, apx.showWeather, apx.showBattery].filter(Boolean).length;
@@ -278,11 +287,11 @@ function Notch({ settings, update }) {
           } ${dragging ? "ring-2 ring-sky-400" : ""}`}
           style={{
             background: notchFill,
-            borderRadius: expanded ? "0 0 28px 28px" : peek ? "0 0 20px 20px" : "0 0 16px 16px",
+            borderRadius: expanded || greeting ? "0 0 28px 28px" : peek ? "0 0 20px 20px" : "0 0 16px 16px",
             boxShadow: expanded ? "0 14px 36px rgba(0,0,0,0.55)" : "none",
           }}
         >
-          {notchTheme && !peek && <NotchDecor theme={notchTheme} compact={!expanded} />}
+          {notchTheme && !peek && !greeting && <NotchDecor theme={notchTheme} compact={!expanded} />}
           {expanded ? (
             <ExpandedView
               tabs={tabs}
@@ -295,6 +304,17 @@ function Notch({ settings, update }) {
               banner={banner}
               welcome={!welcomed ? { shortcuts: settings.shortcuts, done: () => setWelcomed(true) } : null}
             />
+          ) : greeting ? (
+            <button
+              type="button"
+              onClick={greet.dismiss}
+              className="flex h-full w-full animate-[fadeIn_300ms_ease-out_120ms_both] cursor-default items-end justify-center gap-3 px-5 pb-2.5"
+              style={{ paddingTop: ap.collapsedH }}
+              aria-label="Saludo de bienvenida"
+            >
+              <Mascot size={28} mood="happy" look={look} skin={mascotState.skin} />
+              <span className="truncate text-sm font-medium text-white">{greeting}</span>
+            </button>
           ) : peek ? (
             <div className="relative h-full animate-[peekIn_240ms_cubic-bezier(0.2,0.8,0.2,1)_both]">
               <PeekContent peek={peek} setHold={setHold} />
