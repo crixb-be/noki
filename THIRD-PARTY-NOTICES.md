@@ -38,12 +38,14 @@ de código abierto de abajo, cada uno con su propia licencia.
 | Package | Version | License | Use |
 |---|---|---|---|
 | [@crabnebula/tauri-plugin-drag](https://www.npmjs.com/package/@crabnebula/tauri-plugin-drag) | 2.1.0 | Apache-2.0 OR MIT (see the tauri-plugin-drag repository) | runtime |
+| [@huggingface/transformers](https://www.npmjs.com/package/@huggingface/transformers) | 4.3.2 | Apache-2.0 | runtime (voice transcription) |
 | [@tauri-apps/api](https://www.npmjs.com/package/@tauri-apps/api) | 2.12.4 | Apache-2.0 OR MIT | runtime |
 | [@tauri-apps/cli](https://www.npmjs.com/package/@tauri-apps/cli) | 2.12.4 | Apache-2.0 OR MIT | build |
 | [@tauri-apps/plugin-dialog](https://www.npmjs.com/package/@tauri-apps/plugin-dialog) | 2.8.3 | MIT OR Apache-2.0 | runtime |
 | [@vitejs/plugin-react](https://www.npmjs.com/package/@vitejs/plugin-react) | 4.7.0 | MIT | build |
 | [autoprefixer](https://www.npmjs.com/package/autoprefixer) | 10.6.1 | MIT | build |
 | [postcss](https://www.npmjs.com/package/postcss) | 8.5.31 | MIT | build |
+| [onnxruntime-web](https://www.npmjs.com/package/onnxruntime-web) | 1.31.0-dev | MIT | runtime (voice transcription) |
 | [react](https://www.npmjs.com/package/react) | 18.3.1 | MIT | runtime |
 | [react-dom](https://www.npmjs.com/package/react-dom) | 18.3.1 | MIT | runtime |
 | [tailwindcss](https://www.npmjs.com/package/tailwindcss) | 3.4.19 | MIT | build |
@@ -60,3 +62,13 @@ de código abierto de abajo, cada uno con su propia licencia.
 - **AI assistant**: your own API key with the provider you choose (Google Gemini, Anthropic Claude, OpenAI-compatible, Ollama). / Asistente de IA con tu propia clave.
 
 "Windows" and "WebView2" are trademarks of Microsoft. Other names are property of their respective owners.
+
+## Speech models (downloaded on demand) / Modelos de voz (se descargan al usarlos)
+
+Voice transcription uses OpenAI Whisper (MIT License) through ONNX conversions published by
+[onnx-community](https://huggingface.co/onnx-community) (`whisper-tiny`, `whisper-base`). They are not bundled with Noki:
+they are downloaded once from Hugging Face the first time you transcribe, then cached on your PC.
+
+La transcripción de voz usa Whisper de OpenAI (licencia MIT) mediante conversiones ONNX de
+[onnx-community](https://huggingface.co/onnx-community). No vienen con Noki: se descargan una vez de Hugging Face la primera
+vez que transcribes y quedan guardados en tu PC.

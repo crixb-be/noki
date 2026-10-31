@@ -1,11 +1,13 @@
-import { useEffect, useState } from "react";
+import { Children, Fragment, cloneElement, isValidElement, useEffect, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import { getVersion } from "@tauri-apps/api/app";
 import { open, save } from "@tauri-apps/plugin-dialog";
 import { useSettings } from "../hooks/useSettings.js";
 import { useBgImage } from "../lib/background.js";
-import { presetLanguage, useLanguage } from "../lib/i18n.js";
+import { locale, presetLanguage, useLanguage } from "../lib/i18n.js";
+import Mascot from "./Mascot.jsx";
+import { THEMES, THEME_CHOICES, resolveTheme } from "../lib/themes.js";
 import NokiLogo from "./NokiLogo.jsx";
 import { APP_ICONS } from "../lib/icons.js";
 
@@ -39,14 +41,86 @@ const SECTIONS = [
 
 // ───────────── primitivas de formulario ─────────────
 
-function Row({ title, hint, children }) {
+const CARD = "mb-2.5 rounded-2xl bg-white/[0.04] ring-1 ring-white/[0.06] transition-colors duration-200 hover:bg-white/[0.05]";
+
+/** Icono de cada ajuste (se ve en un cuadrito a la izquierda del título). */
+const ROW_ICONS = {
+  "Idioma de la interfaz": "🌐", "Mostrar el notch": "👁️", "Iniciar con Windows": "🚀", "Ocultar en pantalla completa": "🖥️",
+  "Pantalla principal del notch": "🖥️", "Monitor": "🖥️", "Abrir al": "👆", "Retraso al abrir": "⏳", "Retraso al cerrar": "⌛",
+  "Personaje en el notch": "😊", "Transparencia del notch con tema": "💧", "Transparencia de la franja con tema": "💧",
+  "Mismo tema para todo": "🎭", "Grabar voz": "🎙", "No molestar": "🔕", "Nueva tarea rápida": "✅", "Ir directo a una pestaña": "🔢", "Tu cumpleaños": "🎂", "Compartir mi apariencia": "🎁", "Ancho (compacto)": "↔️", "Alto (compacto)": "↕️",
+  "Ancho (expandido)": "↔️", "Alto (expandido)": "↕️", "Desplazamiento horizontal": "⇄", "Opacidad del fondo": "💧",
+  "Color automático": "🪄", "Color": "🎨", "Imagen": "🖼️", "Oscurecer imagen": "🌓", "Fondo de la franja": "🎨",
+  "Color de la franja": "🎨", "Imagen de la franja": "🖼️", "Opacidad de la franja": "💧", "Hora": "🕐", "Fecha": "📅",
+  "Tareas pendientes": "✅", "Hábitos de hoy": "🎯", "Temperatura": "🌡️", "Batería": "🔋", "Actividad en el centro": "🎵",
+  "Reloj de 24 horas": "🕛", "Visualizador de audio": "📊", "Letras en el reproductor": "🎤", "Pestaña al abrir": "📑",
+  "Enfoque": "🍅", "Descanso corto": "☕", "Descanso largo": "🛋️", "Ciclos hasta el descanso largo": "🔁",
+  "Empezar la siguiente fase sola": "⏭️", "Sonido en las alertas": "🔔", "Descanso de vista (20-20-20)": "👀",
+  "Levantarse y estirarse": "🧘", "Cada": "⏲️", "Elementos que se recuerdan": "📝", "Duración de cada aviso": "⏱️",
+  "Abrir / cerrar el notch": "⌨️", "Proveedor": "🤖", "API key": "🔑", "Modelo": "🧠", "Dirección del servidor": "🔗",
+  "Instrucciones del asistente": "📜", "Aviso antes de cada reunión": "⏰", "Ciudad actual": "📍", "Unidades": "📏",
+  "Buscar automáticamente": "🔄", "Versión": "🏷️", "Licencia": "📄", "Carpeta de datos": "📂", "Restablecer ajustes": "♻️",
+  "Cerrar Noki": "⏻", "Apoya el proyecto": "☕", "Código fuente": "💻",
+};
+const EMOJI_LEAD = /^((?:\p{Extended_Pictographic}|⇪)(?:️|‍\p{Extended_Pictographic})*)\s+/u;
+
+/** Separa un emoji inicial del título ("🏠 Panel") o busca el icono del ajuste. */
+function splitTitle(title) {
+  if (typeof title !== "string") return { icon: "⚙️", text: title };
+  const m = title.match(EMOJI_LEAD);
+  if (m) return { icon: m[1], text: title.slice(m[0].length) };
+  return { icon: ROW_ICONS[title] ?? "⚙️", text: title };
+}
+
+/** Foto del desarrollador (public/yo.jpeg). Si falta, se ve el icono de siempre. */
+function Avatar({ size, className = "" }) {
+  const [failed, setFailed] = useState(false);
+  if (failed) return <span aria-hidden="true">👤</span>;
   return (
-    <div className="flex items-center justify-between gap-6 border-b border-white/5 py-3.5">
-      <div className="min-w-0">
-        <div className="text-sm">{title}</div>
-        {hint && <div className="mt-0.5 text-xs leading-snug text-white/40">{hint}</div>}
+    <img
+      src="/yo.jpeg"
+      alt={DEV.name}
+      draggable={false}
+      onError={() => setFailed(true)}
+      className={`rounded-full object-cover object-center ring-1 ring-white/20 ${className}`}
+      style={{ width: size, height: size }}
+    />
+  );
+}
+
+const IconTile = ({ icon, size = "h-9 w-9 text-lg" }) => (
+  <span className={`flex shrink-0 items-center justify-center rounded-xl bg-white/[0.07] ${size}`} aria-hidden="true">{icon}</span>
+);
+
+/** `grouped`: la fila va dentro de un recuadro compartido (lo pone `Page`), sin tarjeta propia. */
+function Row({ title, hint, children, grouped = false }) {
+  const { icon, text } = splitTitle(title);
+  return (
+    <div className={`${grouped ? "" : CARD} flex items-center justify-between gap-4 px-4 ${grouped ? "py-2.5 first:pt-3.5 last:pb-3.5" : "py-3"}`}>
+      <div className="flex min-w-0 items-center gap-3">
+        <IconTile icon={icon} />
+        <div className="min-w-0">
+          <div className="text-sm">{text}</div>
+          {hint && <div className="mt-0.5 text-xs leading-snug text-white/40">{hint}</div>}
+        </div>
       </div>
       <div className="shrink-0">{children}</div>
+    </div>
+  );
+}
+
+const SECTION_ICONS = {
+  "Fondo del notch": "🎨", "Franja a los costados del notch": "🌈", "Contenido": "🧩", "Qué se ve en el notch cerrado": "👁️",
+  "Reloj": "🕐", "Otros": "✨", "Pomodoro": "🍅", "Salud": "💚",
+};
+
+/** Cabecera de un grupo de ajustes. */
+function SectionTitle({ children }) {
+  return (
+    <div className="mb-2.5 mt-7 flex items-center gap-2 text-[13px] font-semibold tracking-wide text-white/75 first:mt-1">
+      <span className="flex h-6 w-6 items-center justify-center rounded-lg bg-white/[0.07] text-sm" aria-hidden="true">{SECTION_ICONS[children] ?? "•"}</span>
+      <span>{children}</span>
+      <span className="ml-1 h-px flex-1 bg-white/10" />
     </div>
   );
 }
@@ -108,12 +182,50 @@ const input =
   "w-72 rounded-lg border border-white/10 bg-zinc-900 px-3 py-1.5 text-sm outline-none placeholder:text-white/30 focus:border-white/30";
 const button = "rounded-lg bg-white/10 px-3 py-1.5 text-sm transition-colors hover:bg-white/20";
 
+/** Filas seguidas (bajo un mismo título) comparten un solo recuadro, separadas por una línea fina. */
+function groupRows(children) {
+  const flat = [];
+  const walk = (c) =>
+    Children.forEach(c, (x) => {
+      if (isValidElement(x) && x.type === Fragment) walk(x.props.children);
+      else if (x != null && x !== false) flat.push(x);
+    });
+  walk(children);
+  const out = [];
+  let run = [];
+  const flush = () => {
+    if (!run.length) return;
+    out.push(
+      <div key={`g${out.length}`} className={`${CARD} overflow-hidden`}>
+        {run.map((r, i) => cloneElement(r, { grouped: true, key: r.key ?? i }))}
+      </div>
+    );
+    run = [];
+  };
+  for (const x of flat) {
+    if (isValidElement(x) && x.type === Row) run.push(x);
+    else {
+      flush();
+      out.push(x);
+    }
+  }
+  flush();
+  return out;
+}
+
 function Page({ title, subtitle, children }) {
+  const section = SECTIONS.find((x) => x.label === title);
+  const icon = section?.id === "developer" ? <Avatar size={44} /> : section?.icon;
   return (
     <div>
-      <h1 className="text-xl font-semibold">{title}</h1>
-      {subtitle && <p className="mt-1 text-sm text-white/40">{subtitle}</p>}
-      <div className="mt-4">{children}</div>
+      <div className="flex items-center gap-3">
+        {icon && (section?.id === "developer" ? icon : <IconTile icon={icon} size="h-11 w-11 text-2xl" />)}
+        <div>
+          <h1 className="text-xl font-semibold">{title}</h1>
+          {subtitle && <p className="mt-0.5 text-sm text-white/40">{subtitle}</p>}
+        </div>
+      </div>
+      <div className="mt-5">{groupRows(children)}</div>
     </div>
   );
 }
@@ -231,10 +343,15 @@ function ImagePicker({ name, onChange }) {
 /** Elegir el icono de Noki (bandeja y ventana de Ajustes). */
 function IconPicker({ value, onChange }) {
   return (
-    <div className="border-b border-white/5 pb-4 pt-3.5">
-      <div className="text-sm">Icono de Noki</div>
-      <div className="mt-0.5 text-xs leading-snug text-white/40">
-        Cambia el icono de la bandeja y de Ajustes. El del instalador y el de los accesos directos lo fija Windows al instalar y no cambia.
+    <div className={`${CARD} px-4 py-3`}>
+      <div className="flex items-center gap-3">
+        <IconTile icon="🖼️" />
+        <div>
+          <div className="text-sm">Icono de Noki</div>
+          <div className="mt-0.5 text-xs leading-snug text-white/40">
+            Cambia el icono de la bandeja y de Ajustes. El del instalador y el de los accesos directos lo fija Windows al instalar y no cambia.
+          </div>
+        </div>
       </div>
       <div className="mt-3 flex flex-wrap gap-3">
         {APP_ICONS.map((i) => (
@@ -255,6 +372,149 @@ function IconPicker({ value, onChange }) {
   );
 }
 
+/** Selector de tema para una parte (cara, notch o franja), con vista previa de cada opción. */
+function ThemePicker({ title, hint, value, birthday, events, kind, onChange }) {
+  return (
+    <div className={`${CARD} px-4 py-3`}>
+      <div className="flex items-center gap-3">
+        <IconTile icon={{ face: "😊", notch: "🔲", bar: "➖" }[kind]} />
+        <div>
+          <div className="text-sm">{title}</div>
+          <div className="mt-0.5 text-xs leading-snug text-white/40">{hint}</div>
+        </div>
+      </div>
+      <div className="mt-3 flex flex-wrap gap-3">
+        {THEME_CHOICES.map(([id, label]) => {
+          const shown = id === "auto" ? resolveTheme("auto", birthday, events) : id;
+          const t = THEMES[shown];
+          return (
+            <button
+              key={id}
+              onClick={() => onChange(id)}
+              aria-pressed={value === id}
+              className={`flex w-24 flex-col items-center gap-1.5 rounded-2xl p-2.5 text-xs transition-all duration-200 ${
+                value === id ? "bg-white/15 ring-2 ring-white/60" : "bg-white/5 hover:bg-white/10"
+              }`}
+            >
+              <span
+                className="relative flex h-12 w-full items-center justify-center overflow-hidden rounded-xl"
+                style={{ background: kind === "face" ? "#000" : kind === "notch" ? t?.notch ?? "#000" : t?.bar ?? "#27272a" }}
+              >
+                {kind === "face" && <Mascot size={26} skin={shown} />}
+                {kind === "notch" && t && t.decor.slice(0, 3).map((d, i) => (
+                  <span key={i} className="absolute text-base leading-none opacity-80" style={{ left: `${[14, 46, 76][i]}%`, top: `${[48, 20, 52][i]}%` }}>{d.e}</span>
+                ))}
+                {kind === "bar" && (
+                  <span className="flex w-full justify-around text-sm leading-none">{(t?.strip ?? []).slice(0, 4).map((e, i) => <span key={i}>{e}</span>)}</span>
+                )}
+              </span>
+              <span className="text-center leading-tight text-white/75">{label}</span>
+            </button>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+const DAYS = Array.from({ length: 31 }, (_, i) => [String(i + 1), String(i + 1)]);
+const MONTHS = () => Array.from({ length: 12 }, (_, i) => [String(i + 1), new Date(2000, i, 1).toLocaleDateString(locale(), { month: "long" })]);
+
+/** Día + mes de una fecha "MM-DD". */
+function DayMonth({ value, onChange }) {
+  const [m, d] = value.split("-").map(Number);
+  const mk = (mm, dd) => `${String(mm).padStart(2, "0")}-${String(dd).padStart(2, "0")}`;
+  return (
+    <span className="flex gap-1">
+      <Select value={String(d)} options={DAYS} onChange={(v) => onChange(mk(m, v))} />
+      <Select value={String(m)} options={MONTHS()} onChange={(v) => onChange(mk(v, d))} />
+    </span>
+  );
+}
+
+/** Fechas propias que activan un tema (aniversario, Fiestas Patrias, San Valentín…). */
+function ThemeEvents({ events, onChange }) {
+  const patch = (i, p) => onChange(events.map((e, j) => (j === i ? { ...e, ...p } : e)));
+  return (
+    <div className={`${CARD} px-4 py-3`}>
+      <div className="flex items-center gap-3">
+        <IconTile icon="📆" />
+        <div className="min-w-0 flex-1">
+          <div className="text-sm">Fechas propias para un tema</div>
+          <div className="mt-0.5 text-xs leading-snug text-white/40">Entre esas fechas, «Automático» usará el tema que elijas (por ejemplo un aniversario o Fiestas Patrias).</div>
+        </div>
+        <button className={button} onClick={() => events.length < 12 && onChange([...events, { name: "", from: "07-28", to: "07-29", theme: "birthday" }])}>＋ Añadir</button>
+      </div>
+      {events.map((e, i) => (
+        <div key={i} className="mt-3 flex flex-wrap items-center gap-2 rounded-xl bg-black/20 p-2.5">
+          <input
+            value={e.name}
+            maxLength={40}
+            placeholder="Nombre (opcional)"
+            onChange={(ev) => patch(i, { name: ev.target.value })}
+            className="w-40 rounded-lg border border-white/10 bg-zinc-900 px-3 py-1.5 text-sm outline-none focus:border-white/30"
+          />
+          <span className="text-xs text-white/40">del</span>
+          <DayMonth value={e.from} onChange={(v) => patch(i, { from: v })} />
+          <span className="text-xs text-white/40">al</span>
+          <DayMonth value={e.to} onChange={(v) => patch(i, { to: v })} />
+          <Select value={e.theme} onChange={(v) => patch(i, { theme: v })} options={Object.entries(THEMES).map(([id, t]) => [id, t.label])} />
+          <button onClick={() => onChange(events.filter((_, j) => j !== i))} className="ml-auto text-xs text-white/40 hover:text-red-300" aria-label="Quitar">✕ Quitar</button>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+/** Solo lo visual: nada personal (cumpleaños) ni rutas de tu equipo (imágenes). */
+const SHARE_KEYS = [
+  "collapsedW", "collapsedH", "expandedW", "expandedH", "offsetX", "opacity", "notchColor", "notchAuto", "notchDim", "barMode", "barColor",
+  "barDim", "barOpacity", "mascot", "mascotTheme", "notchTheme", "barTheme", "notchThemeOpacity", "barThemeOpacity", "themeEvents",
+  "showClock", "showDate", "showTasks", "showHabits", "showWeather", "showBattery", "showActivity", "clock24", "visualizer",
+];
+
+function ShareAppearance({ a, ap }) {
+  const [msg, setMsg] = useState(null);
+  const done = (ok, text) => {
+    setMsg({ ok, text });
+    setTimeout(() => setMsg(null), 4000);
+  };
+  const exportLook = async () => {
+    try {
+      const path = await save({ defaultPath: "noki-apariencia.json", filters: [{ name: "Apariencia de Noki", extensions: ["json"] }] });
+      if (!path) return;
+      const out = Object.fromEntries(SHARE_KEYS.filter((k) => a[k] !== undefined).map((k) => [k, a[k]]));
+      await invoke("save_text", { path, text: JSON.stringify({ noki: "appearance", version: 1, appearance: out }, null, 2) });
+      done(true, "Apariencia exportada.");
+    } catch (e) {
+      done(false, String(e));
+    }
+  };
+  const importLook = async () => {
+    try {
+      const path = await open({ multiple: false, title: "Apariencia de Noki", filters: [{ name: "Apariencia de Noki", extensions: ["json"] }] });
+      if (!path) return;
+      const data = JSON.parse(await invoke("read_text", { path }));
+      if (data?.noki !== "appearance" || typeof data.appearance !== "object") throw new Error("Ese archivo no es una apariencia de Noki.");
+      ap(Object.fromEntries(SHARE_KEYS.filter((k) => data.appearance[k] !== undefined).map((k) => [k, data.appearance[k]])));
+      done(true, "Apariencia importada.");
+    } catch (e) {
+      done(false, String(e?.message ?? e));
+    }
+  };
+  return (
+    <>
+      <Row title="Compartir mi apariencia" hint="Guarda colores, temas y tamaños en un archivo para otro equipo o para un amigo. No incluye tu cumpleaños ni tus imágenes.">
+        <div className="flex gap-2">
+          <button className={button} onClick={exportLook}>Exportar…</button>
+          <button className={button} onClick={importLook}>Importar…</button>
+        </div>
+      </Row>
+      {msg && <div className={`mb-2.5 rounded-lg p-3 text-sm ${msg.ok ? "bg-emerald-500/10 text-emerald-300" : "bg-amber-500/10 text-amber-300"}`}>{msg.text}</div>}
+    </>
+  );
+}
+
 function Appearance({ s, set }) {
   const a = s.appearance;
   const ap = (patch) => set({ appearance: patch });
@@ -264,6 +524,76 @@ function Appearance({ s, set }) {
       <Row title="Personaje en el notch" hint="Una carita que parpadea, te mira y reacciona: se alegra al terminar tareas, hábitos o un Pomodoro, baila con la música y se adormece de noche.">
         <Toggle checked={a.mascot} onChange={(v) => ap({ mascot: v })} />
       </Row>
+      {(
+        <>
+          <ThemePicker
+            title="Cara de Noki"
+            hint="Disfraz del personaje: gorro de bruja, de Papá Noel, de fiesta u ojitos de corazón."
+            value={a.mascotTheme}
+            birthday={a.birthday}
+            events={a.themeEvents}
+            kind="face"
+            onChange={(v) => ap({ mascotTheme: v })}
+          />
+          <ThemePicker
+            title="Notch central"
+            hint="Color y adornos del notch. «Ninguno» usa tus colores o imagen de Ajustes."
+            value={a.notchTheme}
+            birthday={a.birthday}
+            events={a.themeEvents}
+            kind="notch"
+            onChange={(v) => ap({ notchTheme: v })}
+          />
+          <Row title="Transparencia del notch con tema" hint="Qué tan sólido es el color del tema en el notch central.">
+            <Slider value={a.notchThemeOpacity} min={20} max={100} unit=" %" onChange={(v) => ap({ notchThemeOpacity: v })} />
+          </Row>
+          <ThemePicker
+            title="Franja de los costados"
+            hint="La barra a los lados del notch. «Ninguno» usa tu configuración."
+            value={a.barTheme}
+            birthday={a.birthday}
+            events={a.themeEvents}
+            kind="bar"
+            onChange={(v) => ap({ barTheme: v })}
+          />
+          <Row title="Transparencia de la franja con tema" hint="Qué tan sólido es el color del tema en los costados.">
+            <Slider value={a.barThemeOpacity} min={0} max={100} unit=" %" onChange={(v) => ap({ barThemeOpacity: v })} />
+          </Row>
+          <Row title="Mismo tema para todo" hint="«Automático» pone Halloween (24 oct–2 nov), Navidad (1–26 dic), Amor (7–14 feb) y Cumpleaños el día que indiques abajo.">
+            <Select
+              value=""
+              onChange={(v) => v && ap({ mascotTheme: v, notchTheme: v, barTheme: v })}
+              options={[["", "Elegir…"], ...THEME_CHOICES]}
+            />
+          </Row>
+          <Row title="Tu cumpleaños" hint="Se guarda únicamente en este equipo. Ese día se activa el tema de cumpleaños y Noki te felicita (con tu edad si pones el año).">
+            <div className="flex items-center gap-2">
+              <Select
+                value={a.birthday ? String(Number(a.birthday.slice(3))) : ""}
+                onChange={(v) => ap({ birthday: v && a.birthday ? `${a.birthday.slice(0, 2)}-${String(v).padStart(2, "0")}` : v ? `01-${String(v).padStart(2, "0")}` : "" })}
+                options={[["", "Día"], ...Array.from({ length: 31 }, (_, i) => [String(i + 1), String(i + 1)])]}
+              />
+              <Select
+                value={a.birthday ? String(Number(a.birthday.slice(0, 2))) : ""}
+                onChange={(v) => ap({ birthday: v ? `${String(v).padStart(2, "0")}-${a.birthday ? a.birthday.slice(3) : "01"}` : "" })}
+                options={[["", "Mes"], ...Array.from({ length: 12 }, (_, i) => [String(i + 1), new Date(2000, i, 1).toLocaleDateString(locale(), { month: "long" })])]}
+              />
+              <Select
+                value={a.birthYear ? String(a.birthYear) : ""}
+                onChange={(v) => ap({ birthYear: v ? Number(v) : 0 })}
+                options={[["", "Año"], ...Array.from({ length: new Date().getFullYear() - 1919 }, (_, i) => String(new Date().getFullYear() - i)).map((y) => [y, y])]}
+              />
+              {a.birthday && (
+                <button onClick={() => ap({ birthday: "", birthYear: 0 })} className="text-xs text-white/40 hover:text-white/80">
+                  Quitar
+                </button>
+              )}
+            </div>
+          </Row>
+          <ThemeEvents events={a.themeEvents ?? []} onChange={(v) => ap({ themeEvents: v })} />
+        </>
+      )}
+      <ShareAppearance a={a} ap={ap} />
       <Row title="Ancho (compacto)">
         <Slider value={a.collapsedW} min={120} max={600} step={2} unit=" px" onChange={(v) => ap({ collapsedW: v })} />
       </Row>
@@ -282,7 +612,7 @@ function Appearance({ s, set }) {
       <Row title="Opacidad del fondo" hint="Con una imagen de fondo en el notch no se aplica; usa «Oscurecer imagen».">
         <Slider value={a.opacity} min={30} max={100} unit=" %" onChange={(v) => ap({ opacity: v })} />
       </Row>
-      <div className="mb-1 mt-5 text-xs uppercase tracking-wider text-white/35">Fondo del notch</div>
+      <SectionTitle>Fondo del notch</SectionTitle>
       <Row title="Color automático" hint="El notch toma el color del programa que tengas abierto debajo y cambia con él. Reemplaza al color y a la imagen.">
         <Toggle checked={a.notchAuto} onChange={(v) => ap({ notchAuto: v })} />
       </Row>
@@ -301,7 +631,7 @@ function Appearance({ s, set }) {
           <Slider value={a.notchDim} min={0} max={85} unit=" %" onChange={(v) => ap({ notchDim: v })} />
         </Row>
       )}
-      <div className="mb-1 mt-5 text-xs uppercase tracking-wider text-white/35">Franja a los costados del notch</div>
+      <SectionTitle>Franja a los costados del notch</SectionTitle>
       <Row title="Fondo de la franja" hint="La barra de arriba que cruza toda la pantalla (la que reserva el espacio). «Igual que el notch» la hace parecer parte de él; «Automático» toma el color del programa que tengas abierto debajo y cambia con él.">
         <Select
           value={a.barMode}
@@ -331,8 +661,7 @@ function Appearance({ s, set }) {
           <Slider value={a.barOpacity} min={0} max={100} unit=" %" onChange={(v) => ap({ barOpacity: v })} />
         </Row>
       )}
-      <div className="mb-1 mt-5 text-xs uppercase tracking-wider text-white/35">Contenido</div>
-      <div className="mb-1 mt-5 text-xs uppercase tracking-wider text-white/35">Qué se ve en el notch cerrado</div>
+      <SectionTitle>Qué se ve en el notch cerrado</SectionTitle>
       <Row title="Hora">
         <Toggle checked={a.showClock} onChange={(v) => ap({ showClock: v })} />
       </Row>
@@ -354,11 +683,11 @@ function Appearance({ s, set }) {
       <Row title="Actividad en el centro" hint="Música sonando, Pomodoro, reunión próxima o No molestar.">
         <Toggle checked={a.showActivity} onChange={(v) => ap({ showActivity: v })} />
       </Row>
-      <div className="mb-1 mt-5 text-xs uppercase tracking-wider text-white/35">Reloj</div>
+      <SectionTitle>Reloj</SectionTitle>
       <Row title="Reloj de 24 horas" hint="Apagado muestra 12 horas con a. m. / p. m.">
         <Toggle checked={a.clock24} onChange={(v) => ap({ clock24: v })} />
       </Row>
-      <div className="mb-1 mt-5 text-xs uppercase tracking-wider text-white/35">Otros</div>
+      <SectionTitle>Otros</SectionTitle>
       <Row title="Visualizador de audio" hint="Barras que reaccionan al sonido real del equipo mientras suena música. Solo se analiza el nivel por banda; no se guarda audio.">
         <Toggle checked={a.visualizer} onChange={(v) => ap({ visualizer: v })} />
       </Row>
@@ -382,11 +711,41 @@ function Modules({ s, set }) {
     ["tools", "🧰 Herramientas", "Lanzador de apps y portapapeles."],
   ];
   const enabled = items.filter(([id]) => m[id]);
+  // Orden elegido: Rust garantiza una lista completa; «Clima» no es pestaña propia, va dentro del Panel.
+  const rank = (id) => (m.order?.indexOf(id) ?? -1) >= 0 ? m.order.indexOf(id) : 99;
+  const sorted = [...items].sort((a, b) => rank(a[0]) - rank(b[0]));
+  const tabIds = sorted.map(([id]) => id).filter((id) => id !== "weather");
+  const move = (id, dir) => {
+    const i = tabIds.indexOf(id);
+    const j = i + dir;
+    if (j < 0 || j >= tabIds.length) return;
+    const next = [...tabIds];
+    [next[i], next[j]] = [next[j], next[i]];
+    set({ modules: { order: next } });
+  };
   return (
-    <Page title="Módulos" subtitle="Elige qué pestañas aparecen en el notch.">
-      {items.map(([id, label, hint]) => (
+    <Page title="Módulos" subtitle="Elige qué pestañas aparecen en el notch y en qué orden.">
+      {sorted.map(([id, label, hint]) => (
         <Row key={id} title={label} hint={hint}>
-          <Toggle checked={m[id]} onChange={(v) => set({ modules: { [id]: v } })} />
+          <div className="flex items-center gap-3">
+            {id !== "weather" && (
+              <div className="flex gap-1">
+                {[[-1, "▲", "Subir"], [1, "▼", "Bajar"]].map(([dir, glyph, tip]) => (
+                  <button
+                    key={dir}
+                    onClick={() => move(id, dir)}
+                    disabled={tabIds.indexOf(id) + dir < 0 || tabIds.indexOf(id) + dir >= tabIds.length}
+                    title={tip}
+                    aria-label={tip}
+                    className="rounded-md bg-white/10 px-1.5 py-0.5 text-[10px] transition-colors hover:bg-white/20 disabled:opacity-25"
+                  >
+                    {glyph}
+                  </button>
+                ))}
+              </div>
+            )}
+            <Toggle checked={m[id]} onChange={(v) => set({ modules: { [id]: v } })} />
+          </div>
         </Row>
       ))}
       <Row title="🎤 Letras en el reproductor" hint="Botón de letra sincronizada (LRCLIB) dentro de la pestaña de música.">
@@ -408,7 +767,7 @@ function Productivity({ s, set }) {
   const pp = (patch) => set({ productivity: patch });
   return (
     <Page title="Agenda" subtitle="Tareas, notas y enfoque.">
-      <div className="mb-1 mt-2 text-xs uppercase tracking-wider text-white/35">Pomodoro</div>
+      <SectionTitle>Pomodoro</SectionTitle>
       <Row title="Enfoque">
         <Slider value={p.workMin} min={5} max={90} unit=" min" onChange={(v) => pp({ workMin: v })} />
       </Row>
@@ -428,7 +787,7 @@ function Productivity({ s, set }) {
         <Toggle checked={p.sound} onChange={(v) => pp({ sound: v })} />
       </Row>
 
-      <div className="mb-1 mt-6 text-xs uppercase tracking-wider text-white/35">Salud</div>
+      <SectionTitle>Salud</SectionTitle>
       <Row title="Descanso de vista (20-20-20)" hint="Cada cierto tiempo de uso te recuerda mirar algo lejano durante 20 segundos.">
         <Toggle checked={s.health.eyes} onChange={(v) => set({ health: { eyes: v } })} />
       </Row>
@@ -537,13 +896,34 @@ function ShortcutRecorder({ value, onChange }) {
   );
 }
 
+const SHORTCUT_ROWS = [
+  ["toggle", "Abrir / cerrar el notch", "Se cierra con el mismo atajo, con Esc o haciendo clic fuera."],
+  ["record", "Grabar voz", "Empieza y detiene una grabación desde cualquier programa; el notch muestra un punto rojo mientras graba."],
+  ["dnd", "No molestar", "Activa o desactiva los avisos y sonidos de Noki."],
+  ["addTask", "Nueva tarea rápida", "Abre el notch con el cursor listo para escribir una tarea."],
+];
+const TAB_MODS = ["Alt", "Ctrl", "Ctrl+Alt", "Ctrl+Shift", "Alt+Shift"];
+
 function Shortcuts({ s, set, warning }) {
+  const sc = s.shortcuts;
+  const cap = (id) => id[0].toUpperCase() + id.slice(1);
   return (
-    <Page title="Atajos" subtitle="Atajos globales: funcionan aunque otra app tenga el foco.">
-      <Row title="Abrir / cerrar el notch" hint="Se cierra con el mismo atajo, con Esc o haciendo clic fuera.">
-        <ShortcutRecorder value={s.shortcuts.toggle} onChange={(v) => set({ shortcuts: { toggle: v } })} />
+    <Page title="Atajos" subtitle="Atajos globales: funcionan aunque otra app tenga el foco. Apaga los que choquen con otros programas.">
+      {SHORTCUT_ROWS.map(([id, title, hint]) => (
+        <Row key={id} title={title} hint={hint}>
+          <div className={`flex items-center gap-3 ${sc[`${id}Enabled`] ? "" : "opacity-50"}`}>
+            <ShortcutRecorder value={sc[id]} onChange={(v) => set({ shortcuts: { [id]: v } })} />
+            <Toggle checked={sc[`${id}Enabled`]} onChange={(v) => set({ shortcuts: { [`${id}Enabled`]: v } })} />
+          </div>
+        </Row>
+      ))}
+      <Row title="Ir directo a una pestaña" hint={`${sc.tabsModifier}+1 … ${sc.tabsModifier}+9 abren la pestaña 1…9, en el orden que elegiste en Módulos.`}>
+        <div className="flex items-center gap-3">
+          <Select value={sc.tabsModifier} native onChange={(v) => set({ shortcuts: { tabsModifier: v } })} options={TAB_MODS.map((m) => [m, m])} />
+          <Toggle checked={sc.tabsEnabled} onChange={(v) => set({ shortcuts: { tabsEnabled: v } })} />
+        </div>
       </Row>
-      {warning && <div className="mt-4 rounded-lg bg-amber-500/10 p-3 text-sm text-amber-300">{warning}</div>}
+      {warning && <div className="mt-2 rounded-lg bg-amber-500/10 p-3 text-sm text-amber-300">{warning}</div>}
     </Page>
   );
 }
@@ -955,7 +1335,7 @@ function About({ reset, s, set }) {
       <UpdatesBlock s={s} set={set} version={version} />
       <Row
         title="Copia de seguridad"
-        hint="Guarda ajustes y datos (tareas, notas, agua, chat…) en un archivo, o restáuralos en otro equipo. No incluye las claves de API."
+        hint="Guarda ajustes y datos (tareas, notas, agua, chat…) en un archivo, o restáuralos en otro equipo. No incluye las claves de API ni los audios de la grabadora (expórtalos desde Agenda → Grabadora)."
       >
         <div className="flex gap-2">
           <button className={button} onClick={exportBackup}>Exportar…</button>
@@ -1031,7 +1411,7 @@ function SocialButton({ id, label, url }) {
 function Developer({ icon }) {
   return (
     <Page title="Desarrollador" subtitle="La persona detrás de Noki.">
-      <div className="mt-2 flex items-center gap-5 rounded-2xl bg-white/5 p-5">
+      <div className="mb-2.5 flex items-center gap-5 rounded-2xl bg-white/[0.04] p-5 ring-1 ring-white/[0.06]">
         <NokiLogo size={72} variant={icon} />
         <div className="min-w-0">
           <div className="text-lg font-semibold">{DEV.name}</div>
@@ -1105,7 +1485,7 @@ export default function SettingsWindow() {
               section === x.id ? "bg-white/10 text-white" : "text-white/55 hover:bg-white/5 hover:text-white"
             }`}
           >
-            <span className="w-5 text-center">{x.icon}</span>
+            <span className="flex w-5 items-center justify-center">{x.id === "developer" ? <Avatar size={20} /> : x.icon}</span>
             {x.label}
           </button>
         ))}

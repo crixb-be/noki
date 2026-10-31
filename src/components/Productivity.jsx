@@ -5,6 +5,7 @@ import { PHASE_LABEL, fmtTime } from "../hooks/usePomodoro.js";
 import { dayKey, fmtDue, nextOccurrence } from "../lib/time.js";
 import { parseQuickTask } from "../lib/quickTask.js";
 import Notes from "./Notes.jsx";
+import Recorder from "./Recorder.jsx";
 
 const chip = "rounded-full bg-white/10 px-3 py-1 text-xs transition-all duration-300 hover:bg-white/20 active:scale-95 disabled:opacity-30";
 const inputCls = "min-w-0 rounded-full bg-white/10 px-3 py-1.5 text-xs outline-none placeholder:text-white/30 focus:bg-white/15";
@@ -150,7 +151,7 @@ function TasksView() {
     <div className="flex h-full flex-col gap-2 rounded-3xl bg-white/5 p-3">
       <form onSubmit={add} className="flex shrink-0 flex-col gap-1.5">
         <div className="flex items-center gap-1.5">
-          <input value={text} onChange={(e) => setText(e.target.value)} placeholder="Escribe una tarea…" className={`${inputCls} h-10 min-w-0 flex-1 rounded-xl`} />
+          <input data-task-input value={text} onChange={(e) => setText(e.target.value)} placeholder="Escribe una tarea…" className={`${inputCls} h-10 min-w-0 flex-1 rounded-xl`} />
           <button type="button" onMouseDown={() => !showSchedule && invoke("request_open", { open: true, sticky: true }).catch(() => {})} onClick={toggleSchedule} title="Programar fecha y hora" aria-label="Programar fecha y hora" className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-xl text-lg transition-colors ${showSchedule ? "bg-sky-400/25 text-sky-100 ring-1 ring-sky-400/60" : "bg-white/10 text-white/70 hover:bg-white/15"}`}>◷</button>
           <button className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-white/10 text-lg text-white/70 transition-colors hover:bg-white/15" aria-label="Agregar">＋</button>
         </div>
@@ -225,28 +226,60 @@ const TASK_CATEGORIES = ["Todas", "Personal", "Trabajo", "Uni", "Casa", "Otros"]
 const SUBTABS = [
   { id: "tasks", label: "Tareas", icon: "✅" },
   { id: "notes", label: "Notas", icon: "📝" },
+  { id: "voice", label: "Grabadora", icon: "🎙" },
   { id: "focus", label: "Enfoque", icon: "🍅" },
 ];
 
 export default function Productivity({ pomo, prod }) {
   const [sub, setSub] = useStore("workTab", "tasks");
+  const [order, setOrder] = useStore("workOrder", SUBTABS.map((t) => t.id));
+  const [editing, setEditing] = useState(false);
+  const tabs = SUBTABS.map((t) => t).sort((a, b) => {
+    const rank = (id) => (order.includes(id) ? order.indexOf(id) : order.length);
+    return rank(a.id) - rank(b.id);
+  });
+  const move = (id, dir) => {
+    const ids = tabs.map((t) => t.id);
+    const i = ids.indexOf(id);
+    const j = i + dir;
+    if (j < 0 || j >= ids.length) return;
+    [ids[i], ids[j]] = [ids[j], ids[i]];
+    setOrder(ids);
+  };
+  const arrow = "rounded-full px-1 text-[10px] text-white/50 transition-colors hover:text-white disabled:opacity-20";
   return (
     <div className="flex h-full flex-col gap-2">
-      <div className="flex shrink-0 gap-1">
-        {SUBTABS.map((t) => (
-          <button
-            key={t.id}
-            onClick={() => setSub(t.id)}
-            className={`rounded-full px-3 py-1 text-[11px] transition-all duration-300 ${sub === t.id ? "bg-white/20" : "text-white/45 hover:text-white/80"}`}
-          >
-            {t.icon} {t.label}
-          </button>
+      <div className="flex shrink-0 items-center gap-1">
+        {tabs.map((t, i) => (
+          <div key={t.id} className={`flex items-center rounded-full transition-all duration-300 ${sub === t.id ? "bg-white/20" : ""}`}>
+            {editing && (
+              <button className={arrow} onClick={() => move(t.id, -1)} disabled={i === 0} aria-label="Mover a la izquierda" title="Mover a la izquierda">◀</button>
+            )}
+            <button
+              onClick={() => setSub(t.id)}
+              className={`rounded-full px-3 py-1 text-[11px] transition-all duration-300 ${sub === t.id ? "" : "text-white/45 hover:text-white/80"}`}
+            >
+              {t.icon} {t.label}
+            </button>
+            {editing && (
+              <button className={arrow} onClick={() => move(t.id, 1)} disabled={i === tabs.length - 1} aria-label="Mover a la derecha" title="Mover a la derecha">▶</button>
+            )}
+          </div>
         ))}
+        <button
+          onClick={() => setEditing(!editing)}
+          className={`ml-auto rounded-full px-2 py-1 text-[11px] transition-all duration-300 ${editing ? "bg-white/20" : "text-white/35 hover:text-white/70"}`}
+          title={editing ? "Listo" : "Reordenar pestañas"}
+          aria-label={editing ? "Listo" : "Reordenar pestañas"}
+        >
+          {editing ? "✓" : "⇄"}
+        </button>
       </div>
       <div className="min-h-0 flex-1">
         {sub === "focus" && <FocusView pomo={pomo} prod={prod} />}
         {sub === "tasks" && <TasksView />}
         {sub === "notes" && <Notes />}
+        {sub === "voice" && <Recorder />}
       </div>
     </div>
   );
