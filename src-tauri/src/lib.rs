@@ -7,6 +7,7 @@ mod icons;
 mod launcher;
 mod legacy;
 mod media;
+mod statuswatch;
 mod dropzone;
 mod fileops;
 mod notch;
@@ -96,6 +97,7 @@ fn shortcut_list(sc: &settings::Shortcuts) -> Vec<(String, String)> {
         (sc.record_enabled, &sc.record, "record"),
         (sc.dnd_enabled, &sc.dnd, "dnd"),
         (sc.add_task_enabled, &sc.add_task, "addTask"),
+        (sc.clip_enabled, &sc.clip, "clip"),
     ] {
         if on {
             v.push((key.clone(), action.to_string()));
@@ -227,6 +229,14 @@ fn set_peek(window: tauri::Window, state: State<NotchState>, width: i32, height:
     if let Some(w) = state.win(window.label()) {
         w.peek_w.store(width.clamp(0, 900), SeqCst);
         w.peek_h.store(height.clamp(0, 200), SeqCst);
+    }
+}
+
+/// La píldora multimedia está visible: el hover sobre el notch deja de abrirlo (lo hace el clic).
+#[tauri::command]
+fn set_media_pill(window: tauri::Window, state: State<NotchState>, active: bool) {
+    if let Some(w) = state.win(window.label()) {
+        w.media_pill.store(active, SeqCst);
     }
 }
 
@@ -649,6 +659,7 @@ pub fn run() {
             set_pinned,
             request_open,
             set_peek,
+            set_media_pill,
             set_greeting,
             broadcast_notify,
             media_state,
@@ -737,6 +748,7 @@ pub fn run() {
             let _window: WebviewWindow = app.get_webview_window("main").expect("ventana main");
             clipboard::start(handle.clone());
             viz::start(handle.clone());
+            statuswatch::start(handle.clone());
             updates::start_auto(handle.clone());
             // La casilla de la bandeja arranca con el valor guardado.
             if let Some(item) = handle.try_state::<TrayDnd>() {

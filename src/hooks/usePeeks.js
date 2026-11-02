@@ -67,6 +67,8 @@ export function usePeeks({ hud, battery, dnd }) {
       setPeek((cur) => (hold.current && cur?.kind === kind ? cur : { kind, value, muted }));
       arm();
     });
+    // Wi-Fi, Bluetooth y micrófono (los vigila Rust). `sys` marca las alertas de sistema: ceden ante grabaciones y llamadas.
+    on("sys-alert", ({ kind, icon, text, tone }) => cfg.current[kind] && show({ kind: "text", icon, text, tone: tone || undefined, sys: true }));
     on("audio-device", ({ name, kind }) => cfg.current.audioDevice && show({ kind: "text", icon: kind === "headphones" ? "🎧" : "🔊", text: name }));
     on("caps-lock", (isOn) => cfg.current.capsLock && show({ kind: "text", icon: "⇪", text: isOn ? "Bloq Mayús activado" : "Bloq Mayús desactivado", tone: isOn ? "warn" : undefined }));
     on("keyboard-language", (tag) => cfg.current.language && show({ kind: "text", icon: "🌐", text: langName(tag) }));
@@ -93,6 +95,7 @@ export function usePeeks({ hud, battery, dnd }) {
         icon: battery.charging ? "⚡" : "🔌",
         text: battery.charging ? `Cargando · ${battery.level}%` : `Cargador desconectado · ${battery.level}%`,
         tone: !battery.charging && battery.level <= 20 ? "warn" : undefined,
+        sys: true,
       });
     }
     prevCharging.current = battery.charging;
@@ -109,7 +112,7 @@ export function usePeeks({ hud, battery, dnd }) {
     if (threshold < lowWarned.current) {
       lowWarned.current = threshold;
       if (cfg.current?.lowBattery) {
-        show({ kind: "text", icon: "🪫", text: `Batería baja · ${battery.level}%`, tone: "warn" }, 4000);
+        show({ kind: "text", icon: "🪫", text: `Batería baja · ${battery.level}%`, tone: "warn", sys: true }, 4000);
       }
     }
   }, [battery?.level, battery?.charging]); // eslint-disable-line react-hooks/exhaustive-deps

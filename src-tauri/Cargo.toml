@@ -31,6 +31,7 @@ base64 = "0.22"
 reqwest = { version = "0.12", default-features = false, features = ["rustls-tls", "stream", "json"] }
 futures-util = "0.3"
 windows-core = "0.62"
+windows-collections = "0.3"
 png = "0.18"
 keyring = { version = "3", default-features = false, features = ["windows-native"] }
 chrono = "0.4"
@@ -46,6 +47,8 @@ windows = { version = "0.62", features = [
   "Globalization",
   "Storage_Streams",
   "Win32_Foundation",
+  "Win32_NetworkManagement_WiFi",
+  "Win32_NetworkManagement_Ndis",
   "Win32_Graphics_Gdi",
   "Win32_Devices_FunctionDiscovery",
   "Win32_Globalization",

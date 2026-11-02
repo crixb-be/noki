@@ -55,8 +55,30 @@ export default function CalendarView({ cal }) {
     return map;
   }, [allEvents]);
 
-  const selectedTasks = todos.filter((t) => !t.done && (t.dueDate ?? (t.due ? dayKey(new Date(t.due)) : null)) === selected);
-  const selectedEvents = allEvents.filter((e) => dayKey(new Date(e.start)) === selected);
+  // Tareas del día elegido. En «Hoy» también van las vencidas y las que no tienen fecha: son lo que hay pendiente ahora.
+  const todayKey = dayKey(new Date(now));
+  const dueKey = (t) => t.dueDate ?? (t.due ? dayKey(new Date(t.due)) : null);
+  const selectedTasks = useMemo(() => {
+    const pending = todos.filter((t) => !t.done).map((t) => ({ t, key: dueKey(t) }));
+    const rank = (key) => (key == null ? 2 : key < todayKey ? 0 : 1);
+    return pending
+      .filter(({ key }) => key === selected || (selected === todayKey && (key == null || key < todayKey)))
+      .map(({ t, key }) => ({ ...t, _state: key == null ? "undated" : key < selected ? "overdue" : "due", _rank: rank(key) }))
+      .sort((a, b) => a._rank - b._rank);
+  }, [todos, selected, todayKey]);
+
+  // Eventos del día de TODOS los calendarios conectados: sin duplicados, los de todo el día primero y luego por hora.
+  const selectedEvents = useMemo(() => {
+    const seen = new Set();
+    return allEvents
+      .filter((e) => dayKey(new Date(e.start)) === selected)
+      .filter((e) => {
+        const k = `${(e.title ?? "").trim().toLowerCase()}|${e.start}|${!!e.allDay}`;
+        return seen.has(k) ? false : seen.add(k);
+      })
+      .sort((a, b) => Number(!!b.allDay) - Number(!!a.allDay) || a.start - b.start);
+  }, [allEvents, selected]);
+  const multiCal = new Set(allEvents.map((e) => e.calendar).filter(Boolean)).size > 1;
 
   const changeMonth = (delta) => {
     const next = new Date(month.getFullYear(), month.getMonth() + delta, 1);
@@ -112,13 +134,14 @@ export default function CalendarView({ cal }) {
           {selectedTasks.length > 0 && <span className="shrink-0 text-red-300">{`${selectedTasks.length} pendiente${selectedTasks.length === 1 ? "" : "s"}`}</span>}
         </div>
         <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain pr-1">
-          {!hasSources && <div className="mb-2 text-[10px] text-white/30">Conecta Google Calendar u Outlook desde Ajustes para ver sus eventos.</div>}
+          {!hasSources && <div className="mb-2 text-[10px] text-white/30">Conecta un calendario (Google, Outlook, iCloud/iOS…) desde Ajustes para ver sus eventos.</div>}
           {selectedTasks.length === 0 && selectedEvents.length === 0 && <div className="py-6 text-center text-[11px] text-white/30">Nada pendiente para esta fecha.</div>}
           <ul className="flex flex-col gap-1">
             {selectedTasks.map((t) => (
               <li key={`task-${t.id}`} className="flex items-center gap-2 rounded-xl bg-red-400/10 px-2 py-1.5 text-[11px]">
                 <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-red-400" />
                 <span className="min-w-0 flex-1 truncate" title={t.text}>{t.text}</span>
+                {t._state !== "due" && <span className={`shrink-0 text-[9px] ${t._state === "overdue" ? "text-red-300/80" : "text-white/35"}`}>{t._state === "overdue" ? "Vencida" : "Sin fecha"}</span>}
                 {t.category && <span className="shrink-0 text-[9px] text-white/40">{t.category}</span>}
               </li>
             ))}
@@ -127,6 +150,7 @@ export default function CalendarView({ cal }) {
                 <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-sky-300" />
                 <span className="w-10 shrink-0 text-white/40">{e.allDay ? "Todo" : fmtClock(e.start)}</span>
                 <span className="min-w-0 flex-1 truncate" title={e.title}>{e.title}</span>
+                {multiCal && e.calendar && <span className="max-w-[70px] shrink-0 truncate text-[9px] text-white/35" title={e.calendar}>{e.calendar}</span>}
               </li>
             ))}
           </ul>

@@ -484,7 +484,7 @@ function ThemeEvents({ events, onChange }) {
 const SHARE_KEYS = [
   "collapsedW", "collapsedH", "expandedW", "expandedH", "offsetX", "opacity", "notchColor", "notchAuto", "notchDim", "barMode", "barColor",
   "barDim", "barOpacity", "mascot", "mascotTheme", "notchTheme", "barTheme", "notchThemeOpacity", "barThemeOpacity", "themeEvents",
-  "showClock", "showDate", "showTasks", "showHabits", "showWeather", "showBattery", "showActivity", "clock24", "visualizer",
+  "showClock", "showDate", "showTasks", "showHabits", "showWeather", "showBattery", "showActivity", "clock24", "visualizer", "mediaPill",
 ];
 
 function ShareAppearance({ a, ap }) {
@@ -702,6 +702,9 @@ function Appearance({ s, set }) {
         <Toggle checked={a.clock24} onChange={(v) => ap({ clock24: v })} />
       </Row>
       <SectionTitle>Otros</SectionTitle>
+      <Row title="Píldora multimedia" hint="Con música o vídeo sonando, el notch se ensancha con la carátula y un ecualizador. Al pasar el cursor muestra anterior, pausa y siguiente; un clic abre el notch completo.">
+        <Toggle checked={a.mediaPill} onChange={(v) => ap({ mediaPill: v })} />
+      </Row>
       <Row title="Visualizador de audio" hint="Barras que reaccionan al sonido real del equipo mientras suena música. Solo se analiza el nivel por banda; no se guarda audio.">
         <Toggle checked={a.visualizer} onChange={(v) => ap({ visualizer: v })} />
       </Row>
@@ -855,6 +858,9 @@ function Alerts({ s, set }) {
     ["charger", "⚡ Cargador", "Al conectar o desconectar el cargador."],
     ["lowBattery", "🪫 Batería baja", "Al bajar al 20 % y al 10 % sin cargador."],
     ["network", "📶 Internet", "Cuando se pierde o vuelve la conexión."],
+    ["wifi", "📡 Wi-Fi", "Al conectarte a una red Wi-Fi o desconectarte."],
+    ["bluetooth", "🔵 Bluetooth", "Al conectarse o desconectarse un dispositivo Bluetooth (auriculares, ratón…)."],
+    ["microphone", "🎙️ Micrófono en uso", "Aviso y punto rojo en el notch mientras una aplicación usa el micrófono."],
     ["audioDevice", "🎧 Dispositivo de audio", "Al conectar auriculares o cambiar la salida de sonido."],
     ["capsLock", "⇪ Bloq Mayús", "Al activar o desactivar las mayúsculas."],
     ["language", "🌐 Idioma del teclado", "Al cambiar la distribución del teclado."],
@@ -915,6 +921,7 @@ const SHORTCUT_ROWS = [
   ["record", "Grabar voz", "Empieza y detiene una grabación desde cualquier programa; el notch muestra un punto rojo mientras graba."],
   ["dnd", "No molestar", "Activa o desactiva los avisos y sonidos de Noki."],
   ["addTask", "Nueva tarea rápida", "Abre el notch con el cursor listo para escribir una tarea."],
+  ["clip", "Historial del portapapeles", "Abre el notch directamente en Herramientas → Portapapeles (si el historial está activado en Ajustes)."],
 ];
 const TAB_MODS = ["Alt", "Ctrl", "Ctrl+Alt", "Ctrl+Shift", "Alt+Shift"];
 
@@ -1068,7 +1075,7 @@ function CalendarSettings({ s, set }) {
   };
 
   return (
-    <Page title="Calendario" subtitle="Conecta calendarios con su dirección iCal (.ics). Solo lectura; se actualizan cada 15 minutos.">
+    <Page title="Calendario" subtitle="Conecta calendarios (Google, Outlook, iCloud/iOS, Apple…) con su dirección iCal (.ics) o un archivo .ics local. Solo lectura; se actualizan cada 15 minutos.">
       {sources.map((src, i) => (
         <div key={i} className="mb-3 flex gap-2">
           <input
@@ -1080,7 +1087,7 @@ function CalendarSettings({ s, set }) {
           <input
             value={src.url}
             onChange={(e) => setSources(sources.map((x, j) => (j === i ? { ...x, url: e.target.value } : x)))}
-            placeholder="https://… o webcal://…"
+            placeholder="https://… · webcal://… · C:\ruta\calendario.ics"
             className={`${input} min-w-0 flex-1`}
             spellCheck={false}
           />
@@ -1115,6 +1122,9 @@ function CalendarSettings({ s, set }) {
         </div>
         <div>
           <b className="text-white/50">Outlook:</b> Configuración → Calendario → Calendarios compartidos → Publicar un calendario → copia el enlace ICS.
+        </div>
+        <div>
+          <b className="text-white/50">iCloud / iOS:</b> en Calendario (iPhone o Mac) marca el calendario como «Calendario público» y copia el enlace webcal://. También puedes exportar un archivo .ics y pegar su ruta.
         </div>
         <div>Cualquiera que tenga la dirección puede ver tu calendario: no la compartas. Las horas con zona horaria se leen en la zona de este equipo.</div>
       </div>

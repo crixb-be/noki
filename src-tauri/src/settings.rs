@@ -75,6 +75,8 @@ pub struct Appearance {
     pub clock24: bool,
     /// Barras del visualizador reaccionando al audio real del sistema.
     pub visualizer: bool,
+    /// Píldora multimedia: con música sonando el notch se ensancha con carátula y ecualizador, y al pasar el cursor muestra controles.
+    pub media_pill: bool,
     /// Color del notch (#rrggbb). La opacidad sale de `opacity`.
     pub notch_color: String,
     /// Imagen de fondo del notch (nombre de archivo dentro de la carpeta `backgrounds`); vacío = ninguna.
@@ -126,6 +128,7 @@ impl Default for Appearance {
             notch_auto: false,
             clock24: true,
             visualizer: true,
+            media_pill: true,
             notch_color: "#000000".into(),
             notch_image: String::new(),
             notch_dim: 35,
@@ -232,6 +235,9 @@ pub struct Shortcuts {
     /// Abrir el notch listo para escribir una tarea.
     pub add_task: String,
     pub add_task_enabled: bool,
+    /// Abrir el notch directamente en el historial del portapapeles.
+    pub clip: String,
+    pub clip_enabled: bool,
     /// Ir directo a una pestaña con <modificador>+1…9.
     pub tabs_enabled: bool,
     pub tabs_modifier: String,
@@ -248,6 +254,8 @@ impl Default for Shortcuts {
             dnd_enabled: false,
             add_task: "Alt+T".into(),
             add_task_enabled: false,
+            clip: "Ctrl+Alt+V".into(),
+            clip_enabled: true,
             tabs_enabled: false,
             tabs_modifier: "Alt".into(),
         }
@@ -373,6 +381,12 @@ pub struct Hud {
     /// Aviso al bajar al 20 % y al 10 % sin cargador.
     pub low_battery: bool,
     pub network: bool,
+    /// Cambios de red Wi-Fi (conectado a una red / desconectado).
+    pub wifi: bool,
+    /// Dispositivos Bluetooth que se conectan o desconectan.
+    pub bluetooth: bool,
+    /// Aviso (y punto rojo en el notch) cuando una app usa el micrófono.
+    pub microphone: bool,
     pub audio_device: bool,
     pub caps_lock: bool,
     pub language: bool,
@@ -388,6 +402,9 @@ impl Default for Hud {
             charger: true,
             low_battery: true,
             network: true,
+            wifi: true,
+            bluetooth: true,
+            microphone: true,
             audio_device: true,
             caps_lock: true,
             language: true,
@@ -634,6 +651,7 @@ impl Settings {
             (&mut self.shortcuts.record, &sc.record),
             (&mut self.shortcuts.dnd, &sc.dnd),
             (&mut self.shortcuts.add_task, &sc.add_task),
+            (&mut self.shortcuts.clip, &sc.clip),
         ] {
             if cur.trim().is_empty() {
                 *cur = def.clone();

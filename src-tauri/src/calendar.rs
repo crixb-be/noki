@@ -448,13 +448,46 @@ fn parse_events(text: &str, calendar: &str, now: DateTime<Local>) -> Vec<Event> 
 
 // ───────────────────────────── descarga ─────────────────────────────
 
+/// ¿Es un archivo local (.ics exportado de iOS/Outlook/Apple Calendar…) en vez de una dirección web?
+fn local_path(src: &str) -> Option<std::path::PathBuf> {
+    let src = src.trim();
+    if let Some(rest) = src.strip_prefix("file:///") {
+        let rest = rest.replace('/', std::path::MAIN_SEPARATOR_STR);
+        return Some(std::path::PathBuf::from(if cfg!(windows) { rest } else { format!("/{rest}") }));
+    }
+    let b = src.as_bytes();
+    let drive = b.len() > 2 && b[0].is_ascii_alphabetic() && b[1] == b':' && (b[2] == 0x5C || b[2] == b'/');
+    if drive || src.starts_with("\\\\") || src.starts_with('/') {
+        return Some(std::path::PathBuf::from(src));
+    }
+    None
+}
+
+fn read_local(path: &std::path::Path) -> Result<String, String> {
+    if !path.extension().map_or(false, |e| e.eq_ignore_ascii_case("ics") || e.eq_ignore_ascii_case("ical") || e.eq_ignore_ascii_case("ifb")) {
+        return Err("el archivo local debe ser un .ics".into());
+    }
+    let bytes = std::fs::read(path).map_err(|_| "no se pudo leer el archivo".to_string())?;
+    if bytes.len() > MAX_BYTES {
+        return Err("el archivo es demasiado grande".into());
+    }
+    let text = String::from_utf8_lossy(&bytes).into_owned();
+    if !text.contains("BEGIN:VCALENDAR") {
+        return Err("no parece un calendario iCal (.ics)".into());
+    }
+    Ok(text)
+}
+
 async fn download(url: &str) -> Result<String, String> {
+    if let Some(path) = local_path(url) {
+        return read_local(&path);
+    }
     let url = match url.strip_prefix("webcal://") {
         Some(rest) => format!("https://{rest}"),
         None => url.to_string(),
     };
     if !url.starts_with("https://") && !url.starts_with("http://") {
-        return Err("la dirección debe empezar por https:// o webcal://".into());
+        return Err("usa una dirección https:// o webcal://, o la ruta de un archivo .ics".into());
     }
     let resp = reqwest::Client::builder()
         .user_agent(concat!("Noki/", env!("CARGO_PKG_VERSION")))

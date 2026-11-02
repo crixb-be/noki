@@ -81,3 +81,7 @@ html, body, #root {
     transition-duration: 1ms !important;
   }
 }
+
+/* Ecualizador sutil de la píldora multimedia */
+@keyframes eqBar { from { transform: scaleY(0.3); } to { transform: scaleY(1); } }
+@media (prefers-reduced-motion: reduce) { [style*="eqBar"] { animation: none !important; } }

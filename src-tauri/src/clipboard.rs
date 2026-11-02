@@ -200,6 +200,8 @@ pub fn clip_copy(app: AppHandle, h: State<History>, text: String) -> Result<(), 
         items.clone()
     };
     let _ = app.emit("clip-changed", snapshot);
+    // Confirmación en el notch (el aviso llega a todas las ventanas, igual que el resto de avisos).
+    let _ = app.emit("notch-notify", serde_json::json!({ "icon": "📋", "text": "Copiado al portapapeles", "ms": 1600 }));
     Ok(())
 }
 

@@ -28,3 +28,15 @@ Thumbs.db
 !.vscode/extensions.json
 .idea
 *.log
+
+# Material del vídeo promo y renders (archivos pesados, no son parte de la app)
+rendered/
+claude-renders/
+analysis/
+__pycache__/
+*.pyc
+build_noki_*.py
+*TEMP_MPY_*
+/assets/*.mp4
+/pc.png
+/pcnotch.png

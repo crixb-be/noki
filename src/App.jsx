@@ -5,6 +5,7 @@ import { addPaths, useNativeDrop } from "./components/FileShelf.jsx";
 import { NotchDecor, StripDecor } from "./components/notch/ThemeDecor.jsx";
 import Ear from "./components/notch/Ear.jsx";
 import CompactBar from "./components/notch/CompactBar.jsx";
+import MediaPill, { PILL_EXTRA_H } from "./components/notch/MediaPill.jsx";
 import ExpandedView from "./components/notch/ExpandedView.jsx";
 import Mascot, { useLook, useMascotMood } from "./components/Mascot.jsx";
 import PeekContent, { peekSize } from "./components/Peek.jsx";
@@ -130,6 +131,7 @@ function Notch({ settings, update }) {
   // Atajos globales que Rust reenvía a esta ventana (grabar, «No molestar», tarea rápida, ir a una pestaña).
   const [, setWorkTab] = useStore("workTab", "tasks");
   const tabsRef = useRef([]);
+  const [, setToolsTab] = useStore("toolsTab", "launcher");
   useTauriEvent("shortcut-action", async (p) => {
     if (p.label !== LABEL) return;
     if (p.action === "record") {
@@ -143,6 +145,10 @@ function Notch({ settings, update }) {
       setTab("work");
       setWorkTab("tasks");
       setTimeout(() => document.querySelector("[data-task-input]")?.focus(), 380);
+    } else if (p.action === "clip") {
+      wantTab.current = "tools";
+      setTab("tools");
+      setToolsTab("clip");
     } else if (p.action.startsWith("tab:")) {
       const t = tabsRef.current[Number(p.action.slice(4))];
       if (t) setTab(t.id);
@@ -158,8 +164,12 @@ function Notch({ settings, update }) {
 
   // Pestaña inicial según los ajustes (cada vez que se abre, salvo mientras se arrastra un archivo).
   const defaultTab = settings.modules.defaultTab;
+  const wantTab = useRef(null); // el saludo pidió abrir directamente Calendario o Tareas: gana a la pestaña inicial
   useEffect(() => {
-    if (expanded && !dragging && defaultTab && defaultTab !== "last") setTab(defaultTab);
+    if (expanded && wantTab.current) {
+      setTab(wantTab.current);
+      wantTab.current = null;
+    } else if (expanded && !dragging && defaultTab && defaultTab !== "last") setTab(defaultTab);
   }, [expanded]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const mascotOn = settings.appearance.mascot;
@@ -175,16 +185,65 @@ function Notch({ settings, update }) {
   });
 
   // Saludo de bienvenida al arrancar: solo la ventana líder, una vez por sesión y sin pisar el notch abierto.
-  const greet = useGreeting({ enabled: leader && settings.general.welcomeGreeting, name: settings.general.userName, busy: expanded });
-  const greeting = expanded ? null : greet.text;
+  const greet = useGreeting({ enabled: leader && settings.general.welcomeGreeting, name: settings.general.userName, pending: pendingTasks, events: settings.modules.calendar ? cal.allEvents : [], hour12: !settings.appearance.clock24, busy: expanded });
+  const greeting = expanded ? null : greet.showSummary ? greet.summary : greet.text;
+  const greetingW = Math.max(greet.text?.length ?? 0, greet.summary?.length ?? 0); // ancho fijo: no salta al cambiar de estado
 
-  const peek = expanded || greeting ? null : rawPeek;
+  // Clic en el resumen: abre el notch directamente en Calendario (eventos) o Agenda → Tareas. En el saludo normal, solo lo cierra.
+  const openFromGreeting = () => {
+    const target = greet.showSummary ? greet.target : null;
+    greet.dismiss();
+    if (!target) return;
+    wantTab.current = target;
+    setTab(target);
+    if (target === "work") setWorkTab("tasks");
+    invoke("request_open", { open: true, sticky: true }).catch(() => {});
+  };
+
+  const rec = useRecorder();
+  const [mic, setMic] = useState({ active: false, app: "" });
+  useTauriEvent("mic-state", setMic);
+
+  // Píldora multimedia: con música sonando el notch se ensancha; al parar/cerrar la app vuelve al estado compacto tras unos segundos.
+  const [pillLinger, setPillLinger] = useState(false);
+  const [pillHover, setPillHover] = useState(false);
+  const pillLeave = useRef(null);
+  const mediaLive = settings.appearance.mediaPill && media.available && media.playing;
+  useEffect(() => {
+    if (mediaLive) {
+      setPillLinger(true);
+      return;
+    }
+    const id = setTimeout(() => setPillLinger(false), 5000);
+    return () => clearTimeout(id);
+  }, [mediaLive]);
+  const meetingSoon = settings.modules.calendar && (!!cal.ongoing || (cal.next && cal.next.start - cal.now <= 15 * 60000));
+  const pillWanted = (mediaLive || (pillLinger && settings.appearance.mediaPill)) && !rec.recording && !pomo.running && !pomo.alert && !meetingSoon;
+  const pillShown = pillWanted && !expanded && !greeting && !peek && !rawPeek;
+  const setHover = (h) => {
+    clearTimeout(pillLeave.current);
+    if (h) setPillHover(true);
+    else pillLeave.current = setTimeout(() => setPillHover(false), 220);
+  };
+  useEffect(() => {
+    if (!pillShown) setPillHover(false);
+    invoke("set_media_pill", { active: pillShown }).catch(() => {});
+  }, [pillShown]);
+
+  // Las alertas de sistema ceden ante una grabación y, durante una llamada (micrófono en uso), ante todo salvo lo urgente (tono de advertencia).
+  const sysYield = !!rawPeek?.sys && (rec.recording || (mic.active && rawPeek.tone !== "warn"));
+  const peek = expanded || greeting || sysYield ? null : rawPeek;
   const banner = expanded && rawPeek?.kind === "text" ? rawPeek : null;
   const peekDims = greeting
-    ? { w: Math.round(Math.min(settings.appearance.expandedW, Math.max(settings.appearance.collapsedW + 60, greeting.length * 8 + 110))), h: settings.appearance.collapsedH + 40 }
+    ? { w: Math.round(Math.min(settings.appearance.expandedW, Math.max(settings.appearance.collapsedW + 60, greetingW * 8 + 110))), h: settings.appearance.collapsedH + 40 }
     : peek
       ? peekSize(peek, settings.appearance.collapsedW, settings.appearance.collapsedH)
-      : null;
+      : pillShown
+        ? {
+            w: Math.min(settings.appearance.expandedW, Math.max(settings.appearance.collapsedW + 80, pillHover ? 300 : 0)),
+            h: settings.appearance.collapsedH + (pillHover ? PILL_EXTRA_H : 0),
+          }
+        : null;
   // El notch cerrado se ensancha lo justo para que quepa lo que elegiste mostrar (hora, fecha, tareas, temperatura, batería).
   const apx = settings.appearance;
   const compactItems = [apx.showClock, apx.showDate, apx.showTasks, apx.showHabits, apx.showWeather, apx.showBattery].filter(Boolean).length;
@@ -201,7 +260,6 @@ function Notch({ settings, update }) {
   }, [expanded, setHold]);
 
   const { appearance: ap, modules } = settings;
-  const rec = useRecorder();
   const rank = (id) => {
     const i = modules.order?.indexOf(id) ?? -1;
     return i < 0 ? TABS.length : i;
@@ -287,7 +345,7 @@ function Notch({ settings, update }) {
           } ${dragging ? "ring-2 ring-sky-400" : ""}`}
           style={{
             background: notchFill,
-            borderRadius: expanded || greeting ? "0 0 28px 28px" : peek ? "0 0 20px 20px" : "0 0 16px 16px",
+            borderRadius: expanded || greeting ? "0 0 28px 28px" : peek || (pillShown && pillHover) ? "0 0 20px 20px" : "0 0 16px 16px",
             boxShadow: expanded ? "0 14px 36px rgba(0,0,0,0.55)" : "none",
           }}
         >
@@ -307,7 +365,7 @@ function Notch({ settings, update }) {
           ) : greeting ? (
             <button
               type="button"
-              onClick={greet.dismiss}
+              onClick={openFromGreeting}
               className="flex h-full w-full animate-[fadeIn_300ms_ease-out_120ms_both] cursor-default items-end justify-center gap-3 px-5 pb-2.5"
               style={{ paddingTop: ap.collapsedH }}
               aria-label="Saludo de bienvenida"
@@ -319,12 +377,14 @@ function Notch({ settings, update }) {
             <div className="relative h-full animate-[peekIn_240ms_cubic-bezier(0.2,0.8,0.2,1)_both]">
               <PeekContent peek={peek} setHold={setHold} />
             </div>
+          ) : pillShown ? (
+            <MediaPill media={media} collapsedH={ap.collapsedH} visualizer={ap.visualizer} hover={pillHover} setHover={setHover} />
           ) : (
             <CompactBar
               ap={ap}
               modules={modules}
               mascot={mascotState}
-              indicator={{ cal, calendarOn: modules.calendar, pomo, media, dnd, rec }}
+              indicator={{ cal, calendarOn: modules.calendar, pomo, media, dnd, rec, mic: settings.hud.microphone ? mic : null }}
               pending={pendingTasks}
               habits={habitStats}
               weatherNow={weatherNow}
