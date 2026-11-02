@@ -1,8 +1,9 @@
 import { useEffect, useRef } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { PROVIDER_NAMES } from "../hooks/useAi.js";
+import { aiGreeting } from "../hooks/useGreeting.js";
 
-export default function AIChat({ ai, chat }) {
+export default function AIChat({ ai, chat, name }) {
   const { messages, prompt, setPrompt, error, busy, submit, stop, clear } = chat;
   const bottom = useRef(null);
 
@@ -34,7 +35,7 @@ export default function AIChat({ ai, chat }) {
         {messages.length === 0 && !error && (
           <div className="flex h-full flex-col items-center justify-center gap-1 text-center text-white/40">
             <span className="text-xl">✨</span>
-            <span>Pregunta lo que quieras a {PROVIDER_NAMES[ai.provider]}</span>
+            <span className="text-sm text-white/70">{aiGreeting(name)}</span>
             <span className="text-[10px] text-white/25">Enter envía · Mayús+Enter salto de línea</span>
           </div>
         )}

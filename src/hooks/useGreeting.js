@@ -20,6 +20,16 @@ export function greetingFor(name, date = new Date()) {
   return `${text}${who ? `, ${who}` : ""} ${icon}`;
 }
 
+/** Saludo del asistente de IA: «¡Hola Ana, buen día! ¿En qué te puedo ayudar?» (sin nombre: «¡Hola! ¿En qué te puedo ayudar?»). */
+export function aiGreeting(name, date = new Date()) {
+  const h = date.getHours();
+  const en = isEn();
+  const who = (name ?? "").replace(/\s+/g, " ").trim();
+  const part = h >= 6 && h < 12 ? (en ? "good morning" : "buen día") : h >= 12 && h < 19 ? (en ? "good afternoon" : "buena tarde") : en ? "good evening" : "buena noche";
+  if (en) return who ? `Hi ${who}, ${part}! How can I help you?` : "Hi! How can I help you?";
+  return who ? `¡Hola ${who}, ${part}! ¿En qué te puedo ayudar?` : "¡Hola! ¿En qué te puedo ayudar?";
+}
+
 const clip = (t, n = 26) => (t.length > n ? `${t.slice(0, n - 1).trimEnd()}…` : t);
 
 /**

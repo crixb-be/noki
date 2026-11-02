@@ -102,7 +102,7 @@ export default function ExpandedView({ tabs, activeTab, setTab, settings, update
         {activeTab === "screentime" && <ScreenTime />}
         {activeTab === "files" && <FileShelf files={files} setFiles={setFiles} dragging={dragging} />}
         {activeTab === "calendar" && <CalendarView cal={cal} />}
-        {activeTab === "ai" && <AIChat ai={settings.ai} chat={aiChat} />}
+        {activeTab === "ai" && <AIChat ai={settings.ai} chat={aiChat} name={settings.general.userName} />}
         {activeTab === "tools" && <ToolsView clip={settings.clipboard} update={update} />}
       </div>
       {welcome && <Welcome {...welcome} />}

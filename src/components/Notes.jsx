@@ -109,8 +109,18 @@ export default function Notes() {
           />
           <div className="flex items-center justify-between text-[10px] text-white/30">
             <span>{draft.length} caracteres</span>
-            <button onClick={remove} className={confirm ? "text-red-400" : "hover:text-white/70"}>
-              {confirm ? "¿Seguro? Clic para borrar" : "🗑 Borrar"}
+            <button
+              onClick={remove}
+              onBlur={() => setConfirm(false)}
+              aria-label={confirm ? "Confirmar: borrar la nota" : "Borrar nota"}
+              title={confirm ? "Clic otra vez para confirmar el borrado" : "Borrar nota"}
+              className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-white transition-colors duration-200 active:scale-95 ${
+                confirm ? "bg-red-600 ring-2 ring-red-300/70 hover:bg-red-500" : "bg-red-500/80 hover:bg-red-500"
+              }`}
+            >
+              <svg viewBox="0 0 24 24" className="h-4 w-4 fill-none stroke-current" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+                <path d="M3 6h18M8 6V4h8v2M6 6l1 14h10l1-14M10 11v5M14 11v5" />
+              </svg>
             </button>
           </div>
         </div>
