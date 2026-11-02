@@ -240,6 +240,14 @@ fn set_media_pill(window: tauri::Window, state: State<NotchState>, active: bool)
     }
 }
 
+/// La píldora Zen está activa: el cursor encima (o en el borde) no abre el panel; solo lo abre un clic.
+#[tauri::command]
+fn set_zen_pill(window: tauri::Window, state: State<NotchState>, active: bool) {
+    if let Some(w) = state.win(window.label()) {
+        w.zen_pill.store(active, SeqCst);
+    }
+}
+
 /// El frontend avisa de que el saludo de bienvenida está visible: Rust vigila Esc y los clics fuera (el notch no suele tener el foco).
 #[tauri::command]
 fn set_greeting(window: tauri::Window, state: State<NotchState>, active: bool) {
@@ -660,6 +668,7 @@ pub fn run() {
             request_open,
             set_peek,
             set_media_pill,
+            set_zen_pill,
             set_greeting,
             broadcast_notify,
             media_state,

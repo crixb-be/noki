@@ -6,6 +6,7 @@ import { NotchDecor, StripDecor } from "./components/notch/ThemeDecor.jsx";
 import Ear from "./components/notch/Ear.jsx";
 import CompactBar from "./components/notch/CompactBar.jsx";
 import MediaPill, { PILL_EXTRA_H } from "./components/notch/MediaPill.jsx";
+import ZenPill, { ZEN_EXTRA_H } from "./components/notch/ZenPill.jsx";
 import ExpandedView from "./components/notch/ExpandedView.jsx";
 import Mascot, { useLook, useMascotMood } from "./components/Mascot.jsx";
 import PeekContent, { peekSize } from "./components/Peek.jsx";
@@ -217,27 +218,39 @@ function Notch({ settings, update }) {
     const id = setTimeout(() => setPillLinger(false), 5000);
     return () => clearTimeout(id);
   }, [mediaLive]);
+  // Las alertas de sistema ceden ante una grabación y, durante una llamada (micrófono en uso), ante todo salvo lo urgente (tono de advertencia).
+  const sysYield = !!rawPeek?.sys && (rec.recording || (mic.active && rawPeek.tone !== "warn"));
+  const peek = expanded || greeting || sysYield ? null : rawPeek;
   const meetingSoon = settings.modules.calendar && (!!cal.ongoing || (cal.next && cal.next.start - cal.now <= 15 * 60000));
-  const pillWanted = (mediaLive || (pillLinger && settings.appearance.mediaPill)) && !rec.recording && !pomo.running && !pomo.alert && !meetingSoon;
+  const pillWanted = (mediaLive || (pillLinger && settings.appearance.mediaPill)) && !rec.recording && !pomo.running && !pomo.paused && !pomo.alert && !meetingSoon;
+  const zenWanted = !!settings.productivity.zen && (pomo.running || pomo.paused) && !rec.recording;
   const pillShown = pillWanted && !expanded && !greeting && !peek && !rawPeek;
+  const zenShown = zenWanted && !expanded && !greeting && !peek && !rawPeek;
+  const hoverShown = pillShown || zenShown;
   const setHover = (h) => {
     clearTimeout(pillLeave.current);
     if (h) setPillHover(true);
     else pillLeave.current = setTimeout(() => setPillHover(false), 220);
   };
   useEffect(() => {
-    if (!pillShown) setPillHover(false);
-    invoke("set_media_pill", { active: pillShown }).catch(() => {});
-  }, [pillShown]);
-
-  // Las alertas de sistema ceden ante una grabación y, durante una llamada (micrófono en uso), ante todo salvo lo urgente (tono de advertencia).
-  const sysYield = !!rawPeek?.sys && (rec.recording || (mic.active && rawPeek.tone !== "warn"));
-  const peek = expanded || greeting || sysYield ? null : rawPeek;
+    if (!hoverShown) setPillHover(false);
+    invoke("set_media_pill", { active: hoverShown }).catch(() => {});
+  }, [hoverShown]);
+  // Modo Zen: Rust bloquea la apertura por hover/borde mientras dure la sesión (aunque un aviso tape la píldora un instante).
+  const zenLock = zenWanted && !expanded;
+  useEffect(() => {
+    invoke("set_zen_pill", { active: zenLock }).catch(() => {});
+  }, [zenLock]);
   const banner = expanded && rawPeek?.kind === "text" ? rawPeek : null;
   const peekDims = greeting
     ? { w: Math.round(Math.min(settings.appearance.expandedW, Math.max(settings.appearance.collapsedW + 60, greetingW * 8 + 110))), h: settings.appearance.collapsedH + 40 }
     : peek
       ? peekSize(peek, settings.appearance.collapsedW, settings.appearance.collapsedH)
+      : zenShown
+        ? {
+            w: Math.max(150, pillHover ? 210 : 0),
+            h: settings.appearance.collapsedH + (pillHover ? ZEN_EXTRA_H : 0),
+          }
       : pillShown
         ? {
             w: Math.min(settings.appearance.expandedW, Math.max(settings.appearance.collapsedW + 80, pillHover ? 300 : 0)),
@@ -345,7 +358,7 @@ function Notch({ settings, update }) {
           } ${dragging ? "ring-2 ring-sky-400" : ""}`}
           style={{
             background: notchFill,
-            borderRadius: expanded || greeting ? "0 0 28px 28px" : peek || (pillShown && pillHover) ? "0 0 20px 20px" : "0 0 16px 16px",
+            borderRadius: expanded || greeting ? "0 0 28px 28px" : peek || (hoverShown && pillHover) ? "0 0 20px 20px" : "0 0 16px 16px",
             boxShadow: expanded ? "0 14px 36px rgba(0,0,0,0.55)" : "none",
           }}
         >
@@ -379,6 +392,8 @@ function Notch({ settings, update }) {
             </div>
           ) : pillShown ? (
             <MediaPill media={media} collapsedH={ap.collapsedH} visualizer={ap.visualizer} hover={pillHover} setHover={setHover} />
+          ) : zenShown ? (
+            <ZenPill pomo={pomo} collapsedH={ap.collapsedH} hover={pillHover} setHover={setHover} />
           ) : (
             <CompactBar
               ap={ap}

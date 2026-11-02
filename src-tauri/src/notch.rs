@@ -62,6 +62,8 @@ pub struct Win {
     pub greeting: AtomicBool,
     /// Píldora multimedia visible: pasar el cursor no abre el notch completo (muestra controles rápidos; el clic lo abre).
     pub media_pill: AtomicBool,
+    /// Píldora Zen (Pomodoro en curso): ni el hover ni el borde superior abren el panel; solo un clic explícito.
+    pub zen_pill: AtomicBool,
     appbar_hwnd: Mutex<Option<isize>>,
     /// Rectángulo de la pantalla donde está este notch (para elegir cuál abre el atajo).
     monitor: Mutex<Option<Rect>>,
@@ -77,6 +79,7 @@ impl Win {
             peek_h: AtomicI32::new(0),
             greeting: AtomicBool::new(false),
             media_pill: AtomicBool::new(false),
+            zen_pill: AtomicBool::new(false),
             appbar_hwnd: Mutex::new(None),
             monitor: Mutex::new(None),
         }
@@ -763,7 +766,7 @@ fn run_loop(app: AppHandle) {
             } else {
                 lp.leave_since = None;
                 let pill_hover = on_pill && !win.media_pill.load(SeqCst);
-                let triggered = pill_hover || (s.general.trigger == "edge" && on_edge);
+                let triggered = !win.zen_pill.load(SeqCst) && (pill_hover || (s.general.trigger == "edge" && on_edge));
                 if triggered {
                     let since = *lp.enter_since.get_or_insert(now);
                     // Con un botón pulsado (arrastrando un archivo) se abre al instante.

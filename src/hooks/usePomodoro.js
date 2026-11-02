@@ -109,5 +109,6 @@ export function usePomodoro(prod, notify, leader = true) {
   }, [setSt]);
 
   const doneToday = stats[dayKey()] ?? 0;
-  return { phase: st.phase, left, total, running: st.running, cycle: st.cycle, doneToday, alert, start, pause, reset, switchPhase, skip };
+  const paused = !st.running && st.pausedLeft != null;
+  return { phase: st.phase, left, total, running: st.running, paused, cycle: st.cycle, doneToday, alert, start, pause, reset, switchPhase, skip };
 }

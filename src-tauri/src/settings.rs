@@ -475,6 +475,8 @@ pub struct Productivity {
     pub auto_next: bool,
     /// Sonido del sistema en alertas (fin de fase, tarea vencida, agua).
     pub sound: bool,
+    /// Modo Zen: mientras hay una sesión en marcha, el notch cerrado se reduce a un punto y la cuenta atrás.
+    pub zen: bool,
 }
 
 impl Default for Productivity {
@@ -486,6 +488,7 @@ impl Default for Productivity {
             cycles_before_long: 4,
             auto_next: false,
             sound: true,
+            zen: true,
         }
     }
 }

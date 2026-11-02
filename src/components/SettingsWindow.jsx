@@ -800,6 +800,9 @@ function Productivity({ s, set }) {
       <Row title="Empezar la siguiente fase sola" hint="Si está apagado, el notch avisa y espera a que pulses Iniciar.">
         <Toggle checked={p.autoNext} onChange={(v) => pp({ autoNext: v })} />
       </Row>
+      <Row title="Modo Zen" hint="Durante una sesión el notch cerrado se reduce a un punto pulsante y la cuenta atrás. Pasa el cursor para pausar o detener.">
+        <Toggle checked={p.zen} onChange={(v) => pp({ zen: v })} />
+      </Row>
       <Row title="Sonido en las alertas" hint="Fin de fase, tarea vencida y recordatorio de agua.">
         <Toggle checked={p.sound} onChange={(v) => pp({ sound: v })} />
       </Row>
