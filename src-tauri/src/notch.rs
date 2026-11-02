@@ -30,9 +30,9 @@ use windows::Win32::{
             QUNS_RUNNING_D3D_FULL_SCREEN,
         },
         WindowsAndMessaging::{
-            GetCursorPos, GetWindowLongPtrW, IsWindowVisible, SetWindowLongPtrW, SetWindowPos, GWL_EXSTYLE,
-            HWND_TOPMOST, SWP_NOACTIVATE, SWP_NOMOVE, SWP_NOSIZE,
-            WS_EX_TOOLWINDOW,
+            GetCursorPos, GetWindowLongPtrW, IsWindowVisible, SetWindowLongPtrW, SetWindowPos,
+            GWL_EXSTYLE, HWND_TOPMOST, SWP_ASYNCWINDOWPOS, SWP_NOACTIVATE, SWP_NOMOVE, SWP_NOSENDCHANGING, SWP_NOSIZE,
+            WS_EX_TOOLWINDOW, WS_EX_TOPMOST,
         },
     },
 };
@@ -349,9 +349,23 @@ fn color_distance(a: (u8, u8, u8), b: (u8, u8, u8)) -> i32 {
     (a.0 as i32 - b.0 as i32).abs() + (a.1 as i32 - b.1 as i32).abs() + (a.2 as i32 - b.2 as i32).abs()
 }
 
-fn raise_topmost(hwnd: HWND) {
+/// Solo reasigna TOPMOST si Windows/tao lo quitó (o si `force`). Antes se llamaba a SetWindowPos cada segundo,
+/// lo que reordenaba el z-order y bloqueaba al hilo de la ventana con un SendMessage síncrono.
+/// SWP_ASYNCWINDOWPOS evita esperar al hilo principal; SWP_NOSENDCHANGING no dispara WM_WINDOWPOSCHANGING.
+fn raise_topmost(hwnd: HWND, force: bool) {
     unsafe {
-        let _ = SetWindowPos(hwnd, Some(HWND_TOPMOST), 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE);
+        if !force && GetWindowLongPtrW(hwnd, GWL_EXSTYLE) & WS_EX_TOPMOST.0 as isize != 0 {
+            return;
+        }
+        let _ = SetWindowPos(
+            hwnd,
+            Some(HWND_TOPMOST),
+            0,
+            0,
+            0,
+            0,
+            SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE | SWP_NOSENDCHANGING | SWP_ASYNCWINDOWPOS,
+        );
     }
 }
 
@@ -547,6 +561,8 @@ struct WinLoop {
     enter_since: Option<Instant>,
     leave_since: Option<Instant>,
     last_top: Instant,
+    /// Última vez que se forzó TOPMOST aunque el estilo ya lo tuviera.
+    last_raise: Instant,
     last_show: Instant,
     /// Franja automática: cuándo se muestreó y se avisó por última vez, y el último color enviado.
     last_tint: Instant,
@@ -566,6 +582,7 @@ impl WinLoop {
             enter_since: None,
             leave_since: None,
             last_top: long_ago,
+            last_raise: long_ago,
             last_show: long_ago,
             last_tint: long_ago,
             last_tint_emit: long_ago,
@@ -583,17 +600,23 @@ fn run_loop(app: AppHandle) {
     let long_ago = Instant::now() - Duration::from_secs(10);
     let mut last_slow = long_ago;
     let mut last_fs = long_ago;
+    let mut last_drop = long_ago;
+    // Ajustes en caché: antes se clonaba toda la estructura (con sus Strings) 40 veces por segundo.
+    let mut s = app.state::<NotchState>().settings.lock().unwrap().clone();
+    // Pausa entre vueltas: 25 ms solo cuando el cursor está cerca del notch; en reposo basta con ~80 ms.
+    let mut nap = 25u64;
 
     loop {
-        std::thread::sleep(Duration::from_millis(25));
+        std::thread::sleep(Duration::from_millis(nap));
         let st = app.state::<NotchState>();
-        let s = st.settings.lock().unwrap().clone();
         let now = Instant::now();
         let dirty = st.dirty.swap(false, SeqCst);
 
-        // Camino lento (cada segundo o al cambiar ajustes): qué pantallas hay, qué ventanas existen y dónde van.
-        let slow = dirty || assign.is_empty() || now - last_slow >= Duration::from_secs(1);
+        // Camino lento (cada 2 s o al cambiar ajustes): qué pantallas hay, qué ventanas existen y dónde van.
+        // `monitors()` y `sync_windows()` esperan al hilo principal, que es el que atiende a WebView2.
+        let slow = dirty || assign.is_empty() || now - last_slow >= Duration::from_secs(2);
         if slow {
+            s = st.settings.lock().unwrap().clone();
             last_slow = now;
             let mons = monitors(&app);
             if mons.is_empty() {
@@ -611,6 +634,8 @@ fn run_loop(app: AppHandle) {
 
         let cur = cursor();
         let btn = button_down();
+        let mut busy = btn;
+        let mut drop_done = false;
 
         for (label, mon) in &assign {
             let Some(window) = app.get_webview_window(label) else { continue };
@@ -619,8 +644,13 @@ fn run_loop(app: AppHandle) {
             let lp = loops.entry(label.clone()).or_insert_with(WinLoop::new);
 
             if slow || lp.applied.is_none() {
+                let fresh = lp.applied.is_none();
                 ensure_layout(&win, &window, &s, mon, &mut lp.applied, dirty);
-                crate::dropzone::ensure(&app, &window);
+                // Enumerar hijos de WebView2 en el hilo principal: cada 5 s es suficiente.
+                if fresh || dirty || now - last_drop >= Duration::from_secs(5) {
+                    crate::dropzone::ensure(&app, &window);
+                    drop_done = true;
+                }
             }
             let Some((_, layout)) = lp.applied else { continue };
 
@@ -637,13 +667,18 @@ fn run_loop(app: AppHandle) {
                     let _ = window.hide();
                 }
                 if want_visible {
-                    raise_topmost(hwnd);
+                    raise_topmost(hwnd, true);
                 }
             }
             if want_visible && now - lp.last_top >= Duration::from_secs(1) {
                 lp.last_top = now;
                 hide_from_alt_tab(hwnd);
-                raise_topmost(hwnd);
+                // Normalmente solo comprueba el estilo; fuerza el z-order cada 15 s por si otra ventana TOPMOST la tapó.
+                let force = now - lp.last_raise >= Duration::from_secs(15);
+                if force {
+                    lp.last_raise = now;
+                }
+                raise_topmost(hwnd, force);
             }
 
             let open = win.open.load(SeqCst);
@@ -657,6 +692,15 @@ fn run_loop(app: AppHandle) {
                     lp.ignoring = Some(true);
                 }
                 continue;
+            }
+
+            // Cursor cerca de la franja, notch abierto o saludo activo → vueltas rápidas; si no, en reposo.
+            let near_bar = cur.x >= layout.frame.left
+                && cur.x < layout.frame.right
+                && cur.y >= layout.frame.top - 2
+                && cur.y < layout.frame.bottom + px(60, layout.scale);
+            if near_bar || open || win.greeting.load(SeqCst) {
+                busy = true;
             }
 
             // El personaje del notch mira hacia el cursor: se avisa de su posición relativa (como mucho cada 60 ms y solo si cambia).
@@ -683,7 +727,9 @@ fn run_loop(app: AppHandle) {
 
             // Franja en modo «automático»: toma el color de lo que hay justo debajo de ella (el programa abierto).
             if s.appearance.bar_mode == "auto" || s.appearance.notch_auto {
-                if now - lp.last_tint >= Duration::from_millis(350) {
+                // GetPixel sobre el DC de pantalla es una llamada GDI síncrona que compite con el DWM
+                // y con la app en primer plano: se limita a 1 vez por segundo.
+                if now - lp.last_tint >= Duration::from_millis(1000) {
                     lp.last_tint = now;
                     if let Some(c) = sample_tint(layout.frame, px(s.appearance.collapsed_h, layout.scale) + px(4, layout.scale)) {
                         let changed = lp.tint.map_or(true, |p| color_distance(p, c) > 6);
@@ -780,5 +826,9 @@ fn run_loop(app: AppHandle) {
                 }
             }
         }
+        if drop_done {
+            last_drop = now;
+        }
+        nap = if busy { 25 } else { 80 };
     }
 }
