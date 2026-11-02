@@ -15,13 +15,16 @@ const langName = (tag) => {
  * dispositivo de audio, Bloq Mayús e idioma. Rust emite los eventos del sistema; aquí se
  * filtran según los ajustes y se decide qué mostrar y por cuánto tiempo.
  */
-export function usePeeks({ hud, battery, dnd }) {
+export function usePeeks({ hud, battery, dnd, focus }) {
   const [peek, setPeek] = useState(null);
   const cfg = useRef(hud);
   cfg.current = hud;
   // No molestar: se silencian los avisos automáticos; el volumen y el brillo (acción tuya) se siguen mostrando.
   const quiet = useRef(dnd);
   quiet.current = dnd;
+  // Enfoque (Modo Zen): se silencian las alertas de sistema, pero pasan las críticas (tono «warn» o «alert»).
+  const focusing = useRef(focus);
+  focusing.current = focus;
   const timer = useRef(null);
   const hold = useRef(false); // el cursor está sobre el aviso o se arrastra su slider
   const prevCharging = useRef(null);
@@ -39,6 +42,7 @@ export function usePeeks({ hud, battery, dnd }) {
   const show = useCallback(
     (p, ms) => {
       if (quiet.current) return;
+      if (focusing.current && p.tone !== "warn" && p.tone !== "alert") return;
       setPeek(p);
       arm(ms);
     },

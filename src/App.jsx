@@ -7,6 +7,7 @@ import Ear from "./components/notch/Ear.jsx";
 import CompactBar from "./components/notch/CompactBar.jsx";
 import MediaPill, { PILL_EXTRA_H } from "./components/notch/MediaPill.jsx";
 import ZenPill, { ZEN_EXTRA_H } from "./components/notch/ZenPill.jsx";
+import QuickAsk, { QUICK_H, QUICK_W } from "./components/notch/QuickAsk.jsx";
 import ExpandedView from "./components/notch/ExpandedView.jsx";
 import Mascot, { useLook, useMascotMood } from "./components/Mascot.jsx";
 import PeekContent, { peekSize } from "./components/Peek.jsx";
@@ -70,7 +71,6 @@ function Notch({ settings, update }) {
   const unpinTimer = useRef(null);
 
   const dnd = settings.general.dnd;
-  const { peek: rawPeek, setHold, show } = usePeeks({ hud: settings.hud, battery, dnd });
 
   // Con un notch por pantalla hay varias ventanas con esta misma app. La principal ("main") es la «líder»: solo ella
   // genera avisos (Pomodoro, tareas, agua, salud, calendario) y descarga datos; las demás reflejan el estado
@@ -87,9 +87,12 @@ function Notch({ settings, update }) {
     },
     [prod.sound, dnd]
   );
-  useTauriEvent("notch-notify", ({ ms, ...p }) => show({ kind: "text", ...p }, ms));
 
   const pomo = usePomodoro(prod, notify, leader);
+  // Modo Zen: mientras dura un bloque de enfoque se silencian las alertas de sistema (pasan las críticas).
+  const focusDnd = !!prod.zenDnd && pomo.running && pomo.phase === "work";
+  const { peek: rawPeek, setHold, show } = usePeeks({ hud: settings.hud, battery, dnd, focus: focusDnd });
+  useTauriEvent("notch-notify", ({ ms, ...p }) => show({ kind: "text", ...p }, ms));
   useReminders({ health: settings.health, notify, leader });
   useHabits({ enabled: settings.modules.habits, notify, leader });
   const cal = useCalendar({ calendar: settings.calendar, enabled: settings.modules.calendar, notify, leader });
@@ -133,6 +136,15 @@ function Notch({ settings, update }) {
   const [, setWorkTab] = useStore("workTab", "tasks");
   const tabsRef = useRef([]);
   const [, setToolsTab] = useStore("toolsTab", "launcher");
+  // Pregunta rápida a la IA (atajo): el notch abierto muestra solo un campo de texto, no el panel entero.
+  const [quick, setQuick] = useState(false);
+  const [quickAsked, setQuickAsked] = useState(false);
+  useEffect(() => {
+    if (!expanded) {
+      setQuick(false);
+      setQuickAsked(false);
+    }
+  }, [expanded]);
   useTauriEvent("shortcut-action", async (p) => {
     if (p.label !== LABEL) return;
     if (p.action === "record") {
@@ -146,6 +158,9 @@ function Notch({ settings, update }) {
       setTab("work");
       setWorkTab("tasks");
       setTimeout(() => document.querySelector("[data-task-input]")?.focus(), 380);
+    } else if (p.action === "ai") {
+      setQuickAsked(false);
+      setQuick(true);
     } else if (p.action === "clip") {
       wantTab.current = "tools";
       setTab("tools");
@@ -237,7 +252,7 @@ function Notch({ settings, update }) {
     invoke("set_media_pill", { active: hoverShown }).catch(() => {});
   }, [hoverShown]);
   // Modo Zen: Rust bloquea la apertura por hover/borde mientras dure la sesión (aunque un aviso tape la píldora un instante).
-  const zenLock = zenWanted && !expanded;
+  const zenLock = (zenWanted || rec.recording) && !expanded;
   useEffect(() => {
     invoke("set_zen_pill", { active: zenLock }).catch(() => {});
   }, [zenLock]);
@@ -248,7 +263,7 @@ function Notch({ settings, update }) {
       ? peekSize(peek, settings.appearance.collapsedW, settings.appearance.collapsedH)
       : zenShown
         ? {
-            w: Math.max(150, pillHover ? 210 : 0),
+            w: Math.max(150, pillHover ? 250 : 0),
             h: settings.appearance.collapsedH + (pillHover ? ZEN_EXTRA_H : 0),
           }
       : pillShown
@@ -345,8 +360,8 @@ function Notch({ settings, update }) {
       <div
         className="relative"
         style={{
-          width: expanded ? ap.expandedW : peekDims?.w ?? compactW,
-          height: expanded ? ap.expandedH : peekDims?.h ?? ap.collapsedH,
+          width: expanded ? (quick ? Math.min(ap.expandedW, QUICK_W) : ap.expandedW) : peekDims?.w ?? compactW,
+          height: expanded ? (quick ? ap.collapsedH + (quickAsked || aiChat.error ? QUICK_H.answer : QUICK_H.input) : ap.expandedH) : peekDims?.h ?? ap.collapsedH,
           transition: `width ${NOTCH_MS}ms ${NOTCH_EASE}, height ${NOTCH_MS}ms ${NOTCH_EASE}`,
         }}
       >
@@ -363,7 +378,19 @@ function Notch({ settings, update }) {
           }}
         >
           {notchTheme && !peek && !greeting && <NotchDecor theme={notchTheme} compact={!expanded} />}
-          {expanded ? (
+          {expanded && quick ? (
+            <QuickAsk
+              chat={aiChat}
+              asked={quickAsked}
+              onAsk={() => setQuickAsked(true)}
+              onFull={() => {
+                wantTab.current = "ai";
+                setQuick(false);
+                setTab("ai");
+              }}
+              collapsedH={ap.collapsedH}
+            />
+          ) : expanded ? (
             <ExpandedView
               tabs={tabs}
               activeTab={activeTab}

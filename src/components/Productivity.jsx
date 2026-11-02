@@ -2,6 +2,8 @@ import { useMemo, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { useStore } from "../hooks/useStore.js";
 import { PHASE_LABEL, fmtTime } from "../hooks/usePomodoro.js";
+import { SOUNDS, playAmbient, setAmbientVolume, useAmbient } from "../lib/ambient.js";
+import FocusStats from "./FocusStats.jsx";
 import { dayKey, fmtDue, nextOccurrence } from "../lib/time.js";
 import { parseQuickTask } from "../lib/quickTask.js";
 import Notes from "./Notes.jsx";
@@ -13,7 +15,10 @@ const inputCls = "min-w-0 rounded-full bg-white/10 px-3 py-1.5 text-xs outline-n
 // ───────────── Enfoque (Pomodoro) ─────────────
 
 function FocusView({ pomo, prod }) {
-  const { phase, left, total, running, cycle, doneToday, alert, start, pause, reset, switchPhase, skip } = pomo;
+  const { phase, left, total, running, cycle, doneToday, alert, start, pause, reset, switchPhase, skip, taskId, setTask } = pomo;
+  const [todos] = useStore("todos", []);
+  const openTodos = todos.filter((t) => !t.done);
+  const amb = useAmbient();
   const pct = total ? ((total - left) / total) * 100 : 0;
   const accent = phase === "work" ? "#fb7185" : "#34d399";
   const R = 52;
@@ -37,7 +42,20 @@ function FocusView({ pomo, prod }) {
           <span className="text-[10px] uppercase tracking-wider text-white/40">{PHASE_LABEL[phase]}</span>
         </div>
       </div>
-      <div className="flex min-w-0 flex-1 flex-col gap-3">
+      <div className="flex min-w-0 flex-1 flex-col gap-2.5">
+        <select
+          value={taskId ?? ""}
+          onChange={(e) => setTask(openTodos.find((t) => String(t.id) === e.target.value) ?? null)}
+          className="w-full min-w-0 rounded-full bg-white/10 px-3 py-1 text-[11px] outline-none focus:bg-white/15"
+          aria-label="Tarea del enfoque"
+          title="Tarea a la que dedicas este enfoque"
+        >
+          <option value="" className="bg-neutral-900">🎯 Enfoque libre (sin tarea)</option>
+          {taskId != null && !openTodos.some((t) => t.id === taskId) && <option value={taskId} className="bg-neutral-900">🎯 {pomo.taskTitle}</option>}
+          {openTodos.map((t) => (
+            <option key={t.id} value={t.id} className="bg-neutral-900">{t.text.length > 48 ? `${t.text.slice(0, 47)}…` : t.text}</option>
+          ))}
+        </select>
         <div className="flex gap-1 text-[11px]">
           {Object.entries(PHASE_LABEL).map(([k, label]) => (
             <button
@@ -61,6 +79,25 @@ function FocusView({ pomo, prod }) {
             ))}
           </span>
           <span>Hoy: {doneToday} {doneToday === 1 ? "ciclo" : "ciclos"}</span>
+        </div>
+        <div className="flex flex-wrap items-center gap-1.5 text-[11px]">
+          {SOUNDS.map((s) => (
+            <button
+              key={s.id}
+              onClick={() => playAmbient(s.id)}
+              className={`rounded-full px-2.5 py-1 transition-all duration-300 ${amb.kind === s.id ? "bg-white/25" : "bg-white/10 text-white/60 hover:bg-white/20"}`}
+              title={amb.kind === s.id ? "Apagar" : s.label}
+            >
+              {s.icon} {s.label}
+            </button>
+          ))}
+          {amb.kind && (
+            <input
+              type="range" min="0.05" max="1" step="0.05" value={amb.volume}
+              onChange={(e) => setAmbientVolume(Number(e.target.value))}
+              className="h-1 w-16 accent-white" aria-label="Volumen del sonido ambiental"
+            />
+          )}
         </div>
         <div className="text-[10px] text-white/30">
           {prod.workMin}/{prod.shortBreakMin}/{prod.longBreakMin} min · cambia los tiempos en Ajustes
@@ -228,6 +265,7 @@ const SUBTABS = [
   { id: "notes", label: "Notas", icon: "📝" },
   { id: "voice", label: "Grabadora", icon: "🎙" },
   { id: "focus", label: "Enfoque", icon: "🍅" },
+  { id: "stats", label: "Estadísticas", icon: "📊" },
 ];
 
 export default function Productivity({ pomo, prod }) {
@@ -277,6 +315,7 @@ export default function Productivity({ pomo, prod }) {
       </div>
       <div className="min-h-0 flex-1">
         {sub === "focus" && <FocusView pomo={pomo} prod={prod} />}
+        {sub === "stats" && <FocusStats />}
         {sub === "tasks" && <TasksView />}
         {sub === "notes" && <Notes />}
         {sub === "voice" && <Recorder />}

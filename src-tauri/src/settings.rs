@@ -238,6 +238,9 @@ pub struct Shortcuts {
     /// Abrir el notch directamente en el historial del portapapeles.
     pub clip: String,
     pub clip_enabled: bool,
+    /// Campo flotante para preguntar a la IA sin abrir todo el panel.
+    pub ai: String,
+    pub ai_enabled: bool,
     /// Ir directo a una pestaña con <modificador>+1…9.
     pub tabs_enabled: bool,
     pub tabs_modifier: String,
@@ -256,6 +259,8 @@ impl Default for Shortcuts {
             add_task_enabled: false,
             clip: "Ctrl+Alt+V".into(),
             clip_enabled: true,
+            ai: "Ctrl+Alt+A".into(),
+            ai_enabled: true,
             tabs_enabled: false,
             tabs_modifier: "Alt".into(),
         }
@@ -477,6 +482,8 @@ pub struct Productivity {
     pub sound: bool,
     /// Modo Zen: mientras hay una sesión en marcha, el notch cerrado se reduce a un punto y la cuenta atrás.
     pub zen: bool,
+    /// Durante el enfoque del Pomodoro se silencian las alertas de sistema (Wi-Fi, Bluetooth…); solo pasan las críticas.
+    pub zen_dnd: bool,
 }
 
 impl Default for Productivity {
@@ -489,6 +496,7 @@ impl Default for Productivity {
             auto_next: false,
             sound: true,
             zen: true,
+            zen_dnd: true,
         }
     }
 }
@@ -655,6 +663,7 @@ impl Settings {
             (&mut self.shortcuts.dnd, &sc.dnd),
             (&mut self.shortcuts.add_task, &sc.add_task),
             (&mut self.shortcuts.clip, &sc.clip),
+            (&mut self.shortcuts.ai, &sc.ai),
         ] {
             if cur.trim().is_empty() {
                 *cur = def.clone();

@@ -98,6 +98,7 @@ fn shortcut_list(sc: &settings::Shortcuts) -> Vec<(String, String)> {
         (sc.dnd_enabled, &sc.dnd, "dnd"),
         (sc.add_task_enabled, &sc.add_task, "addTask"),
         (sc.clip_enabled, &sc.clip, "clip"),
+        (sc.ai_enabled, &sc.ai, "ai"),
     ] {
         if on {
             v.push((key.clone(), action.to_string()));

@@ -1,8 +1,10 @@
+import { invoke } from "@tauri-apps/api/core";
 import Clock from "../Clock.jsx";
 import Battery from "../Battery.jsx";
 import Visualizer from "../Visualizer.jsx";
 import Mascot from "../Mascot.jsx";
 import { fmtTime } from "../../hooks/usePomodoro.js";
+import { stopRecording } from "../../lib/recorder.js";
 
 /** Indicador discreto del estado compacto: reunión inminente > temporizador > canción > no molestar. */
 function Indicator({ cal, calendarOn, pomo, media, visualizer, dnd, rec, mic }) {
@@ -11,6 +13,18 @@ function Indicator({ cal, calendarOn, pomo, media, visualizer, dnd, rec, mic }) 
       <span className="flex items-center gap-1.5 text-xs tabular-nums text-rose-300" aria-label="Grabando">
         <span className="h-2 w-2 animate-pulse rounded-full bg-rose-500" />
         {Math.floor(rec.secs / 60)}:{String(Math.floor(rec.secs % 60)).padStart(2, "0")}
+        <button
+          type="button"
+          onClick={(e) => {
+            e.stopPropagation();
+            stopRecording();
+          }}
+          className="ml-0.5 flex h-5 w-5 items-center justify-center rounded-full bg-rose-500/25 transition-[background-color,transform] hover:bg-rose-500/50 active:scale-90"
+          aria-label="Detener grabación"
+          title="Detener y guardar la grabación"
+        >
+          <span className="h-2 w-2 rounded-[2px] bg-rose-200" />
+        </button>
       </span>
     );
   }
@@ -70,7 +84,11 @@ function Indicator({ cal, calendarOn, pomo, media, visualizer, dnd, rec, mic }) 
 /** Contenido del notch cerrado: reloj, mascota/indicador y los datos que elegiste mostrar. */
 export default function CompactBar({ ap, modules, mascot, indicator, pending, habits, weatherNow, temperature, battery }) {
   return (
-    <div className="relative flex h-full animate-[compactIn_260ms_cubic-bezier(0.2,0.8,0.2,1)_both] items-center justify-between gap-2 px-4">
+    <div
+      className="relative flex h-full animate-[compactIn_260ms_cubic-bezier(0.2,0.8,0.2,1)_both] items-center justify-between gap-2 px-4"
+      // Grabando, el notch no se abre al pasar el cursor (el botón ■ debe quedar a mano); un clic sí lo abre.
+      onClick={indicator.rec?.recording ? () => invoke("request_open", { open: true, sticky: false }).catch(() => {}) : undefined}
+    >
       <div className="flex shrink-0 items-center gap-2">
         {(ap.showClock || ap.showDate) && <Clock showTime={ap.showClock} withDate={ap.showDate} hour12={!ap.clock24} />}
       </div>

@@ -803,6 +803,9 @@ function Productivity({ s, set }) {
       <Row title="Modo Zen" hint="Durante una sesión el notch cerrado se reduce a un punto pulsante y la cuenta atrás. Pasa el cursor para pausar o detener.">
         <Toggle checked={p.zen} onChange={(v) => pp({ zen: v })} />
       </Row>
+      <Row title="Silenciar alertas durante el enfoque" hint="Mientras dura un bloque de enfoque se ocultan los avisos de Wi-Fi, Bluetooth, cargador, etc. Siguen pasando los urgentes (batería baja, micrófono).">
+        <Toggle checked={p.zenDnd} onChange={(v) => pp({ zenDnd: v })} />
+      </Row>
       <Row title="Sonido en las alertas" hint="Fin de fase, tarea vencida y recordatorio de agua.">
         <Toggle checked={p.sound} onChange={(v) => pp({ sound: v })} />
       </Row>
@@ -924,6 +927,7 @@ const SHORTCUT_ROWS = [
   ["record", "Grabar voz", "Empieza y detiene una grabación desde cualquier programa; el notch muestra un punto rojo mientras graba."],
   ["dnd", "No molestar", "Activa o desactiva los avisos y sonidos de Noki."],
   ["addTask", "Nueva tarea rápida", "Abre el notch con el cursor listo para escribir una tarea."],
+  ["ai", "Pregunta rápida a la IA", "Despliega un campo de texto en el notch para consultar a la IA sin abrir todo el panel."],
   ["clip", "Historial del portapapeles", "Abre el notch directamente en Herramientas → Portapapeles (si el historial está activado en Ajustes)."],
 ];
 const TAB_MODS = ["Alt", "Ctrl", "Ctrl+Alt", "Ctrl+Shift", "Alt+Shift"];
