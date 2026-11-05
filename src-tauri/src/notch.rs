@@ -32,7 +32,7 @@ use windows::Win32::{
         WindowsAndMessaging::{
             GetCursorPos, GetWindowLongPtrW, IsWindowVisible, SetWindowLongPtrW, SetWindowPos,
             GWL_EXSTYLE, HWND_TOPMOST, SWP_ASYNCWINDOWPOS, SWP_NOACTIVATE, SWP_NOMOVE, SWP_NOSENDCHANGING, SWP_NOSIZE,
-            WS_EX_TOOLWINDOW, WS_EX_TOPMOST,
+            WS_EX_TOOLWINDOW, WS_EX_TOPMOST, WS_EX_TRANSPARENT,
         },
     },
 };
@@ -308,8 +308,9 @@ fn fullscreen_app_active() -> bool {
     }
 }
 
-/// WS_EX_TOOLWINDOW lo oculta de Alt+Tab. Tao reescribe los estilos cuando cambian sus flags
-/// (p. ej. click-through), así que se reaplica periódicamente.
+/// WS_EX_TOOLWINDOW lo oculta de Alt+Tab. Tao reescribe GWL_EXSTYLE entero (sin este bit) cada vez que
+/// cambian sus flags (click-through, mostrar/ocultar), así que hay que reponerlo justo después.
+/// Solo debe llamarse en el hilo de la interfaz: ver `ex_style_on_ui`.
 fn hide_from_alt_tab(hwnd: HWND) {
     unsafe {
         let ex = GetWindowLongPtrW(hwnd, GWL_EXSTYLE);
@@ -318,6 +319,45 @@ fn hide_from_alt_tab(hwnd: HWND) {
             SetWindowLongPtrW(hwnd, GWL_EXSTYLE, ex | tool);
         }
     }
+}
+
+fn has_ex(hwnd: HWND, bit: u32) -> bool {
+    // GetWindowLongPtrW no envía mensajes: es seguro desde cualquier hilo.
+    unsafe { GetWindowLongPtrW(hwnd, GWL_EXSTYLE) & bit as isize != 0 }
+}
+
+/// Cambia el click-through y/o la visibilidad y repone WS_EX_TOOLWINDOW, todo en el hilo de la interfaz.
+///
+/// Antes se llamaba a `set_ignore_cursor_events` (que tao aplica *más tarde* en el hilo principal reescribiendo
+/// GWL_EXSTYLE entero) y a continuación, desde este hilo, a `hide_from_alt_tab` (leer-modificar-escribir del
+/// mismo GWL_EXSTYLE). Las dos escrituras competían: si la nuestra leía el estilo antes de que tao aplicara
+/// WS_EX_TRANSPARENT|WS_EX_LAYERED y escribía después, borraba el click-through. La ventana (todo el ancho de la
+/// pantalla × ~350 px, TOPMOST) se quedaba captando el ratón encima de las demás apps, y como `lp.ignoring` ya
+/// decía «ignorando», nunca se corregía. Además, SetWindowLongPtrW sobre una ventana de otro hilo hace un
+/// SendMessage síncrono (WM_STYLECHANGING/ED) que bloqueaba este bucle mientras el hilo principal estaba ocupado.
+/// En el hilo principal, tauri y tao ejecutan la llamada al momento, así que ambas escrituras quedan en orden.
+fn ex_style_on_ui(window: &WebviewWindow, ignore: Option<bool>, visible: Option<bool>) {
+    let w = window.clone();
+    let _ = window.run_on_main_thread(move || {
+        match visible {
+            Some(true) => {
+                let _ = w.show();
+            }
+            Some(false) => {
+                let _ = w.hide();
+            }
+            None => {}
+        }
+        if let Some(ignore) = ignore {
+            let _ = w.set_ignore_cursor_events(ignore);
+        }
+        if let Some(h) = hwnd_of(&w) {
+            hide_from_alt_tab(h);
+            if visible == Some(true) {
+                raise_topmost(h, true);
+            }
+        }
+    });
 }
 
 /// Color medio de la pantalla justo bajo la franja (dos puntos, cerca de cada borde, fuera del notch).
@@ -645,7 +685,10 @@ fn run_loop(app: AppHandle) {
 
             if slow || lp.applied.is_none() {
                 let fresh = lp.applied.is_none();
-                ensure_layout(&win, &window, &s, mon, &mut lp.applied, dirty);
+                // No se fuerza con `dirty`: `Key` ya recoge todo lo que afecta al layout. Forzarlo hacía un
+                // ABM_SETPOS en cada guardado de ajustes (cualquiera, p. ej. el modo No molestar), y cada uno obliga
+                // a Windows a recalcular el área de trabajo y a redimensionar todas las ventanas maximizadas.
+                ensure_layout(&win, &window, &s, mon, &mut lp.applied, false);
                 // Enumerar hijos de WebView2 en el hilo principal: cada 5 s es suficiente.
                 if fresh || dirty || now - last_drop >= Duration::from_secs(5) {
                     crate::dropzone::ensure(&app, &window);
@@ -661,18 +704,21 @@ fn run_loop(app: AppHandle) {
                 // Se muestra/oculta con tao y no con SetWindowPos: tao recuerda su propio estado de
                 // visibilidad y lo reaplica cada vez que reescribe los estilos (click-through), lo que
                 // ocultaba la ventana en pleno uso (p. ej. al salir el cursor hacia un selector nativo).
-                if want_visible {
-                    let _ = window.show();
-                } else {
-                    let _ = window.hide();
-                }
-                if want_visible {
-                    raise_topmost(hwnd, true);
-                }
+                // Mostrar/ocultar también reescribe GWL_EXSTYLE, así que va junto con WS_EX_TOOLWINDOW.
+                ex_style_on_ui(&window, None, Some(want_visible));
             }
             if want_visible && now - lp.last_top >= Duration::from_secs(1) {
                 lp.last_top = now;
-                hide_from_alt_tab(hwnd);
+                if !has_ex(hwnd, WS_EX_TOOLWINDOW.0) {
+                    ex_style_on_ui(&window, None, None);
+                }
+                // Autocorrección: si el estilo real no coincide con el click-through recordado (p. ej. tao lo
+                // reescribió), se olvida el recordado para que este mismo paso vuelva a aplicarlo.
+                if let Some(ign) = lp.ignoring {
+                    if has_ex(hwnd, WS_EX_TRANSPARENT.0) != ign {
+                        lp.ignoring = None;
+                    }
+                }
                 // Normalmente solo comprueba el estilo; fuerza el z-order cada 15 s por si otra ventana TOPMOST la tapó.
                 let force = now - lp.last_raise >= Duration::from_secs(15);
                 if force {
@@ -687,8 +733,7 @@ fn run_loop(app: AppHandle) {
                     set_open(&app, label, false);
                 }
                 if lp.ignoring != Some(true) {
-                    let _ = window.set_ignore_cursor_events(true);
-                    hide_from_alt_tab(hwnd);
+                    ex_style_on_ui(&window, Some(true), None);
                     lp.ignoring = Some(true);
                 }
                 continue;
@@ -785,8 +830,7 @@ fn run_loop(app: AppHandle) {
                 }
             }
             if lp.ignoring != Some(!hit) {
-                let _ = window.set_ignore_cursor_events(!hit);
-                hide_from_alt_tab(hwnd);
+                ex_style_on_ui(&window, Some(!hit), None);
                 lp.ignoring = Some(!hit);
             }
 
