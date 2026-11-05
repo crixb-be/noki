@@ -213,6 +213,37 @@ function groupRows(children) {
   return out;
 }
 
+/** Bloque de filas que se puede bloquear entero: `fieldset disabled` desactiva todos los botones e inputs de
+ *  dentro y pointer-events-none cubre los controles que no son nativos. Agrupa sus filas como `Page`. */
+function Locked({ locked, reason, action, onAction, children }) {
+  return (
+    <>
+      {locked && (
+        <div className="mb-2.5 flex items-center gap-3 rounded-xl border border-amber-300/20 bg-amber-300/[0.07] px-3.5 py-2.5">
+          <span className="text-base" aria-hidden="true">🔒</span>
+          <p className="min-w-0 flex-1 text-xs leading-snug text-amber-100/80">{reason}</p>
+          {action && (
+            <button
+              type="button"
+              onClick={onAction}
+              className="shrink-0 rounded-lg bg-amber-300/20 px-2.5 py-1 text-xs font-medium text-amber-50 transition-colors hover:bg-amber-300/35"
+            >
+              {action}
+            </button>
+          )}
+        </div>
+      )}
+      <fieldset
+        disabled={locked}
+        aria-disabled={locked}
+        className={`m-0 min-w-0 border-0 p-0 transition-[opacity,filter] duration-300 ${locked ? "pointer-events-none select-none opacity-40 grayscale" : ""}`}
+      >
+        {groupRows(children)}
+      </fieldset>
+    </>
+  );
+}
+
 function Page({ title, subtitle, children }) {
   const section = SECTIONS.find((x) => x.label === title);
   const icon = section?.id === "developer" ? <Avatar size={44} /> : section?.icon;
@@ -532,6 +563,13 @@ function ShareAppearance({ a, ap }) {
 function Appearance({ s, set }) {
   const a = s.appearance;
   const ap = (patch) => set({ appearance: patch });
+  // La franja solo existe con el espacio superior reservado; sin él, todo lo que la configura queda bloqueado.
+  const stripLock = {
+    locked: !s.general.reserveSpace,
+    reason: "La franja está desactivada porque el notch flota sobre las ventanas. Para personalizarla, activa «Reservar espacio en la parte superior» (en General).",
+    action: "Activar",
+    onAction: () => set({ general: { reserveSpace: true } }),
+  };
   return (
     <Page title="Apariencia" subtitle="Tamaño, posición y transparencia. Los cambios se ven al instante en el notch.">
       <IconPicker value={a.appIcon} onChange={(v) => ap({ appIcon: v })} />
@@ -561,6 +599,7 @@ function Appearance({ s, set }) {
           <Row title="Transparencia del notch con tema" hint="Qué tan sólido es el color del tema en el notch central.">
             <Slider value={a.notchThemeOpacity} min={20} max={100} unit=" %" onChange={(v) => ap({ notchThemeOpacity: v })} />
           </Row>
+          <Locked {...stripLock}>
           <ThemePicker
             title="Franja de los costados"
             hint="La barra a los lados del notch. «Ninguno» usa tu configuración."
@@ -573,6 +612,7 @@ function Appearance({ s, set }) {
           <Row title="Transparencia de la franja con tema" hint="Qué tan sólido es el color del tema en los costados.">
             <Slider value={a.barThemeOpacity} min={0} max={100} unit=" %" onChange={(v) => ap({ barThemeOpacity: v })} />
           </Row>
+          </Locked>
           <Row title="Mismo tema para todo" hint="«Automático» pone Halloween (24 oct–2 nov), Navidad (1–26 dic), Amor (7–14 feb) y Cumpleaños el día que indiques abajo.">
             <Select
               value=""
@@ -646,6 +686,8 @@ function Appearance({ s, set }) {
         </Row>
       )}
       <SectionTitle>Franja a los costados del notch</SectionTitle>
+      {/* Sin espacio reservado la franja no se pinta (taparía las apps maximizadas): sus controles se bloquean. */}
+      <Locked {...stripLock}>
       <Row title="Fondo de la franja" hint="La barra de arriba que cruza toda la pantalla (la que reserva el espacio). «Igual que el notch» la hace parecer parte de él; «Automático» toma el color del programa que tengas abierto debajo y cambia con él.">
         <Select
           value={a.barMode}
@@ -675,6 +717,7 @@ function Appearance({ s, set }) {
           <Slider value={a.barOpacity} min={0} max={100} unit=" %" onChange={(v) => ap({ barOpacity: v })} />
         </Row>
       )}
+      </Locked>
       <SectionTitle>Qué se ve en el notch cerrado</SectionTitle>
       <Row title="Hora">
         <Toggle checked={a.showClock} onChange={(v) => ap({ showClock: v })} />

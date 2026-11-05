@@ -355,7 +355,8 @@ function Notch({ settings, update }) {
 
   return (
     <div className="relative h-full w-full" onFocus={onFocus} onBlur={onBlur}>
-      {barFill && <div className="pointer-events-none absolute left-0 right-0 top-0" style={{ height: ap.collapsedH, background: barFill, transition: "background-color 350ms ease" }}>{barTheme && <StripDecor theme={barTheme} height={ap.collapsedH} />}</div>}
+      {/* Sin espacio reservado la franja taparía la parte de arriba de las apps maximizadas: solo queda el notch. */}
+      {barFill && settings.general.reserveSpace && <div className="pointer-events-none absolute left-0 right-0 top-0" style={{ height: ap.collapsedH, background: barFill, transition: "background-color 350ms ease" }}>{barTheme && <StripDecor theme={barTheme} height={ap.collapsedH} />}</div>}
       <div className="flex h-full w-full items-start justify-center" style={{ transform: `translateX(${ap.offsetX}px)` }}>
       <div
         className="relative"
