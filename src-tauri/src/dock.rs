@@ -221,7 +221,7 @@ fn register_appbar(window: &WebviewWindow, monitor: notch::Rect, height: i32, sc
 pub fn sync(app: &AppHandle, settings: &Settings, fullscreen: bool) {
     if !window_utils::frontend_ready("notch") { return; }
     let Some(window) = create(app) else { return };
-    let icon_size = settings.dock.icon_size.clamp(32, 96);
+    let icon_size = settings.dock.icon_size.clamp(36, 64);
     sync_taskbar(settings);
     let enabled = settings.dock.enabled && !fullscreen && settings.general.visible;
     if !enabled {
@@ -301,6 +301,9 @@ unsafe extern "system" fn enum_callback(hwnd: HWND, lparam: LPARAM) -> windows::
     if pid == own { return true.into(); }
     let process_path = icons::process_image_path(pid).unwrap_or_default();
     let process_name = process_path.rsplit(['\\', '/']).next().unwrap_or_default().to_ascii_lowercase();
+    // Procesos del sistema que tienen ventanas «visibles» pero no son apps: la Experiencia de entrada
+    // de Windows (teclado táctil, panel de emojis, dictado) y sus ventanas vacías.
+    if HIDDEN_PROCESSES.contains(&process_name.as_str()) { return true.into(); }
     let icon_hwnd = if process_name == "applicationframehost.exe" {
         let mut child = None;
         let _ = EnumChildWindows(Some(hwnd), Some(child_callback), LPARAM(&mut child as *mut _ as isize));
@@ -311,6 +314,9 @@ unsafe extern "system" fn enum_callback(hwnd: HWND, lparam: LPARAM) -> windows::
     list.push((title(hwnd), hwnd.0 as isize, process_path, aumid));
     true.into()
 }
+
+/// Procesos cuyas ventanas nunca aparecen en el Dock como app abierta.
+const HIDDEN_PROCESSES: [&str; 1] = ["textinputhost.exe"];
 
 /// Ventana abierta de otra app: título, HWND, ruta del ejecutable y AUMID.
 struct Running { title: String, hwnd: isize, path: String, aumid: String }

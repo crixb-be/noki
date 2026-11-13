@@ -6,7 +6,7 @@ const isObj = (v) => v && typeof v === "object" && !Array.isArray(v);
 
 const DEFAULTS = {
   topbar: { enabled: false, height: 30, tint: "auto", showTray: true, showCpu: false, showRam: false, showWifi: true, showBluetooth: true, showSound: true, showBattery: true, showBatteryPct: true, showSearch: true, showControlCenter: true, showCapture: true, showNotifications: true, showAvatar: true, showClock: true, avatarPath: "" },
-  dock: { enabled: false, iconSize: 48, magnify: true, magnifyScale: 1.6, showApps: true, showRunning: true, showTrash: true, autohide: false, hideTaskbar: false, reserveSpace: false, pinned: [], folders: [] },
+  dock: { enabled: false, iconSize: 44, magnify: true, magnifyScale: 1.6, showApps: true, showRunning: true, showTrash: true, autohide: false, hideTaskbar: false, reserveSpace: false, pinned: [], folders: [] },
 };
 
 /** Fusión profunda: `patch` solo pisa las claves que trae. */

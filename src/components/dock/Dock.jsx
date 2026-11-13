@@ -19,9 +19,12 @@ export default function Dock() {
   const iconRefs = useRef([]);
   const pointerX = useRef(null);
   const frame = useRef(0);
-  const dock = settings?.dock ?? { enabled: true, iconSize: 40, magnify: true, magnifyScale: 1.6, showApps: true, showRunning: true, showTrash: true, autohide: false, pinned: [], folders: [] };
+  const dock = settings?.dock ?? { enabled: true, iconSize: 44, magnify: true, magnifyScale: 1.6, showApps: true, showRunning: true, showTrash: true, autohide: false, pinned: [], folders: [] };
   // Tamaño y escala vienen de Ajustes (antes estaban fijos: 44-46 px y 62 px máximo).
-  const size = Math.min(96, Math.max(32, Math.round(dock.iconSize || 48)));
+  // «Tamaño del Dock» (Ajustes): tamaño base de los iconos, 36-64 px. El relleno y el hueco de la
+  // píldora escalan con él (variables CSS), así que la píldora, el área de clic y el vidrio cambian juntos.
+  const size = Math.min(64, Math.max(36, Math.round(dock.iconSize || 44)));
+  const pillVars = { "--dock-gap": `${Math.round(size * 0.17)}px`, "--dock-pad-y": `${Math.max(3, Math.round(size * 0.09))}px`, "--dock-pad-x": `${Math.round(size * 0.18)}px` };
   const scale = dock.magnify ? Math.min(2.5, Math.max(1, Number(dock.magnifyScale) || 1.6)) : 1;
   const maxSize = Math.round(size * scale);
   const sizes = useRef([]);
@@ -195,7 +198,7 @@ export default function Dock() {
   const menuLeft = menu ? Math.round(Math.min(Math.max(4, menu.x - MENU_WIDTH / 2), Math.max(4, window.innerWidth - MENU_WIDTH - 4))) : 0;
 
   return <div className="dock-stage" onMouseMove={onMouseMove} onMouseLeave={() => { resetMagnification(); setMenu(null); }} onMouseDown={(e) => { if (menu && !menuRef.current?.contains(e.target)) setMenu(null); }}>
-    <div ref={pill} className="dock-pill">
+    <div ref={pill} className="dock-pill" style={pillVars}>
       {all.map((item, index) => {
         const icon = item.kind === "apps" ? <AppsIcon /> : item.kind === "trash" ? <span className="trash-icon">{item.running ? "🗑️" : "♲"}</span> : item.icon ? <img src={item.icon} alt="" /> : <ItemIcon path={item.path || (item.aumid ? `shell:AppsFolder\\${item.aumid}` : "")} name={item.name} />;
         const firstShelfIndex = all.findIndex((entry) => entry.kind === "folder" || entry.kind === "trash");

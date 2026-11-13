@@ -1604,7 +1604,7 @@ function DockSettings({ s, set }) {
   const updatePinned = (pinned) => set({ dock: { pinned } });
   return <Page title="Dock" subtitle="Tus aplicaciones, ventanas y carpetas favoritas en la parte inferior.">
     <Row title="Activar Dock"><Toggle checked={d.enabled} onChange={(v) => set({ dock: { enabled: v } })} /></Row>
-    <Row title="Tamaño de los iconos"><Slider value={d.iconSize} min={32} max={96} unit=" px" onChange={(v) => set({ dock: { iconSize: v } })} /></Row>
+    <Row title="Tamaño del Dock" hint="Tamaño base de los iconos; la píldora y su vidrio se ajustan al momento."><Slider value={Math.min(64, Math.max(36, d.iconSize ?? 44))} min={36} max={64} step={2} unit=" px" onChange={(v) => set({ dock: { iconSize: v } })} /></Row>
     <Row title="Magnificación" hint="Amplía los iconos alrededor del cursor."><Toggle checked={d.magnify} onChange={(v) => set({ dock: { magnify: v } })} /></Row>
     <Row title="Escala de magnificación"><Slider value={d.magnifyScale} min={1} max={2.5} step={0.1} unit="×" onChange={(v) => set({ dock: { magnifyScale: v } })} /></Row>
     <Row title="Mostrar «Aplicaciones» en el Dock" hint="Icono para abrir la cuadrícula con todos tus programas."><Toggle checked={d.showApps} onChange={(v) => set({ dock: { showApps: v } })} /></Row>

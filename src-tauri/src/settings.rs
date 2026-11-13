@@ -271,7 +271,7 @@ impl Default for Dock {
         let downloads = std::env::var("USERPROFILE").map(|p| std::path::PathBuf::from(p).join("Downloads")).unwrap_or_default();
         Self {
             enabled: false,
-            icon_size: 40,
+            icon_size: 44,
             magnify: true,
             magnify_scale: 1.6,
             show_apps: true,
@@ -784,7 +784,8 @@ impl Settings {
         b.avatar_path = b.avatar_path.chars().take(4096).collect();
 
         let d = &mut self.dock;
-        d.icon_size = d.icon_size.clamp(32, 96);
+        // «Tamaño del Dock» (Ajustes > Dock): tamaño base de los iconos, 36-64 px.
+        d.icon_size = d.icon_size.clamp(36, 64);
         d.magnify_scale = d.magnify_scale.clamp(1.0, 2.5);
         d.pinned.truncate(64);
         d.folders.truncate(32);
