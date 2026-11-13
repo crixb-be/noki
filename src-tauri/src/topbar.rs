@@ -482,6 +482,23 @@ pub struct WifiNetwork {
     pub profile: bool,
 }
 
+/// Fusiona en `out` las redes que Windows conoce ahora mismo para una interfaz.
+unsafe fn collect_networks(client: HANDLE, guid: &windows::core::GUID, out: &mut HashMap<String, WifiNetwork>) {
+    let mut list: *mut WLAN_AVAILABLE_NETWORK_LIST = std::ptr::null_mut();
+    if WlanGetAvailableNetworkList(client, guid, 0, None, &mut list) != 0 || list.is_null() { return; }
+    let count = (*list).dwNumberOfItems as usize;
+    for network in std::slice::from_raw_parts((*list).Network.as_ptr(), count) {
+        let ssid = ssid_text(&network.dot11Ssid.ucSSID, network.dot11Ssid.uSSIDLength);
+        if ssid.is_empty() { continue; }
+        let item = out.entry(ssid.clone()).or_insert(WifiNetwork { ssid, signal: 0, connected: false, secure: false, profile: false });
+        item.signal = item.signal.max(network.wlanSignalQuality);
+        item.connected |= network.dwFlags & WLAN_AVAILABLE_NETWORK_CONNECTED != 0;
+        item.secure |= network.bSecurityEnabled.as_bool();
+        item.profile |= network.dwFlags & WLAN_AVAILABLE_NETWORK_HAS_PROFILE != 0;
+    }
+    WlanFreeMemory(list as *const _);
+}
+
 pub fn wifi_networks() -> Vec<WifiNetwork> {
     let mut out: HashMap<String, WifiNetwork> = HashMap::new();
     unsafe {
@@ -493,38 +510,24 @@ pub fn wifi_networks() -> Vec<WifiNetwork> {
         let mut interfaces: *mut WLAN_INTERFACE_INFO_LIST = std::ptr::null_mut();
         if WlanEnumInterfaces(client, None, &mut interfaces) == 0 && !interfaces.is_null() {
             let count = (*interfaces).dwNumberOfItems as usize;
-            for interface in std::slice::from_raw_parts((*interfaces).InterfaceInfo.as_ptr(), count) {
-                let _ = WlanScan(client, &interface.InterfaceGuid, None, None, None);
-                let mut list: *mut WLAN_AVAILABLE_NETWORK_LIST = std::ptr::null_mut();
-                if WlanGetAvailableNetworkList(client, &interface.InterfaceGuid, 0, None, &mut list) == 0 && !list.is_null() {
-                    let count = (*list).dwNumberOfItems as usize;
-                    for network in std::slice::from_raw_parts((*list).Network.as_ptr(), count) {
-                        let ssid = ssid_text(&network.dot11Ssid.ucSSID, network.dot11Ssid.uSSIDLength);
-                        if ssid.is_empty() { continue; }
-                        let item = out.entry(ssid.clone()).or_insert(WifiNetwork {
-                            ssid,
-                            signal: 0,
-                            connected: false,
-                            secure: false,
-                            profile: false,
-                        });
-                        item.signal = item.signal.max(network.wlanSignalQuality);
-                        item.connected |= network.dwFlags & WLAN_AVAILABLE_NETWORK_CONNECTED != 0;
-                        item.secure |= network.bSecurityEnabled.as_bool();
-                        item.profile |= network.dwFlags & WLAN_AVAILABLE_NETWORK_HAS_PROFILE != 0;
-                    }
-                    WlanFreeMemory(list as *const _);
-                }
-            }
+            let guids: Vec<_> = std::slice::from_raw_parts((*interfaces).InterfaceInfo.as_ptr(), count).iter().map(|i| i.InterfaceGuid).collect();
             WlanFreeMemory(interfaces as *const _);
+            // 1) Resultados en caché (lo que Windows ya vio). 2) Nuevo escaneo.
+            // 3) Lecturas durante ~3 s: mientras escanea, Windows vacía la lista y
+            //    leerla una sola vez justo después de WlanScan devolvía 0-1 redes.
+            for guid in &guids { collect_networks(client, guid, &mut out); }
+            for guid in &guids { let _ = WlanScan(client, guid, None, None, None); }
+            for _ in 0..6 {
+                std::thread::sleep(Duration::from_millis(500));
+                for guid in &guids { collect_networks(client, guid, &mut out); }
+            }
         }
         WlanCloseHandle(client, None);
     }
     let mut values: Vec<_> = out.into_values().collect();
-    values.sort_by(|a, b| b.signal.cmp(&a.signal).then_with(|| a.ssid.cmp(&b.ssid)));
+    values.sort_by(|a, b| b.connected.cmp(&a.connected).then_with(|| b.signal.cmp(&a.signal)).then_with(|| a.ssid.cmp(&b.ssid)));
     values
 }
-
 fn ssid_text(bytes: &[u8; 32], len: u32) -> String {
     String::from_utf8_lossy(&bytes[..(len as usize).min(32)]).trim().to_string()
 }
@@ -787,7 +790,7 @@ pub async fn command_user_info() -> UserInfo {
 
 #[tauri::command]
 pub async fn command_wifi_networks() -> Vec<WifiNetwork> {
-    blocking_with_timeout(Duration::from_secs(4), wifi_networks).await.unwrap_or_default()
+    blocking_with_timeout(Duration::from_secs(6), wifi_networks).await.unwrap_or_default()
 }
 
 #[tauri::command]
