@@ -152,10 +152,12 @@ fn glass_changed(settings: &Settings) -> bool {
     glass_state().lock().unwrap().as_ref() != Some(&(mode, tint))
 }
 
-/// Barra en modo vidrio («none»): desenfoque real debajo (ventanas auxiliares de `backdrop`);
+/// Barra de vidrio: desenfoque real debajo (ventanas auxiliares de `backdrop`);
 /// la ventana de la barra queda 100 % transparente y sin efectos de Windows.
 fn apply_glass_mode(window: &WebviewWindow, mode: &str, _tint: &str) {
-    crate::backdrop::set_enabled(window.app_handle(), "topbar", mode == "none");
+    // Liquid glass en todos los modos de la barra (también «auto»): siempre desenfoque debajo.
+    let _ = mode;
+    crate::backdrop::set_enabled(window.app_handle(), "topbar", true);
 }
 
 fn set_owner(app: &AppHandle, enabled: bool) {

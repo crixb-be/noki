@@ -10,6 +10,7 @@ import Mascot from "./Mascot.jsx";
 import { THEMES, THEME_CHOICES, resolveTheme } from "../lib/themes.js";
 import NokiLogo from "./NokiLogo.jsx";
 import { APP_ICONS } from "../lib/icons.js";
+import { MACDOCK_GLASS, glassVars, useGlassDark } from "../lib/glass.js";
 
 /** Datos del desarrollador (apartado «Desarrollador»). */
 const DEV = {
@@ -559,6 +560,54 @@ function ShareAppearance({ a, ap }) {
   );
 }
 
+const GLASS_SURFACES = [["dock", "Dock"], ["bar", "Barra superior"], ["panels", "Paneles"], ["launcher", "Lanzador"]];
+const BLUR_PX = { low: 8, medium: 16, high: 28 };
+
+/** «Vidrio y colores»: modo y ajustes por superficie, con vista previa en vivo. */
+function GlassSettings({ glass, onChange }) {
+  const [tab, setTab] = useState("panels");
+  const cfg = { ...MACDOCK_GLASS[tab], ...(glass?.[tab] ?? {}) };
+  const dark = useGlassDark(glass?.mode ?? "light");
+  const set = (patch) => onChange({ [tab]: patch });
+  const vars = glassVars(cfg, dark);
+  return (
+    <div className={`${CARD} px-4 py-3`}>
+      <div className="mb-2 flex items-center justify-between gap-3">
+        <div>
+          <div className="text-[15px] font-medium text-white">Vidrio y colores</div>
+          <div className="text-[13px] text-white/45">Desenfoque real del escritorio en el Dock, la barra superior, los paneles y el lanzador. Los cambios se ven al instante.</div>
+        </div>
+        <button type="button" onClick={() => onChange(MACDOCK_GLASS)} className="shrink-0 rounded-lg bg-white/10 px-3 py-1.5 text-[13px] text-white hover:bg-white/15">Restablecer valores de MacDock</button>
+      </div>
+      <Row grouped title="Modo" hint="Automático sigue al tema claro u oscuro de Windows.">
+        <Select value={glass?.mode ?? "light"} onChange={(v) => onChange({ mode: v })} options={[["light", "Claro (día)"], ["dark", "Oscuro (noche)"], ["auto", "Automático (sigue a Windows)"]]} />
+      </Row>
+      <div className="my-2 flex gap-1.5">
+        {GLASS_SURFACES.map(([id, label]) => (
+          <button key={id} type="button" onClick={() => setTab(id)} className={`rounded-full px-3 py-1 text-[13px] ${tab === id ? "bg-white text-black" : "bg-white/10 text-white/80 hover:bg-white/15"}`}>{label}</button>
+        ))}
+      </div>
+        {/* Vista previa: dentro de Ajustes no hay desenfoque nativo, así que se simula con backdrop-filter. */}
+        <div className="relative mb-2 h-[150px] w-full overflow-hidden rounded-xl" style={{ background: "linear-gradient(135deg,#ff9a3c 0%,#e8487a 35%,#5b6cff 70%,#22c3a6 100%)" }}>
+          <div className="absolute left-[18%] top-5 h-16 w-16 rounded-full bg-white/80" />
+          <div className="absolute bottom-4 right-[18%] h-10 w-28 rounded-lg bg-black/60" />
+          <div className="absolute left-1/2 top-1/2 w-[230px] -translate-x-1/2 -translate-y-1/2 p-3 text-white" style={{ ...vars, borderRadius: vars["--glass-radius"], background: `linear-gradient(to bottom, ${vars["--glass-sheen"]}, rgba(255,255,255,0) 33%), ${vars["--glass-tint"]}, rgba(${dark ? "40,42,50" : "90,90,96"},.35)`, border: `1px solid ${vars["--glass-rim"]}`, borderTopColor: vars["--glass-rim-top"], boxShadow: vars["--glass-shadow"], backdropFilter: `blur(${BLUR_PX[cfg.blur] ?? 16}px) saturate(140%)` }}>
+            <div className="flex items-center justify-between text-[13px] font-semibold">Wi-Fi<span className="h-4 w-7 rounded-full bg-[#34C759]" /></div>
+            <div className="mt-1 text-[11px] text-white/60">Conectado</div>
+            <div className="mt-2 rounded-[10px] bg-white/15 px-2 py-1 text-[12px]">✓ Mi red</div>
+          </div>
+        </div>
+      <div>
+        <Row grouped title="Opacidad del tinte"><Slider value={cfg.tintOpacity} min={0} max={100} unit=" %" onChange={(v) => set({ tintOpacity: v })} /></Row>
+        <Row grouped title="Intensidad del desenfoque"><Select value={cfg.blur} onChange={(v) => set({ blur: v })} options={[["low", "Bajo"], ["medium", "Medio"], ["high", "Alto"]]} /></Row>
+        <Row grouped title="Radio de esquinas"><Slider value={cfg.radius} min={0} max={40} unit=" px" onChange={(v) => set({ radius: v })} /></Row>
+        <Row grouped title="Borde brillante"><Toggle checked={cfg.rim} onChange={(v) => set({ rim: v })} /></Row>
+        <Row grouped title="Sombra"><Toggle checked={cfg.shadow} onChange={(v) => set({ shadow: v })} /></Row>
+      </div>
+    </div>
+  );
+}
+
 function Appearance({ s, set }) {
   const a = s.appearance;
   const ap = (patch) => set({ appearance: patch });
@@ -575,6 +624,7 @@ function Appearance({ s, set }) {
       <Row title="Estilo de paneles" hint="Lanzador, buscador y paneles de la barra superior (Wi-Fi, Bluetooth, batería, centro de control, usuario).">
         <Select value={a.panelStyle ?? "light"} onChange={(v) => ap({ panelStyle: v })} options={[["light", "Claro difuminado (macOS)"], ["dark", "Oscuro"]]} />
       </Row>
+      <GlassSettings glass={a.glass ?? MACDOCK_GLASS} onChange={(patch) => ap({ glass: patch })} />
       <Row title="Personaje en el notch" hint="Una carita que parpadea, te mira y reacciona: se alegra al terminar tareas, hábitos o un Pomodoro, baila con la música y se adormece de noche.">
         <Toggle checked={a.mascot} onChange={(v) => ap({ mascot: v })} />
       </Row>

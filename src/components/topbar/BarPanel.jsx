@@ -3,7 +3,7 @@ import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import { BatteryIcon, BluetoothIcon, ControlCenterIcon, SpeakerIcon, WifiIcon } from "./SymbolIcons.jsx";
 import { useSettings } from "../../hooks/useSettings.js";
-import { GLASS_RADIUS, useGlassShape } from "../../lib/glass.js";
+import { useGlass, useGlassShape } from "../../lib/glass.js";
 
 const action = (uri) => invoke("command_open_system_uri", { uri }).catch(() => {});
 const Switch = ({ checked, onChange }) => <button type="button" role="switch" aria-checked={checked} onClick={() => onChange(!checked)} className={`panel-switch ${checked ? "on" : ""}`}><span /></button>;
@@ -69,7 +69,8 @@ export default function BarPanel() {
     return () => observer.disconnect();
   }, [kind, openCount]);
 
-  useGlassShape(ref, GLASS_RADIUS.panel, [kind, openCount]);
+  const glass = useGlass(settings, "panels");
+  useGlassShape(ref, glass, [kind, openCount]);
   if (!kind) return null;
   const panelDark = settings?.topbar?.tint === "dark" || (settings?.topbar?.tint !== "light" && window.matchMedia?.("(prefers-color-scheme: dark)").matches !== false);
   return <div ref={ref} className={`bar-panel noki-popup-card ${panelDark ? "bar-panel-dark" : "bar-panel-light"}`} onMouseDown={(e) => e.stopPropagation()}><div ref={body} className="bar-panel-body">

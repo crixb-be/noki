@@ -36,5 +36,8 @@ export function BarPaint({ settings, tint }) {
         : a.barMode === "auto" ? rgba(tint ?? a.notchColor, a.barOpacity)
           : a.barMode === "color" ? rgba(a.barColor, a.barOpacity)
             : fillFor({ color: a.barColor, opacity: a.barOpacity, image, dim: a.barDim });
-  return <div className="topbar-paint" style={{ background: fill }} aria-hidden="true">{theme && <StripDecor theme={theme} height={settings?.topbar?.height ?? 30} />}</div>;
+  // Liquid glass en todos los modos: el desenfoque real lo pone backdrop.rs y el tinte, el brillo y
+  // el borde los dibuja CSS (.topbar-glass). Los temas solo añaden su decoración.
+  void fill;
+  return <div className="topbar-paint topbar-glass" aria-hidden="true">{theme && <StripDecor theme={theme} height={settings?.topbar?.height ?? 30} />}</div>;
 }

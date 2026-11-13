@@ -43,6 +43,9 @@ struct Entry {
     /// Último rectángulo físico y radio colocados (para no recolocar si nada cambió).
     placed: Option<(RECT, i32)>,
     shown: bool,
+    /// Tinte (ABGR) que deben tener las piezas y el que tienen aplicado.
+    tint: u32,
+    applied_tint: u32,
 }
 
 static ENTRIES: OnceLock<Mutex<HashMap<String, Entry>>> = OnceLock::new();
@@ -98,9 +101,15 @@ fn create_piece(tint: u32) -> Option<isize> {
     }
 }
 
-/// Tinte del acrílico de las piezas (ABGR): oscuro y translúcido, como el material de macOS; así el
-/// texto blanco se lee también sobre fondos claros. El tinte suave, el brillo y el borde los pinta el CSS.
-const PIECE_TINT: u32 = 0x60_4C_48_46;
+/// Tinte del acrílico de las piezas (ABGR): gris translúcido, como el material de macOS; así el texto
+/// blanco se lee también sobre fondos claros. El tinte suave, el brillo y el borde los pinta el CSS.
+/// Windows no deja cambiar el radio real del acrílico: la «intensidad» se emula con el alfa del tinte
+/// (más alfa = más esmerilado). Modo oscuro: color más oscuro y algo más de alfa.
+pub fn piece_tint(dark: bool, blur: &str) -> u32 {
+    let alpha: u32 = match blur { "low" => 0x40, "high" => 0x90, _ => 0x60 } + if dark { 0x20 } else { 0 };
+    let bgr: u32 = if dark { 0x28_20_1E } else { 0x4C_48_46 };
+    (alpha.min(0xFF) << 24) | bgr
+}
 
 /// Rectángulos (físicos) que cubren la forma redondeada sin salirse de ella.
 fn pieces_for(rect: RECT, r: i32) -> Vec<RECT> {
@@ -155,15 +164,20 @@ fn apply<R: Runtime>(window: &WebviewWindow<R>, label: &str) {
         }
         return;
     };
-    if entry.shown && entry.placed == Some((rect, radius)) {
+    if entry.shown && entry.placed == Some((rect, radius)) && entry.applied_tint == entry.tint {
         // Solo reafirmar el orden: justo debajo de la ventana visible.
         for &p in &entry.pieces { unsafe { let _ = SetWindowPos(HWND(p as *mut _), Some(owner), 0, 0, 0, 0, SWP_NOACTIVATE | SWP_NOMOVE | SWP_NOSIZE); } }
         return;
     }
+    if entry.applied_tint != entry.tint {
+        for &p in &entry.pieces { crate::window_utils::set_acrylic(HWND(p as *mut _), entry.tint); }
+        entry.applied_tint = entry.tint;
+    }
     let rects = pieces_for(rect, radius);
     while entry.pieces.len() < rects.len() {
-        let Some(p) = create_piece(PIECE_TINT) else { return };
+        let Some(p) = create_piece(entry.tint) else { return };
         entry.pieces.push(p);
+        entry.applied_tint = entry.tint;
     }
     for (i, &p) in entry.pieces.iter().enumerate() {
         let h = HWND(p as *mut _);
@@ -200,14 +214,16 @@ pub fn set_enabled<R: Runtime>(app: &AppHandle<R>, label: &str, enabled: bool) {
 
 /// La vista informa de su forma de vidrio (px lógicos relativos a su ventana).
 #[tauri::command]
-pub fn glass_shape(window: WebviewWindow, x: f64, y: f64, w: f64, h: f64, radius: f64) {
+pub fn glass_shape(window: WebviewWindow, x: f64, y: f64, w: f64, h: f64, radius: f64, dark: Option<bool>, blur: Option<String>) {
     let label = window.label().to_string();
     let shape = Shape { x, y, w, h, radius };
     {
         let mut map = entries().lock().unwrap();
         let entry = map.entry(label.clone()).or_insert_with(|| Entry { enabled: true, ..Default::default() });
-        if entry.shape == Some(shape) && entry.shown { return; }
+        let tint = piece_tint(dark.unwrap_or(false), blur.as_deref().unwrap_or("medium"));
+        if entry.shape == Some(shape) && entry.tint == tint && entry.shown { return; }
         entry.shape = Some(shape);
+        entry.tint = tint;
     }
     let w = window.clone();
     let _ = window.run_on_main_thread(move || apply(&w, &label));

@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
 
 import { useSettings } from "../../hooks/useSettings.js";
-import { GLASS_RADIUS, useGlassShape } from "../../lib/glass.js";
+import { useGlass, useGlassShape } from "../../lib/glass.js";
 
 export default function Spotlight() {
   const { settings } = useSettings();
@@ -13,7 +13,8 @@ export default function Spotlight() {
   const [selected, setSelected] = useState(0);
   const input = useRef(null);
   const card = useRef(null);
-  useGlassShape(card, GLASS_RADIUS.panel);
+  const glass = useGlass(settings, "panels");
+  useGlassShape(card, glass);
   const requestId = useRef(0);
   useEffect(() => {
     input.current?.focus();

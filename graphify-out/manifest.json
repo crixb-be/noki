@@ -115,8 +115,8 @@
     "semantic_hash": "406005053b7709743710a7e713374502"
   },
   "src-tauri/src/lib.rs": {
-    "mtime": 1794548004.8207767,
-    "seen": 1794548294.4283786,
+    "mtime": 1794549721.8299015,
+    "seen": 1794550048.0527737,
     "ast_hash": "063f2f62348ca2e9b5e8ea4a4395f1c9",
     "semantic_hash": ""
   },
@@ -157,9 +157,9 @@
     "semantic_hash": "8d07b8147c16c5e4b3f35683193c6334"
   },
   "src-tauri/src/settings.rs": {
-    "mtime": 1794545890.463002,
-    "seen": 1794546995.5394926,
-    "ast_hash": "1b35dda2b960ecdd2d7b000c32744473",
+    "mtime": 1794549735.1417398,
+    "seen": 1794550048.0527816,
+    "ast_hash": "8433fb7554ae5f00a9552d32e38463c4",
     "semantic_hash": ""
   },
   "src-tauri/src/statuswatch.rs": {
@@ -319,9 +319,9 @@
     "semantic_hash": "261138c2c77f7b7f212e64b65a05c7e8"
   },
   "src/components/SettingsWindow.jsx": {
-    "mtime": 1794545907.4531505,
-    "seen": 1794546995.539519,
-    "ast_hash": "66caec9a441a1f8e07bdc1f0dea5e2b7",
+    "mtime": 1794549950.2359402,
+    "seen": 1794550048.052807,
+    "ast_hash": "8c7b5af48153b0bf7ac775ba4fb8f419",
     "semantic_hash": ""
   },
   "src/components/SystemView.jsx": {
@@ -457,8 +457,8 @@
     "semantic_hash": "ff56ccd66393635d3ddc2d3ddcb5f504"
   },
   "src/hooks/useSettings.js": {
-    "mtime": 1794524488.5611196,
-    "seen": 1794525563.4863336,
+    "mtime": 1794549721.8339014,
+    "seen": 1794550048.0528333,
     "ast_hash": "cdc850b770256b656ba7fad578e198d0",
     "semantic_hash": ""
   },
@@ -493,9 +493,9 @@
     "semantic_hash": "58cf5ed43d617a1ab2211df85d4a0262"
   },
   "src/lib/en.js": {
-    "mtime": 1794545914.4224594,
-    "seen": 1794546995.539551,
-    "ast_hash": "c860186e26312584a1096b025cb29911",
+    "mtime": 1794549867.6488292,
+    "seen": 1794550048.0528383,
+    "ast_hash": "b4c66de7a17961294941335efb3c167a",
     "semantic_hash": ""
   },
   "src/lib/i18n.js": {
@@ -589,27 +589,27 @@
     "semantic_hash": ""
   },
   "src-tauri/src/topbar.rs": {
-    "mtime": 1794548004.8178904,
-    "seen": 1794548294.4283922,
-    "ast_hash": "9223daf9cb9c307daa7aa49a38d8d901",
+    "mtime": 1794549754.36359,
+    "seen": 1794550048.0527868,
+    "ast_hash": "c8ca749af23389bf112af536ba7fa3c0",
     "semantic_hash": ""
   },
   "src/components/dock/Dock.jsx": {
-    "mtime": 1794548067.5916178,
-    "seen": 1794548294.4284177,
-    "ast_hash": "92dd3e3346ce3a9b7e8d069696bbd93a",
+    "mtime": 1794549799.15273,
+    "seen": 1794550048.052811,
+    "ast_hash": "c34125c7c3a681564489041a0b3336cd",
     "semantic_hash": ""
   },
   "src/components/launchpad/Launchpad.jsx": {
-    "mtime": 1794548067.5932398,
-    "seen": 1794548294.428419,
-    "ast_hash": "d892d0d7cb5609f8c27356f304232051",
+    "mtime": 1794549799.154239,
+    "seen": 1794550048.052812,
+    "ast_hash": "08846b5c0f55ab5458563c044e715bb0",
     "semantic_hash": ""
   },
   "src/components/topbar/BarPanel.jsx": {
-    "mtime": 1794548067.5916178,
-    "seen": 1794548294.4284275,
-    "ast_hash": "30c10ae46835b37218906b7028a1ef7f",
+    "mtime": 1794549799.15273,
+    "seen": 1794550048.05282,
+    "ast_hash": "175b8aefc6afb70ee7b17c76fa7100ca",
     "semantic_hash": ""
   },
   "src/components/topbar/SymbolIcons.jsx": {
@@ -619,9 +619,9 @@
     "semantic_hash": ""
   },
   "src/components/topbar/TopBar.jsx": {
-    "mtime": 1794548077.9268281,
-    "seen": 1794548294.4284294,
-    "ast_hash": "53a1ad0648aa5e80c6bfb5a4e33e7681",
+    "mtime": 1794549830.447551,
+    "seen": 1794550048.0528219,
+    "ast_hash": "730504f7e943edff916cb05790d80ad7",
     "semantic_hash": ""
   },
   ".github/ISSUE_TEMPLATE/bug_report.md": {
@@ -1207,15 +1207,15 @@
     "semantic_hash": ""
   },
   "src/components/spotlight/Spotlight.jsx": {
-    "mtime": 1794548067.5932398,
-    "seen": 1794548294.4284265,
-    "ast_hash": "54a7f54d258932c8b628a2d0d876b4fc",
+    "mtime": 1794549799.154239,
+    "seen": 1794550048.0528188,
+    "ast_hash": "0a300a8771cec8e5ba90d8e5b8e62f93",
     "semantic_hash": ""
   },
   "src/components/topbar/barPaint.jsx": {
-    "mtime": 1794522538.7561805,
-    "seen": 1794522552.2034078,
-    "ast_hash": "29cd7cd25ed19ea9329e0724e1370819",
+    "mtime": 1794549813.708256,
+    "seen": 1794550048.0528226,
+    "ast_hash": "cdad472e15a318d7dc59ba1a502d7fc8",
     "semantic_hash": ""
   },
   "Capturas/macdock-barra.png": {
@@ -1297,15 +1297,15 @@
     "semantic_hash": ""
   },
   "src-tauri/src/backdrop.rs": {
-    "mtime": 1794548733.7097387,
-    "seen": 1794548816.029743,
-    "ast_hash": "af8ceeb112837bc1f2e95c8243aca1bf",
+    "mtime": 1794549754.361587,
+    "seen": 1794550048.0527623,
+    "ast_hash": "279d6f52b7a672e733e0b3b348acc4c5",
     "semantic_hash": ""
   },
   "src/lib/glass.js": {
-    "mtime": 1794548056.7561421,
-    "seen": 1794548294.4284472,
-    "ast_hash": "07865db440c34d295444de56769e1a66",
+    "mtime": 1794549790.2701287,
+    "seen": 1794550048.0528395,
+    "ast_hash": "99d0b33f26ded6f576208b74f55ba621",
     "semantic_hash": ""
   },
   "package-lock.json": {

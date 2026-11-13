@@ -1,7 +1,7 @@
 import { memo, useEffect, useMemo, useRef, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { useSettings } from "../../hooks/useSettings.js";
-import { GLASS_RADIUS, useGlassShape } from "../../lib/glass.js";
+import { useGlass, useGlassShape } from "../../lib/glass.js";
 import { isEn, presetLanguage, useLanguage } from "../../lib/i18n.js";
 
 const CATEGORIES = ["Todas", "Productividad y finanzas", "Creatividad", "Utilidades", "Información y lectura", "Juegos", "Entretenimiento", "Social"];
@@ -68,7 +68,8 @@ export default function Launchpad() {
   const [category, setCategory] = useState("Todas");
   const [sort, setSort] = useState("az");
   const card = useRef(null);
-  useGlassShape(card, GLASS_RADIUS.launcher);
+  const glass = useGlass(settings, "launcher");
+  useGlassShape(card, glass);
 
   presetLanguage(settings?.general?.language);
   useLanguage(settings?.general?.language);

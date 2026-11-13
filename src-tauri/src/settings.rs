@@ -51,6 +51,57 @@ impl Default for General {
     }
 }
 
+/// Una superficie de vidrio (Dock, barra superior, paneles o lanzador).
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq)]
+#[serde(default, rename_all = "camelCase")]
+pub struct GlassSurface {
+    /// Opacidad del tinte en porcentaje (0-100).
+    pub tint_opacity: i32,
+    /// Intensidad del desenfoque: "low" | "medium" | "high".
+    pub blur: String,
+    /// Radio de las esquinas en px lógicos.
+    pub radius: i32,
+    /// Borde brillante de 1 px.
+    pub rim: bool,
+    /// Sombra suave bajo la forma.
+    pub shadow: bool,
+}
+
+impl GlassSurface {
+    pub fn macdock(radius: i32) -> Self { Self { tint_opacity: 14, blur: "medium".into(), radius, rim: true, shadow: false } }
+    fn clamp(&mut self) {
+        self.tint_opacity = self.tint_opacity.clamp(0, 100);
+        self.radius = self.radius.clamp(0, 40);
+        if !matches!(self.blur.as_str(), "low" | "medium" | "high") { self.blur = "medium".into(); }
+    }
+}
+
+impl Default for GlassSurface { fn default() -> Self { Self::macdock(18) } }
+
+/// «Vidrio y colores» (Ajustes > Apariencia). Por defecto, los valores de MacDock.
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq)]
+#[serde(default, rename_all = "camelCase")]
+pub struct Glass {
+    /// "light" (día) | "dark" (noche) | "auto" (sigue a Windows).
+    pub mode: String,
+    pub dock: GlassSurface,
+    pub bar: GlassSurface,
+    pub panels: GlassSurface,
+    pub launcher: GlassSurface,
+}
+
+impl Default for Glass {
+    fn default() -> Self {
+        Self { mode: "light".into(), dock: GlassSurface::macdock(20), bar: GlassSurface::macdock(0), panels: GlassSurface::macdock(18), launcher: GlassSurface::macdock(24) }
+    }
+}
+
+impl Glass {
+    pub fn clamp(&mut self) {
+        if !matches!(self.mode.as_str(), "light" | "dark" | "auto") { self.mode = "light".into(); }
+        for s in [&mut self.dock, &mut self.bar, &mut self.panels, &mut self.launcher] { s.clamp(); }
+    }
+}
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq)]
 #[serde(default, rename_all = "camelCase")]
 pub struct Appearance {
@@ -104,6 +155,8 @@ pub struct Appearance {
     pub bar_theme_opacity: i32,
     /// Estilo de los paneles (Launchpad, paneles de la barra, buscador): «light» = vidrio claro difuminado (macOS), «dark» = oscuro opaco.
     pub panel_style: String,
+    /// Vidrio y colores (modo y ajustes por superficie).
+    pub glass: Glass,
     /// Cumpleaños de quien usa Noki, "MM-DD" (vacío si no se indica). Solo se usa en este equipo.
     pub birthday: String,
     /// Fechas propias que activan un tema (p. ej. un aniversario) además de las de siempre.
@@ -262,6 +315,7 @@ impl Default for Appearance {
             notch_theme_opacity: 100,
             bar_theme_opacity: 90,
             panel_style: "light".into(),
+            glass: Glass::default(),
             birthday: String::new(),
             birth_year: 0,
             theme_events: Vec::new(),
@@ -682,6 +736,7 @@ impl Settings {
         a.notch_theme_opacity = a.notch_theme_opacity.clamp(20, 100);
         a.bar_theme_opacity = a.bar_theme_opacity.clamp(0, 100);
         if a.panel_style != "light" && a.panel_style != "dark" { a.panel_style = "light".into(); }
+        a.glass.clamp();
         for t in [&mut a.mascot_theme, &mut a.notch_theme, &mut a.bar_theme] {
             if !["auto", "none", "halloween", "christmas", "birthday", "love"].contains(&t.as_str()) {
                 *t = "auto".into();

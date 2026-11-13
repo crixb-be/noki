@@ -5,7 +5,7 @@ import { useSettings } from "../../hooks/useSettings.js";
 import { isEn, presetLanguage, useLanguage } from "../../lib/i18n.js";
 import { BatteryIcon, BellIcon, BluetoothIcon, CameraIcon, ControlCenterIcon, RecordIcon, SearchIcon, SpeakerIcon, WifiIcon } from "./SymbolIcons.jsx";
 import { BarPaint, useBarPaint } from "./barPaint.jsx";
-import { GLASS_RADIUS, useGlassShape } from "../../lib/glass.js";
+import { useGlass, useGlassShape } from "../../lib/glass.js";
 
 function Item({ title, onClick, children, className = "" }) {
   return <button type="button" title={title} aria-label={title} onClick={onClick} className={`topbar-item ${className}`}>{children}</button>;
@@ -23,14 +23,14 @@ export default function TopBar() {
   const { settings } = useSettings();
   const shell = useRef(null);
   // Desenfoque real debajo de la barra (solo en modo vidrio; el backend decide si se muestra).
-  useGlassShape(shell, GLASS_RADIUS.bar);
+  const glass = useGlass(settings, "bar");
+  useGlassShape(shell, glass);
   const [now, setNow] = useState(() => new Date());
   const [avatar, setAvatar] = useState(null);
   const [battery, setBattery] = useState(null);
   const [wifi, setWifi] = useState({ level: 3, off: false });
   const [bt, setBt] = useState([]);
   const [user, setUser] = useState({ displayName: "Usuario" });
-  const [darkSystem, setDarkSystem] = useState(false);
   const [stats, setStats] = useState(null);
   const t = settings?.topbar ?? {};
   const paint = useBarPaint(settings);
@@ -56,11 +56,11 @@ export default function TopBar() {
       }).catch(() => {});
     }, 0);
     listen("avatar-changed", (event) => setAvatar(event.payload || null)).then((fn) => { stop = fn; });
-    setDarkSystem(window.matchMedia?.("(prefers-color-scheme: dark)").matches ?? true);
     return () => { clearTimeout(timer); stop?.(); };
   }, [settings?.topbar?.avatarPath]);
 
-  const dark = t.tint === "dark" || (t.tint === "auto" && darkSystem);
+  // Sobre el vidrio gris el texto va siempre en blanco (como en macOS).
+  const dark = true;
   const open = (kind, event) => invoke("command_open_bar_panel", { kind, anchorX: Math.round(event.currentTarget.getBoundingClientRect().left + event.currentTarget.offsetWidth / 2) }).catch(() => {});
   const initials = (user.displayName || "U").trim().slice(0, 1).toUpperCase();
   const batteryPct = battery?.level ?? 100;
