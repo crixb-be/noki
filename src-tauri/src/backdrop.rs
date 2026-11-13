@@ -208,11 +208,13 @@ fn apply<R: Runtime>(window: &WebviewWindow<R>, label: &str) {
             (true, Some(s)) if s.w > 1.0 && s.h > 1.0 => {
                 let mut win = RECT::default();
                 if unsafe { GetWindowRect(owner, &mut win) }.is_err() { None } else {
+                    // Nunca fuera de su ventana: el redondeo a píxeles físicos (125 %) podía dar 1 px de
+                    // más y el acrílico asomaba como una línea clara bajo la barra.
                     let rect = RECT {
-                        left: win.left + (s.x * scale).round() as i32,
-                        top: win.top + (s.y * scale).round() as i32,
-                        right: win.left + ((s.x + s.w) * scale).round() as i32,
-                        bottom: win.top + ((s.y + s.h) * scale).round() as i32,
+                        left: (win.left + (s.x * scale).round() as i32).max(win.left),
+                        top: (win.top + (s.y * scale).round() as i32).max(win.top),
+                        right: (win.left + ((s.x + s.w) * scale).round() as i32).min(win.right),
+                        bottom: (win.top + ((s.y + s.h) * scale).round() as i32).min(win.bottom),
                     };
                     Some((rect, (s.radius * scale).round() as i32))
                 }
