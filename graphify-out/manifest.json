@@ -583,8 +583,8 @@
     "semantic_hash": ""
   },
   "src-tauri/src/launchpad.rs": {
-    "mtime": 1794538003.4089074,
-    "seen": 1794538250.559301,
+    "mtime": 1794542541.7318592,
+    "seen": 1794542599.7715368,
     "ast_hash": "3887b703747f6baa9b566805ad196bd2",
     "semantic_hash": ""
   },
@@ -601,9 +601,9 @@
     "semantic_hash": ""
   },
   "src/components/launchpad/Launchpad.jsx": {
-    "mtime": 1794538094.0879524,
-    "seen": 1794538250.5593407,
-    "ast_hash": "577c10ad604d455b55a14656c63e8b8b",
+    "mtime": 1794542531.931792,
+    "seen": 1794542599.7715795,
+    "ast_hash": "68d641ce563d6d8d69ca01a0b64cf41f",
     "semantic_hash": ""
   },
   "src/components/topbar/BarPanel.jsx": {
