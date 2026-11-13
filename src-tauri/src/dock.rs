@@ -581,6 +581,11 @@ pub fn start(app: AppHandle) {
                     unsafe { let _ = SetWindowPos(h, Some(HWND_TOPMOST), 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE | SWP_ASYNCWINDOWPOS); }
                 }
             }
+            // El cursor sale del área de clic: la ventana pasa a click-through y WebView2 ya no recibe
+            // `mouseleave`, así que se avisa a la vista (cierra el menú contextual y la magnificación).
+            if last.is_some_and(|(_, was_inside)| was_inside) && !inside {
+                let _ = window.emit("dock-leave", ());
+            }
             if !periodic && last == Some((should_show, inside)) { continue; }
             last = Some((should_show, inside));
             let w = window.clone();

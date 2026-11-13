@@ -30,6 +30,8 @@ export default function Dock() {
   const reportHit = useRef(null);
   // Tras un recorte de pantalla (Impr Pant, Recortes) el backend pide reiniciar el estado de la vista.
   const recover = useRef(null);
+  const leave = useRef(null);
+  const menuOpenedAt = useRef(0);
 
   const refresh = async () => {
     try { if (!(await getCurrentWindow().isVisible())) return; } catch { /* El navegador de desarrollo no expone visibilidad nativa. */ }
@@ -37,7 +39,7 @@ export default function Dock() {
     invoke("trash_state").then(setTrash).catch(() => {});
   };
   useEffect(() => { refresh(); const timer = setInterval(refresh, 1000); return () => clearInterval(timer); }, []);
-  useEffect(() => { let stops = []; Promise.all([listen("settings-updated", refresh), listen("settings-changed", refresh), listen("dock-windows", (event) => setItems(event.payload ?? [])), listen("dock-recover", () => recover.current?.())]).then((fns) => { stops = fns; }); return () => stops.forEach((stop) => stop()); }, []);
+  useEffect(() => { let stops = []; Promise.all([listen("settings-updated", refresh), listen("settings-changed", refresh), listen("dock-windows", (event) => setItems(event.payload ?? [])), listen("dock-recover", () => recover.current?.()), listen("dock-leave", () => leave.current?.())]).then((fns) => { stops = fns; }); return () => stops.forEach((stop) => stop()); }, []);
   const all = useMemo(() => [ ...(dock.showApps ? [{ key: "apps", name: "Aplicaciones", kind: "apps" }] : []), ...items, ...(dock.showTrash ? [{ key: "trash", name: "Papelera", kind: "trash", running: trash.items > 0 }] : []) ], [dock.showApps, dock.showTrash, items, trash.items]);
   // Lo que necesita el área de clic sin depender del cierre del efecto.
   geometry.current = { lift: dock.magnify ? maxSize - size : 0 };
@@ -171,6 +173,9 @@ export default function Dock() {
     if (first) reportHit.current?.();
     start();
   }  recover.current = () => { resetMagnification(); reportHit.current?.(); refresh(); };
+  // El cursor ha salido del Dock (aviso del backend): cierra el menú y suelta la magnificación.
+  // Se ignora justo al abrir el menú: la ventana crece y el área de clic va un instante desfasada.
+  leave.current = () => { if (performance.now() - menuOpenedAt.current < 400) return; setMenu(null); resetMagnification(); };
   function activate(item) {
     if (item.kind === "apps") return invoke("toggle_launchpad");
     if (item.kind === "trash") return invoke("trash_open");
@@ -183,6 +188,7 @@ export default function Dock() {
     // Encima de la píldora, centrado en el icono; medido desde abajo porque la ventana va a crecer.
     const box = pill.current?.getBoundingClientRect();
     const bottom = box ? window.innerHeight - box.top + MENU_GAP : 80;
+    menuOpenedAt.current = performance.now();
     setMenu({ x: event.clientX, bottom, item });
   }
   const actions = menu ? menuActions(menu.item) : [];
