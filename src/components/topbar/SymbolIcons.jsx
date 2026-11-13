@@ -6,6 +6,11 @@ function Svg({ children, ...props }) {
   return <svg {...base} {...props}>{children}</svg>;
 }
 
+/** «^» de los iconos ocultos de la bandeja (como el botón de la barra de tareas de Windows 11). */
+export function ChevronIcon() {
+  return <Svg><path d="M7 14.5 12 9.5l5 5" /></Svg>;
+}
+
 export function WifiIcon({ level = 3, off = false }) {
   return <Svg><path opacity={off ? 0.35 : level < 1 ? 0.3 : 1} d="M3.5 8.8a14.8 14.8 0 0 1 17 0" /><path opacity={off ? 0.35 : level < 2 ? 0.3 : 1} d="M6.8 12.2a9.6 9.6 0 0 1 10.4 0" /><path opacity={off ? 0.35 : level < 3 ? 0.3 : 1} d="M10 15.5a4.5 4.5 0 0 1 4 0" /><circle cx="12" cy="19" r="1.2" fill="currentColor" stroke="none" />{off && <path d="m4 4 16 16" />}</Svg>;
 }

@@ -1,15 +1,74 @@
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
-import { BatteryIcon, BluetoothIcon, ControlCenterIcon, SpeakerIcon, WifiIcon } from "./SymbolIcons.jsx";
+import { BatteryIcon, BluetoothIcon, SpeakerIcon, WifiIcon } from "./SymbolIcons.jsx";
+import { useMedia } from "../../hooks/useMedia.js";
 import { useSettings } from "../../hooks/useSettings.js";
 import { useGlass, useGlassShape } from "../../lib/glass.js";
 
 const action = (uri) => invoke("command_open_system_uri", { uri }).catch(() => {});
 const Switch = ({ checked, onChange }) => <button type="button" role="switch" aria-checked={checked} onClick={() => onChange(!checked)} className={`panel-switch ${checked ? "on" : ""}`}><span /></button>;
 
-function Tile({ title, subtitle, icon, onClick, active = false }) {
-  return <button type="button" onClick={onClick} className={`control-tile ${active ? "active" : ""}`}><span className="control-tile-icon">{icon}</span><span><strong>{title}</strong><small>{subtitle}</small></span></button>;
+/** Píldora del Centro de control: círculo de icono (blanco con icono azul si está activa) + título y estado. */
+function CcPill({ title, subtitle, icon, onClick, on = false }) {
+  return <button type="button" data-glass onClick={onClick} className={`cc-module cc-pill ${on ? "cc-on" : ""}`}><span className="cc-icon">{icon}</span><span><strong>{title}</strong><small>{subtitle}</small></span></button>;
+}
+
+function CcCircle({ title, icon, onClick }) {
+  return <button type="button" data-glass title={title} aria-label={title} onClick={onClick} className="cc-module cc-circle">{icon}</button>;
+}
+
+/**
+ * Centro de control modular, como Capturas/macdock-centro-control.png: sin contenedor, cada módulo
+ * flota como una píldora o tarjeta de vidrio con su propio desenfoque (`data-glass`).
+ */
+function ControlCenter({ brightness, setBrightness, volume, setVolume }) {
+  const [quick, setQuick] = useState({});
+  const [airplane, setAirplane] = useState(false);
+  const media = useMedia();
+  useEffect(() => { invoke("quick_state").then((s) => setQuick(s ?? {})).catch(() => {}); }, []);
+  const toggle = (kind, value) => { setQuick((q) => ({ ...q, [kind]: value })); invoke("quick_set", { kind, on: value }).catch(() => {}); };
+  const dark = !!quick.dark;
+  const track = media.track ?? {};
+  return <>
+    <div className="cc-grid">
+      <div className="cc-col">
+        <CcPill title="Wi-Fi" subtitle={quick.wifi === false ? "Desactivado" : "Activado"} on={quick.wifi !== false} icon={<WifiIcon level={3} />} onClick={() => toggle("wifi", quick.wifi === false)} />
+        <CcPill title="Bluetooth" subtitle={quick.bluetooth ? "Activado" : "Desactivado"} on={!!quick.bluetooth} icon={<BluetoothIcon />} onClick={() => toggle("bluetooth", !quick.bluetooth)} />
+        <CcPill title="Concentración" subtitle="Ajustes" icon="◐" onClick={() => action("ms-settings:quiethours")} />
+        <CcPill title="Luz nocturna" subtitle="Ajustes" icon="☼" onClick={() => action("ms-settings:nightlight")} />
+        <CcPill title="Ahorro de batería" subtitle="Ajustes" icon="▭" onClick={() => action("ms-settings:batterysaver")} />
+        <CcPill title="Captura" subtitle="Recortar pantalla" icon="⌗" onClick={() => action("ms-screenclip:")} />
+        <CcPill title="Modo oscuro" subtitle={dark ? "Activado" : "Desactivado"} on={dark} icon="◑" onClick={() => { setQuick((q) => ({ ...q, dark: !dark })); invoke("command_toggle_dark", { dark: !dark }).catch(() => {}); }} />
+      </div>
+      <div className="cc-col">
+        <div data-glass className="cc-module cc-media">
+          <div className="cc-media-top">
+            <span className="cc-art" style={track.art ? { backgroundImage: `url(${track.art})` } : undefined} />
+            <span className="cc-media-text"><strong>{media.available && track.title ? track.title : "Sin reproducción"}</strong><small>{media.available ? track.artist || track.source || "" : "Multimedia"}</small></span>
+          </div>
+          <div className="cc-media-controls">
+            <button type="button" aria-label="Anterior" disabled={!media.can?.prev} onClick={() => media.control("prev")}>⏮</button>
+            <button type="button" aria-label={media.playing ? "Pausar" : "Reproducir"} disabled={!media.available} onClick={() => media.control("toggle")}>{media.playing ? "⏸" : "▶"}</button>
+            <button type="button" aria-label="Siguiente" disabled={!media.can?.next} onClick={() => media.control("next")}>⏭</button>
+          </div>
+        </div>
+        <div className="cc-row"><CcCircle title="Configuración" icon="⚙" onClick={() => action("ms-settings:")} /><CcCircle title="Notificaciones" icon="🔔" onClick={() => action("ms-actioncenter:")} /></div>
+        <div className="cc-row"><CcCircle title="Bloquear" icon="🔒" onClick={() => invoke("command_lock_user").catch(() => {})} /><CcCircle title="Administrador de tareas" icon="▤" onClick={() => invoke("command_open_task_manager").catch(() => {})} /></div>
+        <CcPill title="Proyectar" subtitle="Pantallas" icon="▣" onClick={() => action("ms-settings-displays-topology:projection")} />
+        <CcPill title="Modo avión" subtitle={airplane ? "Activado" : "Desactivado"} on={airplane} icon="✈" onClick={() => { setAirplane(!airplane); invoke("command_toggle_airplane", { on: !airplane }).catch(() => {}); }} />
+        <CcPill title="Grabar" subtitle="Pantalla" icon="●" onClick={() => invoke("command_send_keys", { combo: "record" }).catch(() => {})} />
+      </div>
+    </div>
+    <div data-glass className="cc-module cc-slider">
+      <span>Pantalla</span>
+      <div className="cc-slider-row"><span>☀</span><input className="cc-range" type="range" min="0" max="100" value={brightness} style={{ "--v": `${brightness}%` }} onChange={(e) => { const v = Number(e.target.value); setBrightness(v); invoke("set_brightness", { value: v }).catch(() => {}); }} /></div>
+    </div>
+    <div data-glass className="cc-module cc-slider">
+      <span>Sonido</span>
+      <div className="cc-slider-row"><SpeakerIcon level={3} /><input className="cc-range" type="range" min="0" max="100" value={volume} style={{ "--v": `${volume}%` }} onChange={(e) => { const v = Number(e.target.value); setVolume(v); invoke("set_volume", { value: v }).catch(() => {}); }} /></div>
+    </div>
+  </>;
 }
 
 export default function BarPanel() {
@@ -70,10 +129,12 @@ export default function BarPanel() {
   }, [kind, openCount]);
 
   const glass = useGlass(settings, "panels");
-  useGlassShape(ref, glass, [kind, openCount]);
+  // Centro de control: una forma de vidrio por módulo; el resto de paneles, la tarjeta entera.
+  useGlassShape(ref, glass, [kind, openCount], kind === "control" ? "[data-glass]" : null);
   if (!kind) return null;
   const panelDark = settings?.topbar?.tint === "dark" || (settings?.topbar?.tint !== "light" && window.matchMedia?.("(prefers-color-scheme: dark)").matches !== false);
-  return <div ref={ref} className={`bar-panel noki-popup-card ${panelDark ? "bar-panel-dark" : "bar-panel-light"}`} onMouseDown={(e) => e.stopPropagation()}><div ref={body} className="bar-panel-body">
+  const card = kind === "control" ? "cc-root" : `noki-popup-card ${panelDark ? "bar-panel-dark" : "bar-panel-light"}`;
+  return <div ref={ref} className={`bar-panel ${card}`} onMouseDown={(e) => e.stopPropagation()}><div ref={body} className="bar-panel-body">
     {kind === "wifi" && <>
       <header className="panel-head-mac"><h2>Wi-Fi</h2><Switch checked onChange={(v) => invoke("quick_set", { kind: "wifi", on: v })} /></header>
       <div className="panel-status"><span>Estado</span><span>{wifi.find((x) => x.connected)?.ssid ? `Conectado a ${wifi.find((x) => x.connected).ssid}` : "Sin conexión"}</span></div>
@@ -87,7 +148,7 @@ export default function BarPanel() {
     {kind === "sound" && <><header><SpeakerIcon level={3} muted={muted} /><div><h2>Sonido</h2><p>{output}</p></div><Switch checked={!muted} onChange={(v) => { setMuted(!v); invoke("set_mute", { muted: !v }); }} /></header><PanelLabel>VOLUMEN</PanelLabel><div className="panel-slider"><SpeakerIcon level={3} muted={muted} /><input type="range" min="0" max="100" value={volume} onChange={(e) => { const v = Number(e.target.value); setVolume(v); invoke("set_volume", { value: v }); }} /><span>{volume}%</span></div><PanelLink onClick={() => action("ms-settings:sound")}>Configuración de sonido…</PanelLink></>}
     {kind === "battery" && <><header><BatteryIcon pct={battery?.level ?? 100} charging={battery?.charging} /><div><h2>Batería</h2><p>{battery?.charging ? "Conectado, cargando" : "Usando batería"}</p></div></header><div className="battery-big">{battery?.level ?? "—"}%</div><p className="panel-muted">Fuente de energía: {battery?.ac ? "Corriente alterna" : "Batería"}</p><PanelLink onClick={() => action("ms-settings:batterysaver")}>Configuración de batería…</PanelLink></>}
     {kind === "user" && <><header><span className="panel-user">U</span><div><h2>Usuario</h2><p>Cambiar opciones de cuenta</p></div></header><PanelLink onClick={() => invoke("command_lock_user")}>Bloquear pantalla</PanelLink><PanelLink onClick={() => invoke("command_logoff_user")}>Cerrar sesión…</PanelLink><PanelLink onClick={() => action("ms-settings:yourinfo")}>Configuración de cuenta…</PanelLink></>}
-    {kind === "control" && <><header><ControlCenterIcon /><div><h2>Centro de control</h2><p>Acciones rápidas de Windows</p></div></header><div className="control-grid"><Tile title="Wi-Fi" subtitle="Redes disponibles" icon={<WifiIcon level={3} />} onClick={() => action("ms-settings:network-wifi")} /><Tile title="Bluetooth" subtitle="Dispositivos" icon={<BluetoothIcon />} onClick={() => action("ms-settings:bluetooth")} /><Tile title="Modo oscuro" subtitle={dark ? "Activado" : "Desactivado"} active={dark} icon="◐" onClick={() => { setDark(!dark); invoke("command_toggle_dark", { dark: !dark }); }} /><Tile title="Modo avión" subtitle={airplane ? "Activado" : "Desactivado"} active={airplane} icon="✈" onClick={() => { setAirplane(!airplane); invoke("command_toggle_airplane", { on: !airplane }); }} /><Tile title="Concentración" subtitle="Ajustes de Windows" icon="◌" onClick={() => action("ms-settings:quiethours")} /><Tile title="Luz nocturna" subtitle="Ajustes de Windows" icon="☾" onClick={() => action("ms-settings:nightlight")} /><Tile title="Proyectar" subtitle="Pantallas" icon="▣" onClick={() => action("ms-settings-displays-topology:projection")} /><Tile title="Ahorro de batería" subtitle="Ajustes de Windows" icon="▰" onClick={() => action("ms-settings:batterysaver")} /><Tile title="Captura" subtitle="Recortar pantalla" icon="⌗" onClick={() => action("ms-screenclip:")} /><Tile title="Grabar" subtitle="Pantalla" icon="●" onClick={() => invoke("command_send_keys", { combo: "record" })} /><Tile title="Multimedia" subtitle="Reproducir / pausar" icon="▶" onClick={() => invoke("media_control", { action: "toggle" })} /></div><PanelLabel>PANTALLA</PanelLabel><div className="panel-slider"><span>☀</span><input type="range" min="0" max="100" value={brightness} onChange={(e) => { const v = Number(e.target.value); setBrightness(v); invoke("set_brightness", { value: v }); }} /><span>{brightness}%</span></div><PanelLabel>SONIDO</PanelLabel><div className="panel-slider"><SpeakerIcon level={3} /><input type="range" min="0" max="100" value={volume} onChange={(e) => { const v = Number(e.target.value); setVolume(v); invoke("set_volume", { value: v }); }} /><span>{volume}%</span></div></>}
+    {kind === "control" && <ControlCenter brightness={brightness} setBrightness={setBrightness} volume={volume} setVolume={setVolume} />}
   </div></div>;
 }
 

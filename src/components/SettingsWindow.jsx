@@ -570,7 +570,7 @@ function GlassSettings({ glass, onChange }) {
   const dark = useGlassDark(glass?.mode ?? "light");
   const set = (patch) => onChange({ [tab]: patch });
   const engine = glass?.engine === "css" ? "css" : "native";
-  const vars = glassVars(cfg, dark, engine);
+  const vars = glassVars(cfg, dark, engine, tab);
   return (
     <div className={`${CARD} px-4 py-3`}>
       <div className="mb-2 flex items-center justify-between gap-3">
@@ -603,7 +603,7 @@ function GlassSettings({ glass, onChange }) {
         </div>
       <div>
         <Row grouped title="Opacidad del tinte"><Slider value={cfg.tintOpacity} min={0} max={100} unit=" %" onChange={(v) => set({ tintOpacity: v })} /></Row>
-        {engine === "css" && <Row grouped title="Radio de esquinas"><Slider value={cfg.radius} min={0} max={40} unit=" px" onChange={(v) => set({ radius: v })} /></Row>}
+        {(engine === "css" || tab === "panels" || tab === "launcher") && <Row grouped title="Radio de esquinas" hint={engine === "native" ? "Con el vidrio nativo: entre 8 y 16 px." : undefined}><Slider value={cfg.radius} min={engine === "native" ? 8 : 0} max={engine === "native" ? 16 : 40} unit=" px" onChange={(v) => set({ radius: v })} /></Row>}
         <Row grouped title="Borde brillante"><Toggle checked={cfg.rim} onChange={(v) => set({ rim: v })} /></Row>
         <Row grouped title="Sombra"><Toggle checked={cfg.shadow} onChange={(v) => set({ shadow: v })} /></Row>
       </div>
@@ -1588,7 +1588,7 @@ function TopBarSettings({ s, set }) {
     listen("avatar-changed", (event) => setAvatar(event.payload || null)).then((fn) => { stop = fn; });
     return () => stop?.();
   }, [t.avatarPath]);
-  const iconRows = [["showCpu", "CPU", "Porcentaje de uso del procesador."], ["showRam", "RAM", "Memoria usada por el equipo."], ["showBluetooth", "Bluetooth", "Dispositivos Bluetooth conectados."], ["showSound", "Sonido", "Salida de audio y volumen."], ["showWifi", "Wi-Fi", "Red inalámbrica y señal."], ["showBattery", "Batería", "Estado de la batería."], ["showSearch", "Buscar", "Abre la búsqueda de Windows."], ["showControlCenter", "Centro de control", "Acciones rápidas y ajustes."], ["showCapture", "Captura y grabación", "Herramientas de recorte de Windows."], ["showNotifications", "Notificaciones", "Centro de notificaciones."], ["showAvatar", "Avatar", "Tu imagen de cuenta."], ["showClock", "Reloj", "Fecha y hora actuales."]];
+  const iconRows = [["showTray", "Iconos ocultos (^)", "Los iconos de la bandeja de Windows (antivirus, apps en segundo plano…), en su panel nativo bajo la barra."], ["showCpu", "CPU", "Porcentaje de uso del procesador."], ["showRam", "RAM", "Memoria usada por el equipo."], ["showBluetooth", "Bluetooth", "Dispositivos Bluetooth conectados."], ["showSound", "Sonido", "Salida de audio y volumen."], ["showWifi", "Wi-Fi", "Red inalámbrica y señal."], ["showBattery", "Batería", "Estado de la batería."], ["showSearch", "Buscar", "Abre la búsqueda de Windows."], ["showControlCenter", "Centro de control", "Acciones rápidas y ajustes."], ["showCapture", "Captura y grabación", "Herramientas de recorte de Windows."], ["showNotifications", "Notificaciones", "Centro de notificaciones."], ["showAvatar", "Avatar", "Tu imagen de cuenta."], ["showClock", "Reloj", "Fecha y hora actuales."]];
   return <Page title="Barra superior" subtitle="Una barra continua de cristal en la parte superior del monitor.">
     <Row title="Activar barra superior" hint="El notch comparte el mismo hueco y queda centrado sobre la barra."><Toggle checked={t.enabled} onChange={(v) => set({ topbar: { enabled: v } })} /></Row>
     <Row title="Alto de la barra"><Slider value={t.height} min={28} max={32} unit=" px" onChange={(v) => set({ topbar: { height: v } })} /></Row>

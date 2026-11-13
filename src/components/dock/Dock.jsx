@@ -26,6 +26,8 @@ export default function Dock() {
   const rest = useRef(null);
   const geometry = useRef({ lift: 0 });
   const reportHit = useRef(null);
+  // Tras un recorte de pantalla (Impr Pant, Recortes) el backend pide reiniciar el estado de la vista.
+  const recover = useRef(null);
 
   const refresh = async () => {
     try { if (!(await getCurrentWindow().isVisible())) return; } catch { /* El navegador de desarrollo no expone visibilidad nativa. */ }
@@ -33,7 +35,7 @@ export default function Dock() {
     invoke("trash_state").then(setTrash).catch(() => {});
   };
   useEffect(() => { refresh(); const timer = setInterval(refresh, 1000); return () => clearInterval(timer); }, []);
-  useEffect(() => { let stops = []; Promise.all([listen("settings-updated", refresh), listen("settings-changed", refresh), listen("dock-windows", (event) => setItems(event.payload ?? []))]).then((fns) => { stops = fns; }); return () => stops.forEach((stop) => stop()); }, []);
+  useEffect(() => { let stops = []; Promise.all([listen("settings-updated", refresh), listen("settings-changed", refresh), listen("dock-windows", (event) => setItems(event.payload ?? [])), listen("dock-recover", () => recover.current?.())]).then((fns) => { stops = fns; }); return () => stops.forEach((stop) => stop()); }, []);
   const all = useMemo(() => [ ...(dock.showApps ? [{ key: "apps", name: "Aplicaciones", kind: "apps" }] : []), ...items, ...(dock.showTrash ? [{ key: "trash", name: "Papelera", kind: "trash", running: trash.items > 0 }] : []) ], [dock.showApps, dock.showTrash, items, trash.items]);
   // Lo que necesita el área de clic sin depender del cierre del efecto.
   geometry.current = { lift: dock.magnify ? maxSize - size : 0 };
@@ -145,7 +147,8 @@ export default function Dock() {
     pointerX.current = event.clientX;
     if (first) reportHit.current?.();
     start();
-  }  function activate(item) {
+  }  recover.current = () => { resetMagnification(); reportHit.current?.(); refresh(); };
+  function activate(item) {
     if (item.kind === "apps") return invoke("toggle_launchpad");
     if (item.kind === "trash") return invoke("trash_open");
     if (item.kind === "folder") return invoke("open_path", { path: item.path });

@@ -95,7 +95,7 @@ pub struct Glass {
 
 impl Default for Glass {
     fn default() -> Self {
-        Self { mode: "light".into(), engine: "native".into(), dock: GlassSurface::macdock(20), bar: GlassSurface::macdock(0), panels: GlassSurface::macdock(18), launcher: GlassSurface::macdock(24) }
+        Self { mode: "light".into(), engine: "native".into(), dock: GlassSurface::macdock(20), bar: GlassSurface::macdock(0), panels: GlassSurface::macdock(16), launcher: GlassSurface::macdock(16) }
     }
 }
 
@@ -175,6 +175,8 @@ pub struct TopBar {
     pub enabled: bool,
     pub height: i32,
     pub tint: String,
+    /// Botón de iconos ocultos de la bandeja de Windows (el «^» de la barra de tareas).
+    pub show_tray: bool,
     pub show_cpu: bool,
     pub show_ram: bool,
     pub show_wifi: bool,
@@ -197,6 +199,7 @@ impl Default for TopBar {
             enabled: false,
             height: 30,
             tint: "auto".into(),
+            show_tray: true,
             show_cpu: false,
             show_ram: false,
             show_wifi: true,

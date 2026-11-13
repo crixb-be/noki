@@ -3,7 +3,7 @@ import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import { useSettings } from "../../hooks/useSettings.js";
 import { isEn, presetLanguage, useLanguage } from "../../lib/i18n.js";
-import { BatteryIcon, BellIcon, BluetoothIcon, CameraIcon, ControlCenterIcon, RecordIcon, SearchIcon, SpeakerIcon, WifiIcon } from "./SymbolIcons.jsx";
+import { BatteryIcon, ChevronIcon, BellIcon, BluetoothIcon, CameraIcon, ControlCenterIcon, RecordIcon, SearchIcon, SpeakerIcon, WifiIcon } from "./SymbolIcons.jsx";
 import { BarPaint, barInk, useBarPaint } from "./barPaint.jsx";
 import { useGlass, useGlassShape } from "../../lib/glass.js";
 
@@ -75,6 +75,7 @@ export default function TopBar() {
       <div className="topbar-left" />
       <div className="topbar-center-reserve" aria-hidden="true" />
       <div className="topbar-actions">
+        {t.showTray !== false && <Item title="Iconos ocultos" onClick={(e) => invoke("command_tray_overflow", { anchorX: Math.round(e.currentTarget.getBoundingClientRect().left + e.currentTarget.offsetWidth / 2) }).catch(() => {})}><ChevronIcon /></Item>}
         {t.showCpu && <Item title="CPU" onClick={() => invoke("command_open_task_manager")}><span className="topbar-text">CPU {stats ? Math.round(stats.cpu) : "--"}%</span></Item>}
         {t.showRam && <Item title="RAM" onClick={() => invoke("command_open_task_manager")}><span className="topbar-text">RAM {stats?.memTotal ? Math.round((stats.memUsed / stats.memTotal) * 100) : "--"}%</span></Item>}
         {t.showBluetooth && <Item title="Bluetooth" onClick={(e) => open("bluetooth", e)}><BluetoothIcon off={!bt.length} /></Item>}

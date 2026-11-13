@@ -46,19 +46,20 @@ pub struct Shape { pub x: f64, pub y: f64, pub w: f64, pub h: f64, pub radius: f
 
 #[derive(Default)]
 struct Entry {
-    shape: Option<Shape>,
+    /// Formas de vidrio de la vista (una por superficie; varias en el Centro de control modular).
+    shapes: Vec<Shape>,
     /// Estilo de paneles (Ajustes > Apariencia): «oscuro opaco» = sin desenfoque.
     enabled: bool,
     /// Vidrio nativo de Windows (`true`) o solo CSS («Vidrio suave sin blur nativo»).
     native: bool,
     /// Material oscuro (modo noche) o claro.
     dark: bool,
-    /// La ventana del desenfoque (una por superficie).
-    piece: Option<isize>,
-    /// Atributos aplicados a la pieza: (oscuro, esquinas).
-    applied: Option<(bool, i32)>,
-    /// Último rectángulo físico colocado (para no recolocar si nada cambió).
-    placed: Option<RECT>,
+    /// Ventanas del desenfoque: una por forma.
+    pieces: Vec<isize>,
+    /// Atributos aplicados a cada pieza: (oscuro, esquinas).
+    applied: Vec<Option<(bool, i32)>>,
+    /// Últimos rectángulos físicos colocados (para no recolocar si nada cambió).
+    placed: Vec<RECT>,
     shown: bool,
     /// La vista ha pintado un fotograma estando visible (`glass_ready`): hasta entonces no hay vidrio.
     ready: bool,
@@ -136,15 +137,15 @@ fn apply_attributes(piece: HWND, dark: bool, corner: DWM_WINDOW_CORNER_PREFERENC
 
 fn hide_piece(entry: &mut Entry) {
     if !entry.shown { return; }
-    if let Some(p) = entry.piece {
+    for &p in &entry.pieces {
         unsafe { let _ = SetWindowPos(HWND(p as *mut _), None, 0, 0, 0, 0, SWP_HIDEWINDOW | SWP_NOACTIVATE | SWP_NOMOVE | SWP_NOSIZE | SWP_NOZORDER); }
     }
     entry.shown = false;
-    entry.placed = None;
+    entry.placed.clear();
 }
 
-/// Recoloca (o esconde) el desenfoque de una ventana. Solo en el hilo de UI. La pieza va siempre
-/// justo debajo de su ventana y nunca pasa por HWND_TOPMOST (un fotograma encima tapaba el Dock).
+/// Recoloca (o esconde) el desenfoque de una ventana. Solo en el hilo de UI. Las piezas van siempre
+/// justo debajo de su ventana y nunca pasan por HWND_TOPMOST (un fotograma encima tapaba el Dock).
 fn apply<R: Runtime>(window: &WebviewWindow<R>, label: &str) {
     let Ok(owner) = window.hwnd() else { return };
     let scale = window.scale_factor().unwrap_or(1.0);
@@ -158,48 +159,56 @@ fn apply<R: Runtime>(window: &WebviewWindow<R>, label: &str) {
             entry.ready = false;
             entry.reveal_at = None;
         }
-        let target = match (entry.enabled && entry.native && visible, entry.shape) {
-            (true, Some(s)) if s.w > 1.0 && s.h > 1.0 => {
-                let mut win = RECT::default();
-                if unsafe { GetWindowRect(owner, &mut win) }.is_err() { None } else {
-                    // Nunca fuera de su ventana (el redondeo a 125 % podía dar 1 px de más).
-                    Some((RECT {
-                        left: (win.left + (s.x * scale).round() as i32).max(win.left),
-                        top: (win.top + (s.y * scale).round() as i32).max(win.top),
-                        right: (win.left + ((s.x + s.w) * scale).round() as i32).min(win.right),
-                        bottom: (win.top + ((s.y + s.h) * scale).round() as i32).min(win.bottom),
-                    }, corner_for(s.radius)))
-                }
-            }
-            _ => None,
+        let mut win = RECT::default();
+        let usable = entry.enabled && entry.native && visible && !entry.shapes.is_empty() && unsafe { GetWindowRect(owner, &mut win) }.is_ok();
+        let targets: Vec<(RECT, DWM_WINDOW_CORNER_PREFERENCE)> = if !usable { Vec::new() } else {
+            entry.shapes.iter().filter(|s| s.w > 1.0 && s.h > 1.0).map(|s| (RECT {
+                // Nunca fuera de su ventana (el redondeo a 125 % podía dar 1 px de más).
+                left: (win.left + (s.x * scale).round() as i32).max(win.left),
+                top: (win.top + (s.y * scale).round() as i32).max(win.top),
+                right: (win.left + ((s.x + s.w) * scale).round() as i32).min(win.right),
+                bottom: (win.top + ((s.y + s.h) * scale).round() as i32).min(win.bottom),
+            }, corner_for(s.radius))).collect()
         };
-        let Some((rect, corner)) = target else { hide_piece(entry); return };
+        if targets.is_empty() { hide_piece(entry); return; }
         if !entry.ready {
             // Visible pero sin un fotograma pintado confirmado: sin vidrio (si no, se veía medio
-            // segundo un recuadro gris vacío al abrir el lanzador). Se pide la confirmación una vez.
+            // segundo un recuadro gris vacío al abrir el lanzador). Se pide la confirmación.
             hide_piece(entry);
             if entry.reveal_at.is_none_or(|at| at.elapsed() >= std::time::Duration::from_millis(400)) {
                 entry.reveal_at = Some(std::time::Instant::now());
                 reveal = true;
             }
         } else {
-            if entry.piece.is_none() { entry.piece = create_piece(); }
-            let Some(p) = entry.piece else { return };
-            let piece = HWND(p as *mut _);
-            if entry.applied != Some((entry.dark, corner.0)) {
-                apply_attributes(piece, entry.dark, corner);
-                entry.applied = Some((entry.dark, corner.0));
+            while entry.pieces.len() < targets.len() {
+                let Some(p) = create_piece() else { return };
+                entry.pieces.push(p);
+                entry.applied.push(None);
             }
-            unsafe {
-                if entry.shown && entry.placed == Some(rect) {
-                    // Solo reafirmar el orden: justo debajo de la ventana visible.
-                    let _ = SetWindowPos(piece, Some(owner), 0, 0, 0, 0, SWP_NOACTIVATE | SWP_NOMOVE | SWP_NOSIZE);
-                } else {
-                    let _ = SetWindowPos(piece, Some(owner), rect.left, rect.top, rect.right - rect.left, rect.bottom - rect.top, SWP_NOACTIVATE | SWP_SHOWWINDOW);
-                    entry.shown = true;
-                    entry.placed = Some(rect);
+            // Las que sobran se destruyen: cada pieza es una ventana acrílica que DWM compone.
+            while entry.pieces.len() > targets.len() {
+                if let Some(p) = entry.pieces.pop() { unsafe { let _ = DestroyWindow(HWND(p as *mut _)); } }
+                entry.applied.pop();
+            }
+            let rects: Vec<RECT> = targets.iter().map(|(r, _)| *r).collect();
+            let same = entry.shown && entry.placed == rects;
+            for (i, (rect, corner)) in targets.iter().enumerate() {
+                let piece = HWND(entry.pieces[i] as *mut _);
+                if entry.applied[i] != Some((entry.dark, corner.0)) {
+                    apply_attributes(piece, entry.dark, *corner);
+                    entry.applied[i] = Some((entry.dark, corner.0));
+                }
+                unsafe {
+                    if same {
+                        // Solo reafirmar el orden: justo debajo de la ventana visible.
+                        let _ = SetWindowPos(piece, Some(owner), 0, 0, 0, 0, SWP_NOACTIVATE | SWP_NOMOVE | SWP_NOSIZE);
+                    } else {
+                        let _ = SetWindowPos(piece, Some(owner), rect.left, rect.top, rect.right - rect.left, rect.bottom - rect.top, SWP_NOACTIVATE | SWP_SHOWWINDOW);
+                    }
                 }
             }
+            entry.shown = true;
+            entry.placed = rects;
         }
     }
     if reveal { let _ = window.emit("glass-reveal", label); }
@@ -236,31 +245,41 @@ pub fn set_enabled<R: Runtime>(app: &AppHandle<R>, label: &str, enabled: bool) {
     schedule(app, label);
 }
 
-/// La vista informa de su forma de vidrio (px lógicos relativos a su ventana), del modo (noche o
+/// Forma tal como llega de la vista.
+#[derive(serde::Deserialize, Clone, Copy)]
+pub struct ShapeArg { x: f64, y: f64, w: f64, h: f64, radius: f64 }
+
+/// La vista informa de sus formas de vidrio (px lógicos relativos a su ventana), del modo (noche o
 /// día) y de si quiere el desenfoque nativo o solo el vidrio CSS.
 #[tauri::command]
-pub fn glass_shape(window: WebviewWindow, x: f64, y: f64, w: f64, h: f64, radius: f64, dark: Option<bool>, native: Option<bool>) {
+pub fn glass_shapes(window: WebviewWindow, shapes: Vec<ShapeArg>, dark: Option<bool>, native: Option<bool>) {
     let label = window.label().to_string();
-    let shape = Shape { x, y, w, h, radius };
+    let shapes: Vec<Shape> = shapes.into_iter().take(32).map(|s| Shape { x: s.x, y: s.y, w: s.w, h: s.h, radius: s.radius }).collect();
     let (dark, native) = (dark.unwrap_or(false), native.unwrap_or(true));
     let stale = {
         let mut map = entries().lock().unwrap();
         let entry = map.entry(label.clone()).or_insert_with(|| Entry { enabled: true, native: true, ..Default::default() });
-        let unchanged = entry.shape == Some(shape) && entry.dark == dark && entry.native == native;
-        entry.shape = Some(shape);
+        let unchanged = entry.shapes == shapes && entry.dark == dark && entry.native == native;
+        entry.shapes = shapes;
         entry.dark = dark;
         entry.native = native;
-        // Sin desenfoque nativo, la ventana auxiliar sobra: se destruye.
-        let stale = if native { None } else { entry.shown = false; entry.placed = None; entry.applied = None; entry.piece.take() };
-        if unchanged && stale.is_none() && (entry.shown || !native) { return; }
+        // Sin desenfoque nativo, las ventanas auxiliares sobran: se destruyen.
+        let stale = if native { Vec::new() } else { entry.shown = false; entry.placed.clear(); entry.applied.clear(); std::mem::take(&mut entry.pieces) };
+        if unchanged && stale.is_empty() && (entry.shown || !native) { return; }
         stale
     };
     follow_window(&window, &label);
     let w = window.clone();
     let _ = window.run_on_main_thread(move || {
-        if let Some(p) = stale { unsafe { let _ = DestroyWindow(HWND(p as *mut _)); } }
+        for p in stale { unsafe { let _ = DestroyWindow(HWND(p as *mut _)); } }
         apply(&w, &label);
     });
+}
+
+/// Una sola forma (compatibilidad).
+#[tauri::command]
+pub fn glass_shape(window: WebviewWindow, x: f64, y: f64, w: f64, h: f64, radius: f64, dark: Option<bool>, native: Option<bool>) {
+    glass_shapes(window, vec![ShapeArg { x, y, w, h, radius }], dark, native);
 }
 
 /// La vista confirma que ya ha pintado un fotograma estando visible: desde ahora puede verse su vidrio.

@@ -7,7 +7,7 @@ use crate::{icons, notch, settings::{DockPinned, Settings}, window_utils};
 use serde::Serialize;
 use std::{path::Path, sync::{Mutex, OnceLock}, time::{Duration, Instant}};
 use tauri::{window::Color, AppHandle, Emitter, Manager, PhysicalPosition, PhysicalSize, WebviewUrl, WebviewWindow, WebviewWindowBuilder};
-use windows::{core::{w, PCWSTR}, Win32::{Foundation::{HWND, LPARAM, RECT}, Graphics::{Gdi::{GetMonitorInfoW, MonitorFromWindow, MONITORINFO, MONITOR_DEFAULTTONEAREST}}, UI::{Shell::{SHAppBarMessage, SHEmptyRecycleBinW, SHFileOperationW, SHQueryRecycleBinW, APPBARDATA, SHFILEOPSTRUCTW, FO_DELETE, FOF_ALLOWUNDO, FOF_NOCONFIRMATION, FOF_NOERRORUI, FOF_SILENT}, WindowsAndMessaging::{EnumChildWindows, EnumWindows, FindWindowExW, FindWindowW, GetClassNameW, GetWindowRect, GetAncestor, GetCursorPos, GetWindowLongPtrW, GetWindowTextLengthW, GetWindowTextW, GetWindowThreadProcessId, GetForegroundWindow, IsIconic, IsWindowVisible, SetForegroundWindow, SetWindowPos, ShowWindow, GA_ROOT, GWL_EXSTYLE, HWND_TOPMOST, SW_MINIMIZE, SW_RESTORE, SW_HIDE, SW_SHOW, SW_SHOWNA, SWP_ASYNCWINDOWPOS, SWP_NOACTIVATE, SWP_NOMOVE, SWP_NOSIZE, WS_EX_TOOLWINDOW}}}};
+use windows::{core::{w, PCWSTR}, Win32::{Foundation::{HWND, LPARAM, RECT}, Graphics::{Gdi::{GetMonitorInfoW, MonitorFromWindow, MONITORINFO, MONITOR_DEFAULTTONEAREST}}, UI::{Shell::{SHAppBarMessage, SHEmptyRecycleBinW, SHFileOperationW, SHQueryRecycleBinW, APPBARDATA, SHFILEOPSTRUCTW, FO_DELETE, FOF_ALLOWUNDO, FOF_NOCONFIRMATION, FOF_NOERRORUI, FOF_SILENT}, WindowsAndMessaging::{EnumChildWindows, EnumWindows, FindWindowExW, FindWindowW, GetClassNameW, GetWindowRect, GetAncestor, GetCursorPos, GetWindowLongPtrW, GetWindowTextLengthW, GetWindowTextW, GetWindowThreadProcessId, GetForegroundWindow, IsIconic, IsWindowVisible, SetForegroundWindow, SetWindowPos, ShowWindow, ShowWindowAsync, GA_ROOT, GWL_EXSTYLE, HWND_TOPMOST, SW_MINIMIZE, SW_RESTORE, SW_HIDE, SW_SHOW, SW_SHOWNA, SWP_ASYNCWINDOWPOS, SWP_NOACTIVATE, SWP_NOMOVE, SWP_NOSIZE, WS_EX_TOOLWINDOW}}}};
 
 const ABM_NEW: u32 = 0;
 const ABM_REMOVE: u32 = 1;
@@ -110,9 +110,10 @@ pub fn sync_taskbar(settings: &Settings) {
                 data.lParam = LPARAM(ABS_AUTOHIDE as isize);
                 let _ = SHAppBarMessage(ABM_SETSTATE, &mut data);
             }
-            for h in taskbars() { if IsWindowVisible(h).as_bool() { let _ = ShowWindow(h, SW_HIDE); } }
+            // ShowWindowAsync: la barra es de Explorer; ShowWindow esperaría a que responda.
+            for h in taskbars() { if IsWindowVisible(h).as_bool() { let _ = ShowWindowAsync(h, SW_HIDE); } }
         } else if let Some(state) = previous.take() {
-            for h in taskbars() { let _ = ShowWindow(h, SW_SHOWNA); }
+            for h in taskbars() { let _ = ShowWindowAsync(h, SW_SHOWNA); }
             data.lParam = LPARAM(state as isize);
             let _ = SHAppBarMessage(ABM_SETSTATE, &mut data);
         }
@@ -497,16 +498,45 @@ fn trash_drop_blocking(paths: Vec<String>) -> Result<(), String> {
     if code == 0 { Ok(()) } else { Err(format!("No se pudieron enviar los elementos a la papelera ({}).", code)) }
 }
 
+/// Mantenimiento lento del Dock en su propio hilo: lista de apps abiertas (EnumWindows, procesos,
+/// AUMID) y barra de tareas (SHAppBarMessage y ShowWindow son llamadas síncronas a Explorer).
+/// Antes iban en el bucle de clics: si Explorer tardaba en responder (justo tras usar Impr Pant o
+/// Recortes), ese bucle se quedaba bloqueado y el Dock seguía en click-through, «congelado».
+fn start_maintenance(app: AppHandle) {
+    std::thread::spawn(move || {
+        let mut last_signature: Option<Vec<String>> = None;
+        let mut last_taskbar = Instant::now() - Duration::from_secs(10);
+        loop {
+            std::thread::sleep(Duration::from_millis(1000));
+            let settings = app.state::<notch::NotchState>().settings.lock().unwrap().clone();
+            if last_taskbar.elapsed() >= Duration::from_secs(2) {
+                last_taskbar = Instant::now();
+                sync_taskbar(&settings);
+            }
+            if !settings.dock.enabled { continue; }
+            let Some(window) = app.get_webview_window("dock") else { continue };
+            let Some(h) = hwnd(&window) else { continue };
+            if !unsafe { IsWindowVisible(h).as_bool() } { continue; }
+            let current = items(&settings);
+            let signature = current.iter().map(|item| format!("{}:{}:{}", item.key, item.window_count, item.running)).collect::<Vec<_>>();
+            if last_signature.as_ref() != Some(&signature) {
+                let _ = app.emit("dock-windows", &current);
+                last_signature = Some(signature);
+            }
+        }
+    });
+}
+
 /// Sondeo económico: solo ajusta click-through y auto-ocultar cuando el dock está visible.
+/// Este bucle no hace ninguna llamada que pueda esperar a otro proceso.
 pub fn start(app: AppHandle) {
+    start_maintenance(app.clone());
     std::thread::spawn(move || {
         let mut last: Option<(bool, bool)> = None;
-        let mut last_scan = Instant::now() - Duration::from_secs(1);
         let mut last_check = Instant::now();
-        let mut last_signature: Option<Vec<String>> = None;
+        let mut was_capturing = false;
         loop {
-            let settings = app.state::<notch::NotchState>().settings.lock().unwrap().clone();
-            let dock_settings = settings.dock.clone();
+            let dock_settings = app.state::<notch::NotchState>().settings.lock().unwrap().dock.clone();
             let interval = if dock_settings.autohide { 120 } else { 250 };
             std::thread::sleep(Duration::from_millis(interval));
             let Some(window) = app.get_webview_window("dock") else { continue };
@@ -515,14 +545,15 @@ pub fn start(app: AppHandle) {
             // podía dejar este bucle bloqueado y el Dock sin responder).
             let Some(h) = hwnd(&window) else { continue };
             let visible = unsafe { IsWindowVisible(h).as_bool() };
-            if visible && last_scan.elapsed() >= Duration::from_secs(1) {
-                let current = items(&settings);
-                let signature = current.iter().map(|item| format!("{}:{}:{}", item.key, item.window_count, item.running)).collect::<Vec<_>>();
-                if last_signature.as_ref() != Some(&signature) {
-                    let _ = app.emit("dock-windows", &current);
-                    last_signature = Some(signature);
-                }
-                last_scan = Instant::now();
+            // Al terminar un recorte (Impr Pant, Win+Shift+S, Recortes) se reaplica todo al momento:
+            // visibilidad, click-through, orden Z, área de clic y estado de la vista.
+            let capturing = capture_in_progress();
+            let recovered = was_capturing && !capturing;
+            was_capturing = capturing;
+            if recovered {
+                last = None;
+                last_check = Instant::now() - Duration::from_secs(10);
+                let _ = window.emit("dock-recover", ());
             }
             let mut rect = RECT::default();
             let has_rect = unsafe { GetWindowRect(h, &mut rect).is_ok() };
@@ -541,8 +572,7 @@ pub fn start(app: AppHandle) {
             let periodic = last_check.elapsed() >= Duration::from_secs(2);
             if periodic {
                 last_check = Instant::now();
-                sync_taskbar(&settings);
-                if visible && !capture_overlay_active() {
+                if visible && !capturing {
                     unsafe { let _ = SetWindowPos(h, Some(HWND_TOPMOST), 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE | SWP_ASYNCWINDOWPOS); }
                 }
             }

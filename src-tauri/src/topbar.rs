@@ -807,6 +807,76 @@ pub async fn command_audio_output_name() -> String {
 #[tauri::command]
 pub fn command_send_keys(combo: String) -> Result<(), String> { send_keys(combo) }
 
+/// Panel de iconos ocultos de la bandeja de Windows 11 (`TopLevelWindowForOverflowXamlIsland`).
+const TRAY_OVERFLOW_CLASS: &str = "TopLevelWindowForOverflowXamlIsland";
+
+fn tray_overflow() -> Option<HWND> {
+    let wide: Vec<u16> = TRAY_OVERFLOW_CLASS.encode_utf16().chain(std::iter::once(0)).collect();
+    unsafe { windows::Win32::UI::WindowsAndMessaging::FindWindowW(PCWSTR(wide.as_ptr()), PCWSTR::null()).ok().filter(|h| !h.0.is_null()) }
+}
+
+fn tray_overflow_visible() -> Option<HWND> {
+    tray_overflow().filter(|h| unsafe { windows::Win32::UI::WindowsAndMessaging::IsWindowVisible(*h).as_bool() })
+}
+
+/// Cuándo se cerró por última vez el panel (para que el clic que lo cierra no lo vuelva a abrir).
+fn tray_closed_at() -> &'static Mutex<Option<std::time::Instant>> {
+    static AT: OnceLock<Mutex<Option<std::time::Instant>>> = OnceLock::new();
+    AT.get_or_init(|| Mutex::new(None))
+}
+
+/// Abre el panel nativo de iconos ocultos (Win+B enfoca el botón «Mostrar iconos ocultos» de la
+/// bandeja y Enter lo abre; funciona aunque Noki oculte la barra de tareas) y lo coloca justo debajo
+/// de la barra superior, centrado en el botón «^». Los iconos son los reales: clic izquierdo y
+/// derecho los gestiona Windows. Comprobado en Windows 11: la bandeja XAML no se expone por UI
+/// Automation con la barra de tareas oculta, pero el panel abierto sí, y se puede mover.
+fn open_tray_overflow(app: &AppHandle, anchor_x: i32) -> Result<(), String> {
+    // Un segundo clic en «^» lo cierra: el propio clic ya lo ha cerrado (pierde el foco).
+    if tray_overflow_visible().is_some() || tray_closed_at().lock().unwrap().is_some_and(|at| at.elapsed() < Duration::from_millis(400)) {
+        return Ok(());
+    }
+    let settings = app.state::<crate::notch::NotchState>().settings.lock().unwrap().clone();
+    let Some((_, monitor)) = notch::assignments(&settings, &notch::monitors(app)).into_iter().find(|(l, _)| l == "main") else { return Err("Sin monitor.".into()) };
+    let inputs = [
+        key_input(VK_LWIN, KEYEVENTF_EXTENDEDKEY),
+        key_input(VIRTUAL_KEY(0x42), Default::default()),
+        key_input(VIRTUAL_KEY(0x42), KEYEVENTF_KEYUP),
+        key_input(VK_LWIN, KEYEVENTF_EXTENDEDKEY | KEYEVENTF_KEYUP),
+    ];
+    unsafe { SendInput(&inputs, std::mem::size_of::<INPUT>() as i32); }
+    std::thread::sleep(Duration::from_millis(220));
+    let enter = [key_input(VIRTUAL_KEY(0x0D), Default::default()), key_input(VIRTUAL_KEY(0x0D), KEYEVENTF_KEYUP)];
+    unsafe { SendInput(&enter, std::mem::size_of::<INPUT>() as i32); }
+    // Espera a que aparezca (hasta ~1,5 s) y lo coloca bajo la barra.
+    let mut panel = None;
+    for _ in 0..30 {
+        std::thread::sleep(Duration::from_millis(50));
+        if let Some(h) = tray_overflow_visible() { panel = Some(h); break; }
+    }
+    let Some(panel) = panel else { return Err("Windows no abrió el panel de iconos ocultos.".into()) };
+    let mut rect = windows::Win32::Foundation::RECT::default();
+    unsafe { let _ = windows::Win32::UI::WindowsAndMessaging::GetWindowRect(panel, &mut rect); }
+    let width = rect.right - rect.left;
+    let scale = monitor.scale;
+    let left = (monitor.rect.left + physical(anchor_x, scale) - width / 2)
+        .clamp(monitor.rect.left + physical(TOPBAR_MARGIN, scale), monitor.rect.right - width - physical(TOPBAR_MARGIN, scale));
+    let top = monitor.rect.top + physical(settings.topbar.height, scale) + physical(6, scale);
+    unsafe { let _ = SetWindowPos(panel, None, left, top, 0, 0, SWP_NOSIZE | windows::Win32::UI::WindowsAndMessaging::SWP_NOZORDER | SWP_NOACTIVATE); }
+    // Vigila su cierre (lo cierra Windows al hacer clic fuera o al elegir un icono).
+    let raw = panel.0 as isize;
+    std::thread::spawn(move || {
+        let h = HWND(raw as *mut _);
+        while unsafe { windows::Win32::UI::WindowsAndMessaging::IsWindowVisible(h).as_bool() } { std::thread::sleep(Duration::from_millis(40)); }
+        *tray_closed_at().lock().unwrap() = Some(std::time::Instant::now());
+    });
+    Ok(())
+}
+
+#[tauri::command]
+pub async fn command_tray_overflow(app: AppHandle, anchor_x: i32) -> Result<(), String> {
+    tauri::async_runtime::spawn_blocking(move || open_tray_overflow(&app, anchor_x)).await.map_err(|e| e.to_string())?
+}
+
 #[tauri::command]
 pub async fn command_open_bar_panel(app: AppHandle, kind: String, anchor_x: i32) -> Result<(), String> { open_bar_panel_impl(&app, kind, anchor_x) }
 
