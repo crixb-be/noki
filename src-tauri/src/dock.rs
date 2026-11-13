@@ -7,7 +7,7 @@ use crate::{icons, notch, settings::{DockPinned, Settings}, window_utils};
 use serde::Serialize;
 use std::{path::Path, sync::{Mutex, OnceLock}, time::{Duration, Instant}};
 use tauri::{window::Color, AppHandle, Emitter, Manager, PhysicalPosition, PhysicalSize, WebviewUrl, WebviewWindow, WebviewWindowBuilder};
-use windows::{core::{w, PCWSTR}, Win32::{Foundation::{HWND, LPARAM, RECT}, Graphics::{Dwm::{DwmSetWindowAttribute, DWMWA_BORDER_COLOR, DWMWA_COLOR_NONE, DWMWA_WINDOW_CORNER_PREFERENCE, DWMWCP_DONOTROUND}, Gdi::{GetMonitorInfoW, MonitorFromWindow, MONITORINFO, MONITOR_DEFAULTTONEAREST}}, UI::{Shell::{SHAppBarMessage, SHEmptyRecycleBinW, SHFileOperationW, SHQueryRecycleBinW, APPBARDATA, SHFILEOPSTRUCTW, FO_DELETE, FOF_ALLOWUNDO, FOF_NOCONFIRMATION, FOF_NOERRORUI, FOF_SILENT}, WindowsAndMessaging::{EnumChildWindows, EnumWindows, FindWindowW, GetAncestor, GetCursorPos, GetWindowLongPtrW, GetWindowTextLengthW, GetWindowTextW, GetWindowThreadProcessId, GetForegroundWindow, IsIconic, IsWindowVisible, SetForegroundWindow, SetWindowLongPtrW, SetWindowPos, ShowWindow, GA_ROOT, GWL_EXSTYLE, GWL_STYLE, HWND_TOPMOST, SW_MINIMIZE, SW_RESTORE, SW_SHOW, SWP_FRAMECHANGED, SWP_NOACTIVATE, SWP_NOMOVE, SWP_NOSIZE, SWP_SHOWWINDOW, WS_BORDER, WS_CAPTION, WS_DLGFRAME, WS_EX_CLIENTEDGE, WS_EX_DLGMODALFRAME, WS_EX_NOACTIVATE, WS_EX_STATICEDGE, WS_EX_TOOLWINDOW, WS_EX_TOPMOST, WS_EX_WINDOWEDGE, WS_MAXIMIZEBOX, WS_MINIMIZEBOX, WS_SYSMENU, WS_THICKFRAME}}}};
+use windows::{core::{w, PCWSTR}, Win32::{Foundation::{HWND, LPARAM, RECT}, Graphics::{Dwm::{DwmSetWindowAttribute, DWMWA_BORDER_COLOR, DWMWA_COLOR_NONE, DWMWA_WINDOW_CORNER_PREFERENCE, DWMWCP_DONOTROUND}, Gdi::{GetMonitorInfoW, MonitorFromWindow, MONITORINFO, MONITOR_DEFAULTTONEAREST}}, UI::{Shell::{SHAppBarMessage, SHEmptyRecycleBinW, SHFileOperationW, SHQueryRecycleBinW, APPBARDATA, SHFILEOPSTRUCTW, FO_DELETE, FOF_ALLOWUNDO, FOF_NOCONFIRMATION, FOF_NOERRORUI, FOF_SILENT}, WindowsAndMessaging::{EnumChildWindows, EnumWindows, FindWindowExW, FindWindowW, GetWindowRect, GetAncestor, GetCursorPos, GetWindowLongPtrW, GetWindowTextLengthW, GetWindowTextW, GetWindowThreadProcessId, GetForegroundWindow, IsIconic, IsWindowVisible, SetForegroundWindow, SetWindowLongPtrW, SetWindowPos, ShowWindow, GA_ROOT, GWL_EXSTYLE, GWL_STYLE, HWND_TOPMOST, SW_MINIMIZE, SW_RESTORE, SW_HIDE, SW_SHOW, SW_SHOWNA, SWP_ASYNCWINDOWPOS, SWP_FRAMECHANGED, SWP_NOACTIVATE, SWP_NOMOVE, SWP_NOSIZE, SWP_SHOWWINDOW, WS_BORDER, WS_CAPTION, WS_DLGFRAME, WS_EX_CLIENTEDGE, WS_EX_DLGMODALFRAME, WS_EX_NOACTIVATE, WS_EX_STATICEDGE, WS_EX_TOOLWINDOW, WS_EX_TOPMOST, WS_EX_WINDOWEDGE, WS_MAXIMIZEBOX, WS_MINIMIZEBOX, WS_SYSMENU, WS_THICKFRAME}}}};
 
 const ABM_NEW: u32 = 0;
 const ABM_REMOVE: u32 = 1;
@@ -55,19 +55,6 @@ fn physical(v: i32, scale: f64) -> i32 { (v as f64 * scale).round() as i32 }
 
 fn hwnd(window: &WebviewWindow) -> Option<HWND> { window.hwnd().ok() }
 
-fn visible_on_ui(window: &WebviewWindow) -> bool {
-    let (tx, rx) = std::sync::mpsc::channel();
-    let ui_window = window.clone();
-    let _ = window.run_on_main_thread(move || { let _ = tx.send(ui_window.is_visible().unwrap_or(false)); });
-    rx.recv().unwrap_or(false)
-}
-
-fn position_on_ui(window: &WebviewWindow) -> Option<PhysicalPosition<i32>> {
-    let (tx, rx) = std::sync::mpsc::channel();
-    let ui_window = window.clone();
-    let _ = window.run_on_main_thread(move || { let _ = tx.send(ui_window.outer_position().ok()); });
-    rx.recv().ok().flatten()
-}
 
 /// Zona de trabajo real del monitor de `main`, no el rectángulo que incluye la barra de tareas.
 pub(crate) fn work_area(app: &AppHandle) -> Option<(notch::Rect, f64)> {
@@ -88,19 +75,41 @@ pub(crate) fn work_area_with_monitor(app: &AppHandle, full_monitor: bool) -> Opt
     }
 }
 
-/// Aplica el autoocultado de la barra de tareas y conserva el estado anterior para restaurarlo.
+/// Ventanas de la barra de tareas de Windows (principal y de otros monitores).
+fn taskbars() -> Vec<HWND> {
+    let mut out = Vec::new();
+    unsafe {
+        if let Ok(h) = FindWindowW(w!("Shell_TrayWnd"), PCWSTR::null()) { out.push(h); }
+        let mut after: Option<HWND> = None;
+        while let Ok(h) = FindWindowExW(None, after, w!("Shell_SecondaryTrayWnd"), PCWSTR::null()) {
+            if h.0.is_null() { break; }
+            out.push(h);
+            after = Some(h);
+        }
+    }
+    out
+}
+
+/// Oculta de verdad la barra de tareas cuando la opción está activa. Solo con
+/// autoocultar, Windows la volvía a mostrar al acercar el ratón al borde inferior
+/// (justo donde está el Dock). Se llama cada 2 s: si Explorer la vuelve a mostrar, se oculta otra vez.
 pub fn sync_taskbar(settings: &Settings) {
     let Some(taskbar) = (unsafe { FindWindowW(w!("Shell_TrayWnd"), PCWSTR::null()) }).ok() else { return };
     let mut data = APPBARDATA { cbSize: std::mem::size_of::<APPBARDATA>() as u32, hWnd: taskbar, ..Default::default() };
     unsafe {
         let mut previous = taskbar_state().lock().unwrap();
-        if settings.dock.enabled && settings.dock.hide_taskbar {
+        if settings.dock.enabled && settings.dock.hide_taskbar && settings.general.visible {
             if previous.is_none() {
                 *previous = Some(SHAppBarMessage(ABM_GETSTATE, &mut data) as u32);
             }
-            data.lParam = LPARAM(ABS_AUTOHIDE as isize);
-            let _ = SHAppBarMessage(ABM_SETSTATE, &mut data);
+            // Autoocultar libera la zona de trabajo; SW_HIDE evita que reaparezca.
+            if SHAppBarMessage(ABM_GETSTATE, &mut data) as u32 & ABS_AUTOHIDE == 0 {
+                data.lParam = LPARAM(ABS_AUTOHIDE as isize);
+                let _ = SHAppBarMessage(ABM_SETSTATE, &mut data);
+            }
+            for h in taskbars() { if IsWindowVisible(h).as_bool() { let _ = ShowWindow(h, SW_HIDE); } }
         } else if let Some(state) = previous.take() {
+            for h in taskbars() { let _ = ShowWindow(h, SW_SHOWNA); }
             data.lParam = LPARAM(state as isize);
             let _ = SHAppBarMessage(ABM_SETSTATE, &mut data);
         }
@@ -110,10 +119,10 @@ pub fn sync_taskbar(settings: &Settings) {
 pub fn restore_taskbar() {
     let Some(taskbar) = (unsafe { FindWindowW(w!("Shell_TrayWnd"), PCWSTR::null()) }).ok() else { return };
     let Some(state) = taskbar_state().lock().unwrap().take() else { return };
+    unsafe { for h in taskbars() { let _ = ShowWindow(h, SW_SHOWNA); } }
     let mut data = APPBARDATA { cbSize: std::mem::size_of::<APPBARDATA>() as u32, hWnd: taskbar, lParam: LPARAM(state as isize), ..Default::default() };
     unsafe { let _ = SHAppBarMessage(ABM_SETSTATE, &mut data); }
 }
-
 fn create(app: &AppHandle) -> Option<WebviewWindow> {
     if let Some(w) = app.get_webview_window("dock") { return Some(w); }
     let window = WebviewWindowBuilder::new(app, "dock", WebviewUrl::App("index.html?view=dock".into()))
@@ -461,32 +470,57 @@ pub fn start(app: AppHandle) {
     std::thread::spawn(move || {
         let mut last: Option<(bool, bool)> = None;
         let mut last_scan = Instant::now() - Duration::from_secs(1);
+        let mut last_check = Instant::now();
         let mut last_signature: Option<Vec<String>> = None;
         loop {
-        let settings = app.state::<notch::NotchState>().settings.lock().unwrap().clone();
-        let dock_settings = settings.dock.clone();
-        let interval = if dock_settings.autohide { 120 } else { 500 };
-        std::thread::sleep(Duration::from_millis(interval));
-        let Some(window) = app.get_webview_window("dock") else { continue };
-        let enabled = dock_settings.enabled;
-        if !enabled { continue; }
-        if visible_on_ui(&window) && last_scan.elapsed() >= Duration::from_secs(1) {
-            let current = items(&settings);
-            let signature = current.iter().map(|item| format!("{}:{}:{}", item.key, item.window_count, item.running)).collect::<Vec<_>>();
-            if last_signature.as_ref() != Some(&signature) {
-                let _ = app.emit("dock-windows", &current);
-                last_signature = Some(signature);
+            let settings = app.state::<notch::NotchState>().settings.lock().unwrap().clone();
+            let dock_settings = settings.dock.clone();
+            let interval = if dock_settings.autohide { 120 } else { 250 };
+            std::thread::sleep(Duration::from_millis(interval));
+            let Some(window) = app.get_webview_window("dock") else { continue };
+            if !dock_settings.enabled { continue; }
+            // Win32 directo: nada de esperar al hilo de UI (antes un recv() sin límite
+            // podía dejar este bucle bloqueado y el Dock sin responder).
+            let Some(h) = hwnd(&window) else { continue };
+            let visible = unsafe { IsWindowVisible(h).as_bool() };
+            if visible && last_scan.elapsed() >= Duration::from_secs(1) {
+                let current = items(&settings);
+                let signature = current.iter().map(|item| format!("{}:{}:{}", item.key, item.window_count, item.running)).collect::<Vec<_>>();
+                if last_signature.as_ref() != Some(&signature) {
+                    let _ = app.emit("dock-windows", &current);
+                    last_signature = Some(signature);
+                }
+                last_scan = Instant::now();
             }
-            last_scan = Instant::now();
-        }
-        let pos = position_on_ui(&window); let h = *hit().lock().unwrap();
-        let mut p = windows::Win32::Foundation::POINT::default(); unsafe { let _ = GetCursorPos(&mut p); }
-        let inside = pos.map(|o| { let x = ((p.x - o.x) as f64 / h.scale) as i32; let y = ((p.y - o.y) as f64 / h.scale) as i32; x >= h.x && x < h.x + h.w && y >= h.y && y < h.y + h.h }).unwrap_or(false);
-        let near_bottom = work_area(&app).map(|(r, scale)| p.y >= r.bottom - physical(12, scale) && p.x >= r.left && p.x < r.right).unwrap_or(false);
-        let should_show = !dock_settings.autohide || inside || near_bottom;
-        if last == Some((should_show, inside)) { continue; }
-        last = Some((should_show, inside));
-        let w = window.clone(); let _ = window.run_on_main_thread(move || { if should_show { let _ = w.show(); } else { let _ = w.hide(); } let _ = w.set_ignore_cursor_events(!inside); });
+            let mut rect = RECT::default();
+            let has_rect = unsafe { GetWindowRect(h, &mut rect).is_ok() };
+            let hit_area = *hit().lock().unwrap();
+            let mut p = windows::Win32::Foundation::POINT::default();
+            unsafe { let _ = GetCursorPos(&mut p); }
+            let inside = has_rect && hit_area.w > 0 && {
+                let x = ((p.x - rect.left) as f64 / hit_area.scale) as i32;
+                let y = ((p.y - rect.top) as f64 / hit_area.scale) as i32;
+                x >= hit_area.x && x < hit_area.x + hit_area.w && y >= hit_area.y && y < hit_area.y + hit_area.h
+            };
+            let near_bottom = work_area(&app).map(|(r, scale)| p.y >= r.bottom - physical(12, scale) && p.x >= r.left && p.x < r.right).unwrap_or(false);
+            let should_show = !dock_settings.autohide || inside || near_bottom;
+            // Cada 2 s se reaplica todo aunque nada haya cambiado: si Windows o tao
+            // alteraron los estilos (clics ignorados) o el orden Z, se corrige solo.
+            let periodic = last_check.elapsed() >= Duration::from_secs(2);
+            if periodic {
+                last_check = Instant::now();
+                sync_taskbar(&settings);
+                if visible {
+                    unsafe { let _ = SetWindowPos(h, Some(HWND_TOPMOST), 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE | SWP_ASYNCWINDOWPOS); }
+                }
+            }
+            if !periodic && last == Some((should_show, inside)) { continue; }
+            last = Some((should_show, inside));
+            let w = window.clone();
+            let _ = window.run_on_main_thread(move || {
+                if should_show { let _ = w.show(); } else { let _ = w.hide(); }
+                let _ = w.set_ignore_cursor_events(!inside);
+            });
         }
     });
 }

@@ -39,7 +39,11 @@ export default function Dock() {
     report();
     const observer = new ResizeObserver(report);
     observer.observe(node);
-    return () => observer.disconnect();
+    // Al redimensionar/recolocar la ventana la píldora se recentra sin cambiar de tamaño:
+    // sin esto el área de clic quedaba desfasada y el Dock dejaba de responder.
+    window.addEventListener("resize", report);
+    const timer = setInterval(report, 2000);
+    return () => { observer.disconnect(); window.removeEventListener("resize", report); clearInterval(timer); };
   }, []);
   // Tamaño de la ventana: ancho natural de la píldora en reposo + holgura para la magnificación.
   // Antes la píldora se limitaba al ancho de la ventana y la ventana a la píldora: los iconos se recortaban.

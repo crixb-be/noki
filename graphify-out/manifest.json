@@ -577,9 +577,9 @@
     "semantic_hash": "26884a5a50a10e30d1b9f0dd555b35fe"
   },
   "src-tauri/src/dock.rs": {
-    "mtime": 1794543576.5666027,
-    "seen": 1794543695.2140708,
-    "ast_hash": "0840b393c9c41a35f5deeacc011989d2",
+    "mtime": 1794544451.552065,
+    "seen": 1794545165.4807408,
+    "ast_hash": "eecc1d4039e0b41947898ecab14e5459",
     "semantic_hash": ""
   },
   "src-tauri/src/launchpad.rs": {
@@ -595,9 +595,9 @@
     "semantic_hash": ""
   },
   "src/components/dock/Dock.jsx": {
-    "mtime": 1794543595.792749,
-    "seen": 1794543695.2141197,
-    "ast_hash": "9fa31ff521fd0ceeb2203e262d0d0189",
+    "mtime": 1794544471.2529316,
+    "seen": 1794545165.480789,
+    "ast_hash": "d9e6908e65640498ee26d4d1c629ecd0",
     "semantic_hash": ""
   },
   "src/components/launchpad/Launchpad.jsx": {
