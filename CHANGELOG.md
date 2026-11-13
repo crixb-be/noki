@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.3.0 — Barra superior unificada, Dock y Launchpad
+
+- Barra superior unificada con buscador rápido, paneles de la barra y avatar; nuevo Dock y Launchpad para acceder a aplicaciones y ventanas desde un solo lugar.
+
 ## 1.2.0 — Themes, recorder and shortcuts / Temas, grabadora y atajos
 
 - **Customizable shortcuts**: each one can be turned on/off and rebound — open/close, record voice, do not disturb, quick task, and jump to tab (Alt+1…9). /

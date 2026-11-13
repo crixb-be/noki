@@ -27,6 +27,8 @@ const DEV = {
 const SECTIONS = [
   { id: "general", icon: "⚙", label: "General" },
   { id: "appearance", icon: "🎨", label: "Apariencia" },
+  { id: "topbar", icon: "▔", label: "Barra superior" },
+  { id: "dock", icon: "▥", label: "Dock" },
   { id: "modules", icon: "🧩", label: "Módulos" },
   { id: "productivity", icon: "📋", label: "Agenda" },
   { id: "calendar", icon: "📅", label: "Calendario" },
@@ -290,12 +292,7 @@ function General({ s, set, monitors }) {
       <Row title="Iniciar con Windows" hint="Se abre solo al iniciar sesión. Actívalo desde la versión instalada.">
         <Toggle checked={g.autostart} onChange={(v) => set({ general: { autostart: v } })} />
       </Row>
-      <Row
-        title="Reservar espacio en la parte superior"
-        hint="Las demás ventanas trabajan por debajo del notch, como una barra de tareas. Si lo desactivas, el notch flota encima de ellas."
-      >
-        <Toggle checked={g.reserveSpace} onChange={(v) => set({ general: { reserveSpace: v } })} />
-      </Row>
+
       <Row title="Ocultar en pantalla completa" hint="Se aparta cuando hay un juego, un vídeo o una presentación a pantalla completa.">
         <Toggle checked={g.hideOnFullscreen} onChange={(v) => set({ general: { hideOnFullscreen: v } })} />
       </Row>
@@ -418,7 +415,7 @@ function IconPicker({ value, onChange }) {
 }
 
 /** Selector de tema para una parte (cara, notch o franja), con vista previa de cada opción. */
-function ThemePicker({ title, hint, value, birthday, events, kind, onChange }) {
+function ThemePicker({ title, hint, value, birthday, events, kind, onChange, children }) {
   return (
     <div className={`${CARD} px-4 py-3`}>
       <div className="flex items-center gap-3">
@@ -458,6 +455,8 @@ function ThemePicker({ title, hint, value, birthday, events, kind, onChange }) {
           );
         })}
       </div>
+      {children && <div className="mt-3 h-px bg-white/10" />}
+      {children}
     </div>
   );
 }
@@ -563,12 +562,12 @@ function ShareAppearance({ a, ap }) {
 function Appearance({ s, set }) {
   const a = s.appearance;
   const ap = (patch) => set({ appearance: patch });
-  // La franja solo existe con el espacio superior reservado; sin él, todo lo que la configura queda bloqueado.
+  // La franja es la barra superior; sin ella el notch queda como píldora flotante.
   const stripLock = {
-    locked: !s.general.reserveSpace,
-    reason: "La franja está desactivada porque el notch flota sobre las ventanas. Para personalizarla, activa «Reservar espacio en la parte superior» (en General).",
-    action: "Activar",
-    onAction: () => set({ general: { reserveSpace: true } }),
+    locked: !s.topbar?.enabled,
+    reason: "La franja es la barra superior continua. Activa «Barra superior» para usar estos ajustes.",
+    action: "Activar barra",
+    onAction: () => set({ topbar: { enabled: true } }),
   };
   return (
     <Page title="Apariencia" subtitle="Tamaño, posición y transparencia. Los cambios se ven al instante en el notch.">
@@ -587,32 +586,6 @@ function Appearance({ s, set }) {
             kind="face"
             onChange={(v) => ap({ mascotTheme: v })}
           />
-          <ThemePicker
-            title="Notch central"
-            hint="Color y adornos del notch. «Ninguno» usa tus colores o imagen de Ajustes."
-            value={a.notchTheme}
-            birthday={a.birthday}
-            events={a.themeEvents}
-            kind="notch"
-            onChange={(v) => ap({ notchTheme: v })}
-          />
-          <Row title="Transparencia del notch con tema" hint="Qué tan sólido es el color del tema en el notch central.">
-            <Slider value={a.notchThemeOpacity} min={20} max={100} unit=" %" onChange={(v) => ap({ notchThemeOpacity: v })} />
-          </Row>
-          <Locked {...stripLock}>
-          <ThemePicker
-            title="Franja de los costados"
-            hint="La barra a los lados del notch. «Ninguno» usa tu configuración."
-            value={a.barTheme}
-            birthday={a.birthday}
-            events={a.themeEvents}
-            kind="bar"
-            onChange={(v) => ap({ barTheme: v })}
-          />
-          <Row title="Transparencia de la franja con tema" hint="Qué tan sólido es el color del tema en los costados.">
-            <Slider value={a.barThemeOpacity} min={0} max={100} unit=" %" onChange={(v) => ap({ barThemeOpacity: v })} />
-          </Row>
-          </Locked>
           <Row title="Mismo tema para todo" hint="«Automático» pone Halloween (24 oct–2 nov), Navidad (1–26 dic), Amor (7–14 feb) y Cumpleaños el día que indiques abajo.">
             <Select
               value=""
@@ -663,10 +636,23 @@ function Appearance({ s, set }) {
       <Row title="Desplazamiento horizontal" hint="0 = centrado en la pantalla.">
         <Slider value={a.offsetX} min={-800} max={800} step={4} unit=" px" onChange={(v) => ap({ offsetX: v })} />
       </Row>
+      <ThemePicker
+        title="Notch central"
+        hint="Color y adornos del notch. «Ninguno» usa tus colores o imagen de Ajustes."
+        value={a.notchTheme}
+        birthday={a.birthday}
+        events={a.themeEvents}
+        kind="notch"
+        onChange={(v) => ap({ notchTheme: v })}
+      >
+        <Row grouped title="Transparencia del notch con tema" hint="Qué tan sólido es el color del tema en el notch central.">
+          <Slider value={a.notchThemeOpacity} min={20} max={100} unit=" %" onChange={(v) => ap({ notchThemeOpacity: v })} />
+        </Row>
+      </ThemePicker>
+      <SectionTitle>Fondo del notch</SectionTitle>
       <Row title="Opacidad del fondo" hint="Con una imagen de fondo en el notch no se aplica; usa «Oscurecer imagen».">
         <Slider value={a.opacity} min={30} max={100} unit=" %" onChange={(v) => ap({ opacity: v })} />
       </Row>
-      <SectionTitle>Fondo del notch</SectionTitle>
       <Row title="Color automático" hint="El notch toma el color del programa que tengas abierto debajo y cambia con él. Reemplaza al color y a la imagen.">
         <Toggle checked={a.notchAuto} onChange={(v) => ap({ notchAuto: v })} />
       </Row>
@@ -686,6 +672,21 @@ function Appearance({ s, set }) {
         </Row>
       )}
       <SectionTitle>Franja a los costados del notch</SectionTitle>
+      <Locked {...stripLock}>
+      <ThemePicker
+        title="Franja de los costados"
+        hint="La barra a los lados del notch. «Ninguno» usa tu configuración."
+        value={a.barTheme}
+        birthday={a.birthday}
+        events={a.themeEvents}
+        kind="bar"
+        onChange={(v) => ap({ barTheme: v })}
+      >
+        <Row grouped title="Transparencia de la franja con tema" hint="Qué tan sólido es el color del tema en los costados.">
+          <Slider value={a.barThemeOpacity} min={0} max={100} unit=" %" onChange={(v) => ap({ barThemeOpacity: v })} />
+        </Row>
+      </ThemePicker>
+      </Locked>
       {/* Sin espacio reservado la franja no se pinta (taparía las apps maximizadas): sus controles se bloquean. */}
       <Locked {...stripLock}>
       <Row title="Fondo de la franja" hint="La barra de arriba que cruza toda la pantalla (la que reserva el espacio). «Igual que el notch» la hace parecer parte de él; «Automático» toma el color del programa que tengas abierto debajo y cambia con él.">
@@ -1522,6 +1523,45 @@ function Developer({ icon }) {
   );
 }
 
+function TopBarSettings({ s, set }) {
+  const t = s.topbar ?? {};
+  const [avatar, setAvatar] = useState(null);
+  useEffect(() => {
+    let stop;
+    invoke("command_user_avatar").then(setAvatar).catch(() => {});
+    listen("avatar-changed", (event) => setAvatar(event.payload || null)).then((fn) => { stop = fn; });
+    return () => stop?.();
+  }, [t.avatarPath]);
+  const iconRows = [["showCpu", "CPU", "Porcentaje de uso del procesador."], ["showRam", "RAM", "Memoria usada por el equipo."], ["showBluetooth", "Bluetooth", "Dispositivos Bluetooth conectados."], ["showSound", "Sonido", "Salida de audio y volumen."], ["showWifi", "Wi-Fi", "Red inalámbrica y señal."], ["showBattery", "Batería", "Estado de la batería."], ["showSearch", "Buscar", "Abre la búsqueda de Windows."], ["showControlCenter", "Centro de control", "Acciones rápidas y ajustes."], ["showCapture", "Captura y grabación", "Herramientas de recorte de Windows."], ["showNotifications", "Notificaciones", "Centro de notificaciones."], ["showAvatar", "Avatar", "Tu imagen de cuenta."], ["showClock", "Reloj", "Fecha y hora actuales."]];
+  return <Page title="Barra superior" subtitle="Una barra continua de cristal en la parte superior del monitor.">
+    <Row title="Activar barra superior" hint="El notch comparte el mismo hueco y queda centrado sobre la barra."><Toggle checked={t.enabled} onChange={(v) => set({ topbar: { enabled: v } })} /></Row>
+    <Row title="Alto de la barra"><Slider value={t.height} min={28} max={32} unit=" px" onChange={(v) => set({ topbar: { height: v } })} /></Row>
+    <Row title="Tinte"><Select value={t.tint} options={[["auto", "Automático"], ["dark", "Oscuro"], ["light", "Claro"]]} onChange={(v) => set({ topbar: { tint: v } })} /></Row>
+    <SectionTitle>Iconos visibles</SectionTitle>
+    {iconRows.map(([id, title, hint]) => <Row key={id} title={title} hint={hint}><Toggle checked={t[id]} onChange={(v) => set({ topbar: { [id]: v } })} /></Row>)}
+    <Row title="Avatar de Windows" hint="Elige una imagen o deja vacío para usar la foto de tu cuenta."><div className="flex items-center gap-2"><div className="h-10 w-10 overflow-hidden rounded-full bg-indigo-600">{avatar ? <img src={avatar} alt="" className="h-full w-full object-cover" /> : <span className="flex h-full items-center justify-center text-white">U</span>}</div><button className={button} onClick={async () => { const path = await open({ multiple: false, directory: false, filters: [{ name: "Imagen", extensions: ["png", "jpg", "jpeg", "webp", "bmp", "gif"] }] }); if (typeof path === "string") { const data = await invoke("set_avatar_image", { path }); setAvatar(data || null); } }}>Elegir imagen…</button><button className={button} onClick={async () => { const data = await invoke("set_avatar_image", { path: "" }); setAvatar(data || null); }}>Usar la de Windows</button></div></Row>
+  </Page>;
+}
+
+function DockSettings({ s, set }) {
+  const d = s.dock ?? {};
+  const updatePinned = (pinned) => set({ dock: { pinned } });
+  return <Page title="Dock" subtitle="Tus aplicaciones, ventanas y carpetas favoritas en la parte inferior.">
+    <Row title="Activar Dock"><Toggle checked={d.enabled} onChange={(v) => set({ dock: { enabled: v } })} /></Row>
+    <Row title="Tamaño de los iconos"><Slider value={d.iconSize} min={32} max={96} unit=" px" onChange={(v) => set({ dock: { iconSize: v } })} /></Row>
+    <Row title="Magnificación" hint="Amplía los iconos alrededor del cursor."><Toggle checked={d.magnify} onChange={(v) => set({ dock: { magnify: v } })} /></Row>
+    <Row title="Escala de magnificación"><Slider value={d.magnifyScale} min={1} max={2.5} step={0.1} unit="×" onChange={(v) => set({ dock: { magnifyScale: v } })} /></Row>
+    <Row title="Mostrar «Aplicaciones» en el Dock" hint="Icono para abrir la cuadrícula con todos tus programas."><Toggle checked={d.showApps} onChange={(v) => set({ dock: { showApps: v } })} /></Row>
+    <Row title="Mostrar ventanas abiertas"><Toggle checked={d.showRunning} onChange={(v) => set({ dock: { showRunning: v } })} /></Row>
+    <Row title="Mostrar papelera"><Toggle checked={d.showTrash} onChange={(v) => set({ dock: { showTrash: v } })} /></Row>
+    <Row title="Ocultar automáticamente"><Toggle checked={d.autohide} onChange={(v) => set({ dock: { autohide: v } })} /></Row>
+    <Row title="Reservar espacio" hint="Las ventanas maximizadas dejan libre el borde inferior."><Toggle checked={d.reserveSpace} onChange={(v) => set({ dock: { reserveSpace: v } })} /></Row>
+    <Row title="Ocultar la barra de tareas de Windows" hint="Guarda el estado actual y lo restaura al desactivar o salir de Noki."><Toggle checked={d.hideTaskbar} onChange={(v) => set({ dock: { hideTaskbar: v } })} /></Row>
+    <SectionTitle>Aplicaciones ancladas</SectionTitle>
+    <div className={`${CARD} overflow-hidden`}>{(d.pinned ?? []).map((p, i) => <div key={`${p.name}-${p.path}`} className="flex items-center justify-between gap-3 border-b border-white/5 px-4 py-2.5 last:border-0"><span className="min-w-0 flex-1 truncate text-sm">{p.name}</span><button className={button} disabled={i === 0} onClick={() => { const a = [...d.pinned]; [a[i - 1], a[i]] = [a[i], a[i - 1]]; updatePinned(a); }}>↑</button><button className={button} disabled={i === d.pinned.length - 1} onClick={() => { const a = [...d.pinned]; [a[i], a[i + 1]] = [a[i + 1], a[i]]; updatePinned(a); }}>↓</button><button className={button} onClick={() => updatePinned(d.pinned.filter((_, j) => j !== i))}>Quitar</button></div>)}<button className={`${button} m-3`} onClick={async () => { const path = await open({ multiple: false, directory: false, filters: [{ name: "Programas", extensions: ["exe", "lnk", "url"] }] }); if (typeof path === "string") updatePinned([...(d.pinned ?? []), { name: path.split(/[\\/]/).pop().replace(/\.[^.]+$/, ""), path, args: "", aumid: "" }]); }}>Añadir programa…</button></div>
+  </Page>;
+}
+
 // ───────────── ventana ─────────────
 
 export default function SettingsWindow() {
@@ -1567,6 +1607,8 @@ export default function SettingsWindow() {
       <main className="min-w-0 flex-1 overflow-y-auto px-8 py-6">
         {section === "general" && <General s={settings} set={update} monitors={monitors} />}
         {section === "appearance" && <Appearance s={settings} set={update} />}
+        {section === "topbar" && <TopBarSettings s={settings} set={update} />}
+        {section === "dock" && <DockSettings s={settings} set={update} />}
         {section === "modules" && <Modules s={settings} set={update} />}
         {section === "productivity" && <Productivity s={settings} set={update} />}
         {section === "tools" && <ToolsSettings s={settings} set={update} />}

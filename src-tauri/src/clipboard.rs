@@ -188,8 +188,9 @@ pub fn clip_list(h: State<History>) -> Vec<Entry> {
 
 /// Vuelve a poner un texto en el portapapeles.
 #[tauri::command]
-pub fn clip_copy(app: AppHandle, h: State<History>, text: String) -> Result<(), String> {
-    write_text(&text)?;
+pub async fn clip_copy(app: AppHandle, h: State<'_, History>, text: String) -> Result<(), String> {
+    let clipboard_text = text.clone();
+    tauri::async_runtime::spawn_blocking(move || write_text(&clipboard_text)).await.map_err(|e| e.to_string())??;
     h.own_seq.store(unsafe { GetClipboardSequenceNumber() }, SeqCst);
     let snapshot = {
         let mut items = h.items.lock().unwrap();

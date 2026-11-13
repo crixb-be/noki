@@ -43,7 +43,11 @@ fn mime(name: &str) -> &'static str {
 
 /// Copia la imagen elegida a la carpeta de fondos y devuelve el nombre con el que se guardó.
 #[tauri::command]
-pub fn bg_import(app: AppHandle, path: String) -> Result<String, String> {
+pub async fn bg_import(app: AppHandle, path: String) -> Result<String, String> {
+    tauri::async_runtime::spawn_blocking(move || bg_import_blocking(app, path)).await.map_err(|e| e.to_string())?
+}
+
+fn bg_import_blocking(app: AppHandle, path: String) -> Result<String, String> {
     let src = PathBuf::from(&path);
     let ext = src.extension().and_then(|e| e.to_str()).unwrap_or("").to_ascii_lowercase();
     if !EXTENSIONS.contains(&ext.as_str()) {
@@ -69,7 +73,11 @@ pub fn bg_import(app: AppHandle, path: String) -> Result<String, String> {
 
 /// La imagen guardada como «data URL» lista para usar en CSS; vacío si ya no existe.
 #[tauri::command]
-pub fn bg_data(app: AppHandle, name: String) -> Result<String, String> {
+pub async fn bg_data(app: AppHandle, name: String) -> Result<String, String> {
+    tauri::async_runtime::spawn_blocking(move || bg_data_blocking(app, name)).await.map_err(|e| e.to_string())?
+}
+
+fn bg_data_blocking(app: AppHandle, name: String) -> Result<String, String> {
     if name.is_empty() || !valid_name(&name) {
         return Ok(String::new());
     }

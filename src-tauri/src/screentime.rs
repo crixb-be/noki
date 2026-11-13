@@ -185,9 +185,12 @@ pub fn start(app: AppHandle) {
 
 /// Borra todo el historial.
 #[tauri::command]
-pub fn screentime_clear(app: AppHandle) {
+pub async fn screentime_clear(app: AppHandle) -> Result<(), String> {
     CLEARED.store(true, SeqCst);
     let empty = json!({ "days": {} });
-    let _ = app.state::<Store>().set("screentime".into(), empty.clone());
+    let store = app.state::<Store>().inner().clone();
+    let saved = empty.clone();
+    tauri::async_runtime::spawn_blocking(move || store.set("screentime".into(), saved)).await.map_err(|e| e.to_string())??;
     let _ = app.emit("store-changed", json!({ "key": "screentime", "value": empty, "source": "rust" }));
+    Ok(())
 }

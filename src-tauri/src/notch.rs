@@ -21,7 +21,7 @@ use tauri::{
     AppHandle, Emitter, Manager, PhysicalPosition, PhysicalSize, WebviewUrl, WebviewWindow, WebviewWindowBuilder,
 };
 use windows::Win32::{
-    Foundation::{HWND, LPARAM, POINT, RECT},
+    Foundation::{CloseHandle, HWND, LPARAM, POINT, RECT},
     Graphics::Gdi::{GetDC, GetPixel, ReleaseDC},
     UI::{
         Input::KeyboardAndMouse::{GetAsyncKeyState, VK_ESCAPE, VK_LBUTTON, VK_RBUTTON},
@@ -30,12 +30,13 @@ use windows::Win32::{
             QUNS_RUNNING_D3D_FULL_SCREEN,
         },
         WindowsAndMessaging::{
-            GetCursorPos, GetWindowLongPtrW, IsWindowVisible, SetWindowLongPtrW, SetWindowPos,
+            GetCursorPos, GetForegroundWindow, GetWindowLongPtrW, GetWindowThreadProcessId, IsWindowVisible, SetWindowLongPtrW, SetWindowPos,
             GWL_EXSTYLE, HWND_TOPMOST, SWP_ASYNCWINDOWPOS, SWP_NOACTIVATE, SWP_NOMOVE, SWP_NOSENDCHANGING, SWP_NOSIZE,
             WS_EX_TOOLWINDOW, WS_EX_TOPMOST, WS_EX_TRANSPARENT,
         },
     },
 };
+use windows::{core::PWSTR, Win32::System::Threading::{OpenProcess, QueryFullProcessImageNameW, PROCESS_NAME_FORMAT, PROCESS_QUERY_LIMITED_INFORMATION}};
 
 /// Margen transparente a cada lado del notch para las "orejas" cóncavas (px lógicos).
 pub const EAR: i32 = 16;
@@ -119,10 +120,10 @@ impl NotchState {
 
 #[derive(Clone, Copy, PartialEq, Debug)]
 pub struct Rect {
-    left: i32,
-    top: i32,
-    right: i32,
-    bottom: i32,
+    pub(crate) left: i32,
+    pub(crate) top: i32,
+    pub(crate) right: i32,
+    pub(crate) bottom: i32,
 }
 
 impl Rect {
@@ -132,10 +133,10 @@ impl Rect {
     fn inflate(&self, d: i32) -> Rect {
         Rect { left: self.left - d, top: self.top - d, right: self.right + d, bottom: self.bottom + d }
     }
-    fn width(&self) -> i32 {
+    pub(crate) fn width(&self) -> i32 {
         self.right - self.left
     }
-    fn height(&self) -> i32 {
+    pub(crate) fn height(&self) -> i32 {
         self.bottom - self.top
     }
 }
@@ -143,10 +144,10 @@ impl Rect {
 /// Una pantalla (real o simulada), en píxeles físicos y coordenadas de pantalla virtual.
 #[derive(Clone, Debug)]
 pub struct Mon {
-    rect: Rect,
-    scale: f64,
-    name: String,
-    primary: bool,
+    pub(crate) rect: Rect,
+    pub(crate) scale: f64,
+    pub(crate) name: String,
+    pub(crate) primary: bool,
 }
 
 /// Pantallas conectadas. Con la variable de entorno `MINOTCH_FAKE_MONITORS=N` la pantalla principal se
@@ -217,7 +218,7 @@ pub fn list_monitors(app: &AppHandle) -> Vec<MonitorInfo> {
 
 /// Qué ventana va en qué pantalla: `main` en la elegida (o la principal) y, con «un notch por pantalla»,
 /// `main-1`, `main-2`… en las demás.
-fn assignments(s: &Settings, mons: &[Mon]) -> Vec<(String, Mon)> {
+pub(crate) fn assignments(s: &Settings, mons: &[Mon]) -> Vec<(String, Mon)> {
     if mons.is_empty() {
         return vec![];
     }
@@ -269,14 +270,15 @@ fn compute(monitor: Rect, scale: f64, s: &Settings, top: i32) -> Layout {
     let a = &s.appearance;
     let win_w = px(a.expanded_w + 2 * EAR, scale);
     let win_h = px(a.expanded_h + SHADOW, scale);
+    let collapsed_h = if s.topbar.enabled { s.topbar.height } else { a.collapsed_h };
     let cx = (monitor.left + monitor.right) / 2 + px(a.offset_x, scale);
     let win_left = cx - win_w / 2;
     let centered = |w: i32, h: i32| Rect { left: cx - w / 2, top, right: cx - w / 2 + w, bottom: top + h };
     Layout {
         scale,
         window: Rect { left: win_left, top, right: win_left + win_w, bottom: top + win_h },
-        frame: Rect { left: monitor.left, top, right: monitor.right, bottom: top + win_h },
-        pill: centered(px(a.collapsed_w, scale), px(a.collapsed_h, scale)),
+        frame: Rect { left: win_left, top, right: win_left + win_w, bottom: top + win_h },
+        pill: centered(px(a.collapsed_w, scale), px(collapsed_h, scale)),
     }
 }
 
@@ -336,7 +338,7 @@ fn has_ex(hwnd: HWND, bit: u32) -> bool {
 /// decía «ignorando», nunca se corregía. Además, SetWindowLongPtrW sobre una ventana de otro hilo hace un
 /// SendMessage síncrono (WM_STYLECHANGING/ED) que bloqueaba este bucle mientras el hilo principal estaba ocupado.
 /// En el hilo principal, tauri y tao ejecutan la llamada al momento, así que ambas escrituras quedan en orden.
-fn ex_style_on_ui(window: &WebviewWindow, ignore: Option<bool>, visible: Option<bool>) {
+pub(crate) fn ex_style_on_ui(window: &WebviewWindow, ignore: Option<bool>, visible: Option<bool>) {
     let w = window.clone();
     let _ = window.run_on_main_thread(move || {
         match visible {
@@ -389,12 +391,31 @@ fn color_distance(a: (u8, u8, u8), b: (u8, u8, u8)) -> i32 {
     (a.0 as i32 - b.0 as i32).abs() + (a.1 as i32 - b.1 as i32).abs() + (a.2 as i32 - b.2 as i32).abs()
 }
 
-/// Solo reasigna TOPMOST si Windows/tao lo quitó (o si `force`). Antes se llamaba a SetWindowPos cada segundo,
+/// Solo reasigna TOPMOST si Windows/tao lo quitó. Antes se llamaba a SetWindowPos cada segundo,
 /// lo que reordenaba el z-order y bloqueaba al hilo de la ventana con un SendMessage síncrono.
 /// SWP_ASYNCWINDOWPOS evita esperar al hilo principal; SWP_NOSENDCHANGING no dispara WM_WINDOWPOSCHANGING.
-fn raise_topmost(hwnd: HWND, force: bool) {
+fn transient_foreground_process() -> bool {
     unsafe {
-        if !force && GetWindowLongPtrW(hwnd, GWL_EXSTYLE) & WS_EX_TOPMOST.0 as isize != 0 {
+        let foreground = GetForegroundWindow();
+        if foreground.0.is_null() { return false; }
+        let mut pid = 0u32;
+        GetWindowThreadProcessId(foreground, Some(&mut pid));
+        let Ok(process) = OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION, false, pid) else { return false };
+        let mut length = 32768u32;
+        let mut path = vec![0u16; length as usize];
+        let result = QueryFullProcessImageNameW(process, PROCESS_NAME_FORMAT(0), PWSTR(path.as_mut_ptr()), &mut length);
+        let _ = CloseHandle(process);
+        if result.is_err() { return false; }
+        path.truncate(length as usize);
+        let path = String::from_utf16_lossy(&path);
+        matches!(path.rsplit(['\\', '/']).next().unwrap_or_default().to_ascii_lowercase().as_str(), "screenclippinghost.exe" | "snippingtool.exe" | "shellexperiencehost.exe" | "searchhost.exe")
+    }
+}
+
+fn raise_topmost(hwnd: HWND, _force: bool) {
+    if transient_foreground_process() { return; }
+    unsafe {
+        if GetWindowLongPtrW(hwnd, GWL_EXSTYLE) & WS_EX_TOPMOST.0 as isize != 0 {
             return;
         }
         let _ = SetWindowPos(
@@ -448,6 +469,7 @@ pub fn appbar_remove(state: &NotchState) {
     for (_, win) in state.all() {
         appbar_remove_win(&win);
     }
+    crate::dock::remove();
 }
 
 // ───────────────────────────── estado abierto/cerrado ─────────────────────────────
@@ -554,8 +576,9 @@ fn ensure_layout(
     force: bool,
 ) {
     let a = &s.appearance;
-    let bar_h = px(a.collapsed_h, mon.scale);
-    let reserve = s.general.reserve_space && s.general.visible;
+    let bar_h = px(if s.topbar.enabled { s.topbar.height } else { a.collapsed_h }, mon.scale);
+    // La reserva antigua ya no se usa: la barra superior es el único AppBar superior.
+    let reserve = false;
     let key = Key {
         monitor: mon.rect,
         scale_milli: (mon.scale * 1000.0) as i32,
@@ -577,17 +600,20 @@ fn ensure_layout(
     *win.monitor.lock().unwrap() = Some(mon.rect);
 
     let want = applied.as_ref().unwrap().1.frame;
-    let pos = window.outer_position().ok();
-    let size = window.outer_size().ok();
-    let pos_ok = pos.map(|p| (p.x - want.left).abs() <= 1 && (p.y - want.top).abs() <= 1).unwrap_or(false);
-    let size_ok = size
-        .map(|z| (z.width as i32 - want.width()).abs() <= 1 && (z.height as i32 - want.height()).abs() <= 1)
-        .unwrap_or(false);
-    if !pos_ok || !size_ok {
-        // Primero se mueve (para caer en la pantalla correcta y su DPI) y luego se dimensiona.
-        let _ = window.set_position(PhysicalPosition::new(want.left, want.top));
-        let _ = window.set_size(PhysicalSize::new(want.width() as u32, want.height() as u32));
-    }
+    let ui_window = window.clone();
+    let _ = window.run_on_main_thread(move || {
+        let pos = ui_window.outer_position().ok();
+        let size = ui_window.outer_size().ok();
+        let pos_ok = pos.map(|p| (p.x - want.left).abs() <= 1 && (p.y - want.top).abs() <= 1).unwrap_or(false);
+        let size_ok = size
+            .map(|z| (z.width as i32 - want.width()).abs() <= 1 && (z.height as i32 - want.height()).abs() <= 1)
+            .unwrap_or(false);
+        if !pos_ok || !size_ok {
+            // Primero se mueve (para caer en la pantalla correcta y su DPI) y luego se dimensiona.
+            let _ = ui_window.set_position(PhysicalPosition::new(want.left, want.top));
+            let _ = ui_window.set_size(PhysicalSize::new(want.width() as u32, want.height() as u32));
+        }
+    });
 }
 
 pub fn start(app: AppHandle) {
@@ -666,9 +692,15 @@ fn run_loop(app: AppHandle) {
             sync_windows(&app, &st, &assign, &mut loops);
         }
 
+        let previous_fullscreen = fullscreen;
         if now - last_fs >= Duration::from_millis(400) {
             last_fs = now;
             fullscreen = s.general.hide_on_fullscreen && fullscreen_app_active();
+        }
+        if slow || previous_fullscreen != fullscreen {
+            crate::topbar::sync(&app, &s, fullscreen);
+            crate::dock::sync(&app, &s, fullscreen);
+            crate::launchpad::sync(&app, &s, fullscreen);
         }
         let want_visible = s.general.visible && !fullscreen;
 
@@ -776,7 +808,9 @@ fn run_loop(app: AppHandle) {
                 // y con la app en primer plano: se limita a 1 vez por segundo.
                 if now - lp.last_tint >= Duration::from_millis(1000) {
                     lp.last_tint = now;
-                    if let Some(c) = sample_tint(layout.frame, px(s.appearance.collapsed_h, layout.scale) + px(4, layout.scale)) {
+                    let sample_frame = if s.topbar.enabled { mon.rect } else { layout.frame };
+                    let sample_y = if s.topbar.enabled { s.topbar.height } else { s.appearance.collapsed_h };
+                    if let Some(c) = sample_tint(sample_frame, px(sample_y, layout.scale) + px(4, layout.scale)) {
                         let changed = lp.tint.map_or(true, |p| color_distance(p, c) > 6);
                         // Se repite cada 3 s aunque no cambie, por si la ventana aún no escuchaba.
                         if changed || now - lp.last_tint_emit >= Duration::from_secs(3) {

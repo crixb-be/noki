@@ -73,6 +73,7 @@ pub async fn update_install(app: AppHandle, pending: State<'_, Pending>) -> Resu
         .map_err(|e| format!("No se pudo descargar o la firma no es válida: {e}"))?;
 
     // Libera el espacio reservado en el escritorio antes de que el instalador cierre la app.
+    crate::dock::restore_taskbar();
     notch::appbar_remove(&app.state::<NotchState>());
     update.install(bytes).map_err(|e| format!("No se pudo instalar: {e}"))?;
     Ok(())

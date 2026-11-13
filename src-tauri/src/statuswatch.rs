@@ -106,7 +106,7 @@ fn wifi_loop(app: AppHandle) {
 
 // ───────────── Bluetooth ─────────────
 
-fn connected_bluetooth() -> Option<HashMap<String, String>> {
+pub fn connected_bluetooth() -> Option<HashMap<String, String>> {
     let aqs = HSTRING::from(
         "(System.Devices.Aep.ProtocolId:=\"{e0cbf06c-cd8b-4647-bb8a-263b43f0f974}\" OR System.Devices.Aep.ProtocolId:=\"{bb7bb05e-5972-42b5-94fc-76eaa7084d49}\") AND System.Devices.Aep.IsConnected:=System.StructuredQueryType.Boolean#True",
     );

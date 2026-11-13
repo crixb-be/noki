@@ -4,6 +4,11 @@ import { listen } from "@tauri-apps/api/event";
 
 const isObj = (v) => v && typeof v === "object" && !Array.isArray(v);
 
+const DEFAULTS = {
+  topbar: { enabled: false, height: 30, tint: "auto", showCpu: false, showRam: false, showWifi: true, showBluetooth: true, showSound: true, showBattery: true, showBatteryPct: true, showSearch: true, showControlCenter: true, showCapture: true, showNotifications: true, showAvatar: true, showClock: true, avatarPath: "" },
+  dock: { enabled: false, iconSize: 48, magnify: true, magnifyScale: 1.6, showApps: true, showRunning: true, showTrash: true, autohide: false, hideTaskbar: false, reserveSpace: false, pinned: [], folders: [] },
+};
+
 /** Fusión profunda: `patch` solo pisa las claves que trae. */
 export function merge(base, patch) {
   const out = { ...base };
@@ -13,7 +18,7 @@ export function merge(base, patch) {
 
 /**
  * Ajustes compartidos entre ventanas. Rust es la fuente de verdad: guarda en %APPDATA%,
- * aplica los cambios (layout, atajo, autoinicio) y emite `settings-changed` a todas las ventanas.
+ * aplica los cambios (layout, atajo, autoinicio) y emite `settings-updated` a todas las ventanas.
  */
 export function useSettings() {
   const [settings, setSettings] = useState(null);
@@ -29,37 +34,35 @@ export function useSettings() {
       .catch((e) => setWarning(String(e)))
       .finally(() => {
         inFlight.current = false;
-        // Se vuelve a leer el estado real de Rust (p. ej. una clave recién guardada pasa a verse como «guardada»),
-        // salvo que haya cambios nuevos en camino.
-        if (!timer.current) {
-          invoke("get_settings")
-            .then((s) => {
-              if (timer.current) return;
-              latest.current = s;
-              setSettings(s);
-            })
-            .catch(() => {});
-        }
       });
   }, []);
 
   useEffect(() => {
-    let unlisten;
+    const unlisten = [];
     let cancelled = false;
     invoke("get_settings").then((s) => {
       if (cancelled) return;
-      latest.current = s;
-      setSettings(s);
+      const merged = merge(merge({}, DEFAULTS), s);
+      latest.current = merged;
+      setSettings(merged);
     });
+    const apply = (payload) => {
+      const merged = merge(merge({}, DEFAULTS), payload);
+      latest.current = merged;
+      setSettings(merged);
+    };
+    listen("settings-updated", (e) => {
+      // Este evento es la fuente de verdad: se aplica incluso mientras termina el guardado local.
+      apply(e.payload);
+    }).then((fn) => (cancelled ? fn() : unlisten.push(fn)));
     listen("settings-changed", (e) => {
-      // Mientras hay cambios locales sin confirmar se ignora el eco para evitar saltos en sliders.
+      // Compatibilidad con versiones anteriores; no pisa un slider local en curso.
       if (timer.current || inFlight.current) return;
-      latest.current = e.payload;
-      setSettings(e.payload);
-    }).then((fn) => (cancelled ? fn() : (unlisten = fn)));
+      apply(e.payload);
+    }).then((fn) => (cancelled ? fn() : unlisten.push(fn)));
     return () => {
       cancelled = true;
-      unlisten?.();
+      unlisten.forEach((fn) => fn());
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -81,8 +84,9 @@ export function useSettings() {
     timer.current = null;
     await invoke("reset_settings");
     const s = await invoke("get_settings");
-    latest.current = s;
-    setSettings(s);
+      const merged = merge(merge({}, DEFAULTS), s);
+      latest.current = merged;
+      setSettings(merged);
   }, []);
 
   return { settings, update, reset, warning };

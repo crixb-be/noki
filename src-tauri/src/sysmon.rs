@@ -2,7 +2,7 @@
 //! Solo se consulta mientras la pestaña «Sistema» está abierta.
 
 use serde::Serialize;
-use std::{collections::HashMap, sync::Mutex, time::Instant};
+use std::{collections::HashMap, sync::{Arc, Mutex}, time::Instant};
 use sysinfo::{Disks, Networks, ProcessesToUpdate, System};
 use tauri::State;
 
@@ -22,7 +22,7 @@ impl SysMon {
     }
 }
 
-pub type SysMonState = Mutex<SysMon>;
+pub type SysMonState = Arc<Mutex<SysMon>>;
 
 #[derive(Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -48,7 +48,12 @@ pub struct Stats {
 }
 
 #[tauri::command]
-pub fn system_stats(mon: State<SysMonState>) -> Stats {
+pub async fn system_stats(mon: State<'_, SysMonState>) -> Result<Stats, String> {
+    let mon = mon.inner().clone();
+    tauri::async_runtime::spawn_blocking(move || system_stats_blocking(&mon)).await.map_err(|e| e.to_string())
+}
+
+fn system_stats_blocking(mon: &SysMonState) -> Stats {
     let mut m = mon.lock().unwrap();
     m.sys.refresh_cpu_usage();
     m.sys.refresh_memory();
@@ -97,7 +102,12 @@ pub struct ProcInfo {
 
 /// Programas que más consumen, agrupados por nombre. `by`: "mem" (memoria) o "cpu".
 #[tauri::command]
-pub fn top_processes(mon: State<SysMonState>, by: String) -> Vec<ProcInfo> {
+pub async fn top_processes(mon: State<'_, SysMonState>, by: String) -> Result<Vec<ProcInfo>, String> {
+    let mon = mon.inner().clone();
+    tauri::async_runtime::spawn_blocking(move || top_processes_blocking(&mon, by)).await.map_err(|e| e.to_string())
+}
+
+fn top_processes_blocking(mon: &SysMonState, by: String) -> Vec<ProcInfo> {
     let mut m = mon.lock().unwrap();
     m.sys.refresh_processes(ProcessesToUpdate::All, true);
     let cores = m.sys.cpus().len().max(1) as f32;
@@ -131,7 +141,12 @@ pub fn is_protected(name: &str) -> bool {
 
 /// Cierra todos los procesos de un programa. Devuelve cuántos cerró.
 #[tauri::command]
-pub fn end_task(mon: State<SysMonState>, name: String) -> Result<usize, String> {
+pub async fn end_task(mon: State<'_, SysMonState>, name: String) -> Result<usize, String> {
+    let mon = mon.inner().clone();
+    tauri::async_runtime::spawn_blocking(move || end_task_blocking(&mon, name)).await.map_err(|e| e.to_string())?
+}
+
+fn end_task_blocking(mon: &SysMonState, name: String) -> Result<usize, String> {
     if is_protected(&name) {
         return Err("Este proceso es del sistema y no se puede cerrar desde aquí.".into());
     }

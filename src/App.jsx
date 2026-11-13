@@ -2,7 +2,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { useBattery } from "./components/Battery.jsx";
 import { addPaths, useNativeDrop } from "./components/FileShelf.jsx";
-import { NotchDecor, StripDecor } from "./components/notch/ThemeDecor.jsx";
+import { NotchDecor } from "./components/notch/ThemeDecor.jsx";
 import Ear from "./components/notch/Ear.jsx";
 import CompactBar from "./components/notch/CompactBar.jsx";
 import MediaPill, { PILL_EXTRA_H } from "./components/notch/MediaPill.jsx";
@@ -28,6 +28,7 @@ import { EMPTY_HABITS, countOn, useHabits } from "./hooks/useHabits.js";
 import { fillFor, rgba, useBgImage } from "./lib/background.js";
 import { weatherInfo } from "./lib/wmo.js";
 import { THEMES, resolveTheme } from "./lib/themes.js";
+import { useBarPaint } from "./components/topbar/barPaint.jsx";
 import { presetLanguage, useLanguage } from "./lib/i18n.js";
 
 // Misma curva y duración para ancho y alto: el notch se abre y cierra como una sola pieza.
@@ -317,24 +318,12 @@ function Notch({ settings, update }) {
   // Temas de temporada, cada parte el suyo: personaje, notch central y franja de los costados. No tocan tus colores guardados.
   const themeFor = (setting) => resolveTheme(setting, ap.birthday, ap.themeEvents);
   const notchTheme = THEMES[themeFor(ap.notchTheme)] ?? null;
-  const barTheme = THEMES[themeFor(ap.barTheme)] ?? null;
   const notchImg = useBgImage(ap.notchAuto || notchTheme ? "" : ap.notchImage);
-  const barImg = useBgImage(ap.barMode === "image" ? ap.barImage : "");
+  const barPaint = useBarPaint(settings);
   const notchColor = notchTheme ? notchTheme.notch : ap.notchAuto ? tint ?? ap.notchColor : ap.notchColor;
   const notchOpacity = notchTheme ? ap.notchThemeOpacity : ap.opacity;
   const bg = rgba(notchColor, notchOpacity); // color plano: también lo usan las «orejas»
   const notchFill = fillFor({ color: notchColor, opacity: notchOpacity, image: notchImg, dim: ap.notchDim });
-  const barFill = barTheme
-    ? rgba(barTheme.bar, ap.barThemeOpacity)
-    : ap.barMode === "none"
-      ? null
-      : ap.barMode === "match"
-        ? bg
-        : ap.barMode === "auto"
-          ? rgba(tint ?? ap.notchColor, ap.barOpacity)
-          : ap.barMode === "color"
-            ? rgba(ap.barColor, ap.barOpacity)
-            : fillFor({ color: ap.barColor, opacity: ap.barOpacity, image: barImg, dim: ap.barDim });
 
   const onFocus = (e) => {
     if (!isTextField(e.target)) return;
@@ -356,7 +345,6 @@ function Notch({ settings, update }) {
   return (
     <div className="relative h-full w-full" onFocus={onFocus} onBlur={onBlur}>
       {/* Sin espacio reservado la franja taparía la parte de arriba de las apps maximizadas: solo queda el notch. */}
-      {barFill && settings.general.reserveSpace && <div className="pointer-events-none absolute left-0 right-0 top-0" style={{ height: ap.collapsedH, background: barFill, transition: "background-color 350ms ease" }}>{barTheme && <StripDecor theme={barTheme} height={ap.collapsedH} />}</div>}
       <div className="flex h-full w-full items-start justify-center" style={{ transform: `translateX(${ap.offsetX}px)` }}>
       <div
         className="relative"
@@ -366,8 +354,8 @@ function Notch({ settings, update }) {
           transition: `width ${NOTCH_MS}ms ${NOTCH_EASE}, height ${NOTCH_MS}ms ${NOTCH_EASE}`,
         }}
       >
-        {!notchImg && <Ear side="left" bg={bg} />}
-        {!notchImg && <Ear side="right" bg={bg} />}
+        {!notchImg && <Ear side="left" bg={settings.topbar.enabled ? (barPaint.fill ?? bg) : bg} />}
+        {!notchImg && <Ear side="right" bg={settings.topbar.enabled ? (barPaint.fill ?? bg) : bg} />}
         <div
           className={`absolute inset-0 overflow-hidden text-white transition-[border-radius,box-shadow,background-color] duration-300 ${
             pomo.alert || peek?.tone === "alert" ? "animate-[ringPulse_1.1s_ease-out_infinite] ring-2 ring-amber-400" : ""

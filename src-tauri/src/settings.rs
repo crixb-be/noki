@@ -35,7 +35,8 @@ impl Default for General {
         Self {
             visible: true,
             autostart: false,
-            reserve_space: true,
+            // Se conserva solo para leer configuraciones antiguas; la reserva nueva la hace `topbar`.
+            reserve_space: false,
             trigger: "notch".into(),
             hover_delay: 120,
             close_delay: 300,
@@ -107,6 +108,120 @@ pub struct Appearance {
     pub theme_events: Vec<ThemeEvent>,
     /// Año de nacimiento (0 = no indicado); solo sirve para decir tu edad el día del cumpleaños.
     pub birth_year: i32,
+}
+
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq)]
+#[serde(default, rename_all = "camelCase")]
+pub struct TopBar {
+    pub enabled: bool,
+    pub height: i32,
+    pub tint: String,
+    pub show_cpu: bool,
+    pub show_ram: bool,
+    pub show_wifi: bool,
+    pub show_bluetooth: bool,
+    pub show_sound: bool,
+    pub show_battery: bool,
+    pub show_battery_pct: bool,
+    pub show_search: bool,
+    pub show_control_center: bool,
+    pub show_capture: bool,
+    pub show_notifications: bool,
+    pub show_avatar: bool,
+    pub show_clock: bool,
+    pub avatar_path: String,
+}
+
+impl Default for TopBar {
+    fn default() -> Self {
+        Self {
+            enabled: false,
+            height: 30,
+            tint: "auto".into(),
+            show_cpu: false,
+            show_ram: false,
+            show_wifi: true,
+            show_bluetooth: true,
+            show_sound: true,
+            show_battery: true,
+            show_battery_pct: true,
+            show_search: true,
+            show_control_center: true,
+            show_capture: true,
+            show_notifications: true,
+            show_avatar: true,
+            show_clock: true,
+            avatar_path: String::new(),
+        }
+    }
+}
+
+#[derive(Serialize, Deserialize, Clone, Debug, Default, PartialEq)]
+#[serde(default, rename_all = "camelCase")]
+pub struct DockPinned {
+    pub name: String,
+    pub path: String,
+    pub args: String,
+    pub aumid: String,
+}
+
+#[derive(Serialize, Deserialize, Clone, Debug, Default, PartialEq)]
+#[serde(default, rename_all = "camelCase")]
+pub struct DockFolder {
+    pub name: String,
+    pub path: String,
+}
+
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq)]
+#[serde(default, rename_all = "camelCase")]
+pub struct Dock {
+    pub enabled: bool,
+    pub icon_size: i32,
+    pub magnify: bool,
+    pub magnify_scale: f64,
+    pub show_apps: bool,
+    pub show_running: bool,
+    pub show_trash: bool,
+    pub autohide: bool,
+    #[serde(default)]
+    pub hide_taskbar: bool,
+    pub reserve_space: bool,
+    pub pinned: Vec<DockPinned>,
+    pub folders: Vec<DockFolder>,
+}
+
+impl Default for Dock {
+    fn default() -> Self {
+        let mut pinned = vec![DockPinned {
+            name: "Explorador".into(),
+            path: "explorer.exe".into(),
+            args: String::new(),
+            aumid: String::new(),
+        }];
+        let edge = std::env::var("ProgramFiles(x86)")
+            .ok()
+            .map(|p| std::path::PathBuf::from(p).join("Microsoft\\Edge\\Application\\msedge.exe"))
+            .filter(|p| p.exists());
+        if let Some(path) = edge {
+            pinned.push(DockPinned { name: "Microsoft Edge".into(), path: path.to_string_lossy().into_owned(), args: String::new(), aumid: String::new() });
+        }
+        pinned.push(DockPinned { name: "Bloc de notas".into(), path: "notepad.exe".into(), args: String::new(), aumid: String::new() });
+        let downloads = std::env::var("USERPROFILE").map(|p| std::path::PathBuf::from(p).join("Downloads")).unwrap_or_default();
+        Self {
+            enabled: false,
+            icon_size: 40,
+            magnify: true,
+            magnify_scale: 1.6,
+            show_apps: true,
+            show_running: true,
+            show_trash: true,
+            autohide: false,
+            hide_taskbar: false,
+            reserve_space: false,
+            pinned,
+            folders: vec![DockFolder { name: "Descargas".into(), path: downloads.to_string_lossy().into_owned() }],
+        }
+    }
 }
 
 impl Default for Appearance {
@@ -516,6 +631,8 @@ pub struct Settings {
     pub calendar: Calendar,
     pub weather: Weather,
     pub ai: Ai,
+    pub topbar: TopBar,
+    pub dock: Dock,
 }
 
 impl Settings {
@@ -591,6 +708,29 @@ impl Settings {
         }
         if !["none", "match", "auto", "color", "image"].contains(&a.bar_mode.as_str()) {
             a.bar_mode = "match".into();
+        }
+
+        let b = &mut self.topbar;
+        b.height = b.height.clamp(28, 32);
+        if !["auto", "dark", "light"].contains(&b.tint.as_str()) {
+            b.tint = "auto".into();
+        }
+        b.avatar_path = b.avatar_path.chars().take(4096).collect();
+
+        let d = &mut self.dock;
+        d.icon_size = d.icon_size.clamp(32, 96);
+        d.magnify_scale = d.magnify_scale.clamp(1.0, 2.5);
+        d.pinned.truncate(64);
+        d.folders.truncate(32);
+        for p in &mut d.pinned {
+            p.name = p.name.trim().chars().take(120).collect();
+            p.path = p.path.trim().chars().take(4096).collect();
+            p.args = p.args.chars().take(4096).collect();
+            p.aumid = p.aumid.trim().chars().take(512).collect();
+        }
+        for f in &mut d.folders {
+            f.name = f.name.trim().chars().take(120).collect();
+            f.path = f.path.trim().chars().take(4096).collect();
         }
 
         // gemini-2.5-flash ya no está disponible para cuentas nuevas; el «lite» responde en ~2 s.
@@ -749,12 +889,25 @@ impl Settings {
 }
 
 pub fn load(app: &AppHandle) -> Settings {
-    let mut s: Settings = path(app)
-        .and_then(|p| fs::read_to_string(p).ok())
-        // Se ignora el BOM por si el archivo se editó con el Bloc de notas.
+    let text = path(app).and_then(|p| fs::read_to_string(p).ok());
+    // El campo `topbar` permite distinguir una configuración nueva de una antigua. En las antiguas,
+    // `general.reserveSpace` era precisamente la franja superior.
+    let had_topbar = text.as_deref()
+        .and_then(|raw| serde_json::from_str::<serde_json::Value>(raw.trim_start_matches('\u{feff}')).ok())
+        .and_then(|value| value.get("topbar").cloned())
+        .is_some();
+    let mut s: Settings = text
         .and_then(|t| serde_json::from_str(t.trim_start_matches('\u{feff}')).ok())
         .unwrap_or_default();
+    let migrated_topbar = !had_topbar && s.general.reserve_space;
+    if migrated_topbar {
+        s.topbar.enabled = true;
+        s.general.reserve_space = false;
+    }
     s.clamp();
+    if migrated_topbar {
+        let _ = save(app, &s);
+    }
 
     // Migración: si el archivo trae claves en texto plano (versiones ≤0.5) se pasan a Windows y se reescribe
     // el archivo sin ellas. Si Windows no las acepta, se conservan en el archivo para no perderlas.

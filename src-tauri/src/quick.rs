@@ -179,21 +179,21 @@ fn set_muted(flow: EDataFlow, on: bool) -> Result<(), String> {
 // ───────────── comandos ─────────────
 
 #[tauri::command]
-pub fn quick_state() -> QuickState {
-    QuickState {
+pub async fn quick_state() -> Result<QuickState, String> {
+    tauri::async_runtime::spawn_blocking(|| QuickState {
         wifi: radio_state(RadioKind::WiFi),
         bluetooth: radio_state(RadioKind::Bluetooth),
         keep_awake: KEEP_AWAKE.load(SeqCst),
         dark: dark_enabled(),
         mic_muted: muted(eCapture),
         muted: muted(eRender),
-    }
+    }).await.map_err(|e| e.to_string())
 }
 
 /// `kind`: wifi, bluetooth, awake, dark, mic, sound.
 #[tauri::command]
-pub fn quick_set(kind: String, on: bool) -> Result<(), String> {
-    match kind.as_str() {
+pub async fn quick_set(kind: String, on: bool) -> Result<(), String> {
+    tauri::async_runtime::spawn_blocking(move || match kind.as_str() {
         "wifi" => set_radio(RadioKind::WiFi, on),
         "bluetooth" => set_radio(RadioKind::Bluetooth, on),
         "awake" => {
@@ -207,13 +207,13 @@ pub fn quick_set(kind: String, on: bool) -> Result<(), String> {
         "mic" => set_muted(eCapture, on),
         "sound" => set_muted(eRender, on),
         _ => Err("Interruptor desconocido.".into()),
-    }
+    }).await.map_err(|e| e.to_string())?
 }
 
 /// `kind`: screenshot (recortes de Windows) o lock (bloquear el equipo).
 #[tauri::command]
-pub fn quick_action(kind: String) -> Result<(), String> {
-    match kind.as_str() {
+pub async fn quick_action(kind: String) -> Result<(), String> {
+    tauri::async_runtime::spawn_blocking(move || match kind.as_str() {
         "screenshot" => std::process::Command::new("explorer.exe")
             .arg("ms-screenclip:")
             .spawn()
@@ -221,5 +221,5 @@ pub fn quick_action(kind: String) -> Result<(), String> {
             .map_err(|e| e.to_string()),
         "lock" => unsafe { LockWorkStation().map_err(|e| e.to_string()) },
         _ => Err("Acción desconocida.".into()),
-    }
+    }).await.map_err(|e| e.to_string())?
 }

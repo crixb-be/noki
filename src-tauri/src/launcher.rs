@@ -3,7 +3,7 @@
 use serde::Serialize;
 use std::{
     path::{Path, PathBuf},
-    sync::Mutex,
+    sync::{Arc, Mutex},
     time::{Duration, Instant},
 };
 use tauri::State;
@@ -19,10 +19,11 @@ use windows::{
 pub struct AppEntry {
     pub name: String,
     pub path: String,
+    pub installed: i64,
 }
 
-#[derive(Default)]
-pub struct AppCache(Mutex<Option<(Instant, Vec<AppEntry>)>>);
+#[derive(Clone, Default)]
+pub struct AppCache(pub Arc<Mutex<Option<(Instant, Vec<AppEntry>)>>>);
 
 const EXTENSIONS: [&str; 3] = ["lnk", "exe", "url"];
 const SKIP: [&str; 6] = ["uninstall", "desinstal", "readme", "léeme", "leeme", "license"];
@@ -39,20 +40,27 @@ fn walk(dir: &Path, depth: u8, out: &mut Vec<AppEntry>) {
             let name = p.file_stem().map(|s| s.to_string_lossy().into_owned()).unwrap_or_default();
             let lower = name.to_lowercase();
             if !name.is_empty() && !SKIP.iter().any(|s| lower.contains(s)) {
-                out.push(AppEntry { name, path: p.to_string_lossy().into_owned() });
+                let installed = std::fs::metadata(&p).ok().and_then(|m| m.created().ok()).and_then(|d| d.duration_since(std::time::UNIX_EPOCH).ok()).map(|d| d.as_secs() as i64).unwrap_or(0);
+                out.push(AppEntry { name, path: p.to_string_lossy().into_owned(), installed });
             }
         }
     }
 }
 
 /// Programas del menú Inicio (todos los usuarios y el actual). Se cachea 5 minutos.
-#[tauri::command(async)]
-pub fn launcher_apps(cache: State<AppCache>) -> Vec<AppEntry> {
-    let mut guard = cache.0.lock().unwrap();
-    if let Some((at, list)) = guard.as_ref() {
-        if at.elapsed() < Duration::from_secs(300) {
-            return list.clone();
-        }
+#[tauri::command]
+pub async fn launcher_apps(cache: State<'_, AppCache>) -> Result<Vec<AppEntry>, String> {
+    let cache = cache.inner().clone();
+    Ok(tauri::async_runtime::spawn_blocking(move || launcher_list(&cache)).await.map_err(|e| e.to_string())?)
+}
+
+pub fn launcher_list(cache: &AppCache) -> Vec<AppEntry> {
+    // El recorrido del menú Inicio puede tardar varios segundos. Nunca mantengas el
+    // lock de la caché mientras haces I/O: otras búsquedas deben poder leer la lista.
+    if let Some(cached) = cache.0.lock().unwrap().as_ref().and_then(|(at, list)| {
+        (at.elapsed() < Duration::from_secs(300)).then(|| list.clone())
+    }) {
+        return cached;
     }
     let mut out = Vec::new();
     for var in ["ProgramData", "APPDATA"] {
@@ -64,6 +72,12 @@ pub fn launcher_apps(cache: State<AppCache>) -> Vec<AppEntry> {
     out.extend(store_apps());
     out.sort_by_key(|a| a.name.to_lowercase());
     out.dedup_by(|a, b| a.name.eq_ignore_ascii_case(&b.name));
+    let mut guard = cache.0.lock().unwrap();
+    if let Some((at, list)) = guard.as_ref() {
+        if at.elapsed() < Duration::from_secs(300) {
+            return list.clone();
+        }
+    }
     *guard = Some((Instant::now(), out.clone()));
     out
 }
@@ -101,13 +115,12 @@ fn store_apps() -> Vec<AppEntry> {
             let l = r.name.to_lowercase();
             !SKIP.iter().any(|s| l.contains(s))
         })
-        .map(|r| AppEntry { name: r.name.trim().to_string(), path: format!("{SHELL_PREFIX}{}", r.app_id) })
+        .map(|r| AppEntry { name: r.name.trim().to_string(), path: format!("{SHELL_PREFIX}{}", r.app_id), installed: 0 })
         .collect()
 }
 
 /// Abre un acceso directo o programa. Solo se aceptan rutas existentes de tipos ejecutables conocidos.
-#[tauri::command]
-pub fn launch_app(path: String) -> Result<(), String> {
+fn launch_app_blocking(path: String) -> Result<(), String> {
     let p = Path::new(&path);
     let is_store_app = path.starts_with(SHELL_PREFIX) && path.len() > SHELL_PREFIX.len();
     let ok_ext = p
@@ -125,4 +138,11 @@ pub fn launch_app(path: String) -> Result<(), String> {
     } else {
         Err("Windows no pudo abrirlo".into())
     }
+}
+
+#[tauri::command]
+pub async fn launch_app(path: String) -> Result<(), String> {
+    tauri::async_runtime::spawn_blocking(move || launch_app_blocking(path))
+        .await
+        .map_err(|e| e.to_string())?
 }

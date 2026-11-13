@@ -3,10 +3,15 @@
 //! Vive en Rust y no en localStorage para que sea fácil de respaldar y sobreviva a limpiezas del WebView.
 
 use serde_json::{Map, Value};
-use std::{fs, path::PathBuf, sync::Mutex};
+use std::{fs, path::PathBuf, sync::{Arc, Mutex}};
 use tauri::{AppHandle, Manager};
 
+#[derive(Clone)]
 pub struct Store {
+    inner: Arc<StoreInner>,
+}
+
+struct StoreInner {
     path: Option<PathBuf>,
     data: Mutex<Map<String, Value>>,
 }
@@ -19,28 +24,28 @@ impl Store {
             .and_then(|p| fs::read_to_string(p).ok())
             .and_then(|t| serde_json::from_str::<Map<String, Value>>(t.trim_start_matches('\u{feff}')).ok())
             .unwrap_or_default();
-        Self { path, data: Mutex::new(data) }
+        Self { inner: Arc::new(StoreInner { path, data: Mutex::new(data) }) }
     }
 
     pub fn all(&self) -> Map<String, Value> {
-        self.data.lock().unwrap().clone()
+        self.inner.data.lock().unwrap().clone()
     }
 
     pub fn set(&self, key: String, value: Value) -> Result<(), String> {
-        let mut data = self.data.lock().unwrap();
+        let mut data = self.inner.data.lock().unwrap();
         data.insert(key, value);
         self.flush(&data)
     }
 
     /// Sustituye todos los datos (restaurar una copia de seguridad).
     pub fn replace(&self, new: Map<String, Value>) -> Result<(), String> {
-        let mut data = self.data.lock().unwrap();
+        let mut data = self.inner.data.lock().unwrap();
         *data = new;
         self.flush(&data)
     }
 
     fn flush(&self, data: &Map<String, Value>) -> Result<(), String> {
-        let Some(p) = &self.path else { return Err("sin carpeta de datos".into()) };
+        let Some(p) = &self.inner.path else { return Err("sin carpeta de datos".into()) };
         if let Some(dir) = p.parent() {
             fs::create_dir_all(dir).map_err(|e| e.to_string())?;
         }

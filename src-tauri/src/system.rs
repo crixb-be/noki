@@ -103,6 +103,21 @@ fn friendly_name(dev: &IMMDevice) -> String {
     }
 }
 
+/// Nombre de la salida predeterminada para la barra superior y el panel de sonido.
+pub fn audio_output_name() -> String {
+    unsafe {
+        let _ = CoInitializeEx(None, COINIT_MULTITHREADED);
+        let enumerator: Option<IMMDeviceEnumerator> = CoCreateInstance(&MMDeviceEnumerator, None, CLSCTX_ALL).ok();
+        let Some(enumerator) = enumerator else {
+            return "Salida predeterminada".into();
+        };
+        endpoint(&enumerator).map(|(dev, _)| {
+            let name = friendly_name(&dev);
+            if name.is_empty() { "Salida predeterminada".into() } else { name }
+        }).unwrap_or_else(|| "Salida predeterminada".into())
+    }
+}
+
 fn device_kind(name: &str) -> &'static str {
     let n = name.to_lowercase();
     const HINTS: [&str; 9] = ["head", "auricular", "airpods", "buds", "earbud", "casco", "audífonos", "audifonos", "manos libres"];

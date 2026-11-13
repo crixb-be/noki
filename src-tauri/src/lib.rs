@@ -21,6 +21,12 @@ mod system;
 mod translate;
 mod updates;
 mod viz;
+mod topbar;
+mod dock;
+mod launchpad;
+mod spotlight;
+mod popups;
+mod window_utils;
 
 use notch::NotchState;
 use serde::Serialize;
@@ -30,11 +36,24 @@ use std::sync::atomic::Ordering::SeqCst;
 use tauri::{
     menu::{CheckMenuItem, Menu, MenuItem, PredefinedMenuItem},
     tray::{MouseButton, MouseButtonState, TrayIconBuilder, TrayIconEvent},
-    AppHandle, Emitter, Manager, RunEvent, State, Theme, WebviewUrl, WebviewWindow,
+    AppHandle, Emitter, Listener, Manager, RunEvent, State, Theme, WebviewUrl, WebviewWindow,
     WebviewWindowBuilder,
 };
 use tauri_plugin_autostart::{MacosLauncher, ManagerExt as _};
 use tauri_plugin_global_shortcut::{GlobalShortcutExt, Shortcut, ShortcutState};
+
+#[cfg(debug_assertions)]
+fn start_ui_watchdog(app: AppHandle) {
+    std::thread::spawn(move || loop {
+        let started = std::time::Instant::now();
+        let _ = app.run_on_main_thread(|| {});
+        let elapsed = started.elapsed();
+        if elapsed > std::time::Duration::from_millis(500) {
+            eprintln!("[ui-watchdog] el hilo UI tardó {} ms en responder", elapsed.as_millis());
+        }
+        std::thread::sleep(std::time::Duration::from_secs(2));
+    });
+}
 
 // ───────────────────────────── ajustes ─────────────────────────────
 
@@ -46,7 +65,7 @@ fn get_settings(state: State<NotchState>) -> Settings {
 
 /// Guarda, aplica (layout, atajo, autoinicio) y avisa a todas las ventanas.
 /// Devuelve un aviso si algo no pudo aplicarse (p. ej. atajo ocupado).
-fn commit_settings(app: &AppHandle, mut new: Settings) -> Result<Option<String>, String> {
+pub(crate) async fn commit_settings(app: &AppHandle, mut new: Settings) -> Result<Option<String>, String> {
     let state = app.state::<NotchState>();
     let prev = state.settings.lock().unwrap().clone();
     new.restore_masked_keys(&prev);
@@ -54,9 +73,16 @@ fn commit_settings(app: &AppHandle, mut new: Settings) -> Result<Option<String>,
     if prev == new {
         return Ok(None);
     }
-    // Primero las claves (si Windows las rechaza no se guarda nada a medias).
-    new.sync_secrets(&prev)?;
-    settings::save(app, &new)?;
+    // Las credenciales y el JSON pueden tocar disco o COM. Nunca se ejecutan en el hilo que atiende WebView2.
+    let persist_app = app.clone();
+    let persist_new = new.clone();
+    let persist_prev = prev.clone();
+    tauri::async_runtime::spawn_blocking(move || {
+        persist_new.sync_secrets(&persist_prev)?;
+        settings::save(&persist_app, &persist_new)
+    })
+    .await
+    .map_err(|e| e.to_string())??;
     *state.settings.lock().unwrap() = new.clone();
     state.dirty.store(true, SeqCst);
 
@@ -75,18 +101,25 @@ fn commit_settings(app: &AppHandle, mut new: Settings) -> Result<Option<String>,
     if new.appearance.app_icon != prev.appearance.app_icon {
         appicon::apply(app, &new.appearance.app_icon);
     }
-    let _ = app.emit("settings-changed", &new.masked());
+    // El cambio de ajustes debe verse de inmediato en las ventanas nativas, no en la siguiente vuelta lenta.
+    dock::sync_taskbar(&new);
+    topbar::sync(app, &new, false);
+    dock::sync(app, &new, false);
+    launchpad::sync(app, &new, false);
+    let payload = new.masked();
+    let _ = app.emit("settings-updated", &payload);
+    let _ = app.emit("settings-changed", &payload);
     Ok(warning)
 }
 
 #[tauri::command]
-fn save_settings(app: AppHandle, settings: Settings) -> Result<Option<String>, String> {
-    commit_settings(&app, settings)
+async fn save_settings(app: AppHandle, settings: Settings) -> Result<Option<String>, String> {
+    commit_settings(&app, settings).await
 }
 
 #[tauri::command]
-fn reset_settings(app: AppHandle) -> Result<Option<String>, String> {
-    commit_settings(&app, Settings::default())
+async fn reset_settings(app: AppHandle) -> Result<Option<String>, String> {
+    commit_settings(&app, Settings::default()).await
 }
 
 /// Atajos activos como (combinación, acción). Las pestañas son «tab:0»…«tab:8».
@@ -148,26 +181,26 @@ fn run_shortcut(app: &AppHandle, action: &str) {
 
 /// Guarda texto en un archivo elegido por el usuario (exportar transcripciones, apariencia…).
 #[tauri::command]
-fn save_text(path: String, text: String) -> Result<(), String> {
-    std::fs::write(path, text).map_err(|e| e.to_string())
+async fn save_text(path: String, text: String) -> Result<(), String> {
+    tauri::async_runtime::spawn_blocking(move || std::fs::write(path, text).map_err(|e| e.to_string())).await.map_err(|e| e.to_string())?
 }
 
 /// Guarda bytes (en base64) en un archivo elegido por el usuario (exportar audios).
 #[tauri::command]
-fn save_bytes(path: String, data: String) -> Result<(), String> {
+async fn save_bytes(path: String, data: String) -> Result<(), String> {
     use base64::Engine;
     let bytes = base64::engine::general_purpose::STANDARD.decode(data).map_err(|e| e.to_string())?;
-    std::fs::write(path, bytes).map_err(|e| e.to_string())
+    tauri::async_runtime::spawn_blocking(move || std::fs::write(path, bytes).map_err(|e| e.to_string())).await.map_err(|e| e.to_string())?
 }
 
 /// Lee un archivo de texto pequeño elegido por el usuario (importar apariencia).
 #[tauri::command]
-fn read_text(path: String) -> Result<String, String> {
-    let m = std::fs::metadata(&path).map_err(|e| e.to_string())?;
-    if m.len() > 1_000_000 {
-        return Err("El archivo es demasiado grande.".into());
-    }
-    std::fs::read_to_string(path).map_err(|e| e.to_string())
+async fn read_text(path: String) -> Result<String, String> {
+    tauri::async_runtime::spawn_blocking(move || {
+        let m = std::fs::metadata(&path).map_err(|e| e.to_string())?;
+        if m.len() > 1_000_000 { return Err("El archivo es demasiado grande.".into()); }
+        std::fs::read_to_string(path).map_err(|e| e.to_string())
+    }).await.map_err(|e| e.to_string())?
 }
 
 fn apply_autostart(app: &AppHandle, enable: bool) -> Result<(), String> {
@@ -348,6 +381,9 @@ async fn open_settings(app: AppHandle, section: Option<String>) -> Result<(), St
 
 #[tauri::command]
 fn quit_app(app: AppHandle) {
+    dock::restore_taskbar();
+    topbar::remove();
+    notch::appbar_remove(&app.state::<NotchState>());
     app.exit(0);
 }
 
@@ -359,16 +395,20 @@ fn store_all(store: State<store::Store>) -> serde_json::Map<String, serde_json::
 }
 
 #[tauri::command]
-fn store_set(
+async fn store_set(
     app: AppHandle,
     window: tauri::Window,
-    store: State<store::Store>,
+    store: State<'_, store::Store>,
     key: String,
     value: serde_json::Value,
 ) -> Result<(), String> {
-    store.set(key.clone(), value.clone())?;
+    let source = window.label().to_string();
+    let store = store.inner().clone();
+    let key_for_store = key.clone();
+    let value_for_store = value.clone();
+    tauri::async_runtime::spawn_blocking(move || store.set(key_for_store, value_for_store)).await.map_err(|e| e.to_string())??;
     // Las demás ventanas (otros notch) reflejan el cambio al instante; la que lo originó lo ignora por `source`.
-    let _ = app.emit("store-changed", serde_json::json!({ "key": key, "value": value, "source": window.label() }));
+    let _ = app.emit("store-changed", serde_json::json!({ "key": key, "value": value, "source": source }));
     Ok(())
 }
 
@@ -385,22 +425,18 @@ fn alert_sound() {
 
 /// Para cada ruta, si todavía existe (los archivos del estante pueden haberse movido o borrado).
 #[tauri::command]
-fn files_exist(paths: Vec<String>) -> Vec<bool> {
-    paths.iter().map(|p| std::path::Path::new(p).exists()).collect()
+async fn files_exist(paths: Vec<String>) -> Result<Vec<bool>, String> {
+    tauri::async_runtime::spawn_blocking(move || paths.iter().map(|p| std::path::Path::new(p).exists()).collect()).await.map_err(|e| e.to_string())
 }
 
 /// Abre el Explorador con el archivo seleccionado.
 #[tauri::command]
-fn reveal_in_folder(path: String) -> Result<(), String> {
-    let p = std::path::Path::new(&path);
-    if !p.exists() {
-        return Err("el archivo ya no existe".into());
-    }
-    std::process::Command::new("explorer")
-        .arg(format!("/select,{}", p.display()))
-        .spawn()
-        .map(|_| ())
-        .map_err(|e| e.to_string())
+async fn reveal_in_folder(path: String) -> Result<(), String> {
+    tauri::async_runtime::spawn_blocking(move || {
+        let p = std::path::Path::new(&path);
+        if !p.exists() { return Err("el archivo ya no existe".into()); }
+        std::process::Command::new("explorer").arg(format!("/select,{}", p.display())).spawn().map(|_| ()).map_err(|e| e.to_string())
+    }).await.map_err(|e| e.to_string())?
 }
 
 fn add_to_zip<W: std::io::Write + std::io::Seek>(
@@ -426,6 +462,10 @@ fn add_to_zip<W: std::io::Write + std::io::Seek>(
 /// Comprime los archivos indicados en un .zip dentro de la carpeta de datos y devuelve su ruta.
 #[tauri::command]
 async fn zip_files(app: AppHandle, paths: Vec<String>, name: Option<String>) -> Result<String, String> {
+    tauri::async_runtime::spawn_blocking(move || zip_files_blocking(app, paths, name)).await.map_err(|e| e.to_string())?
+}
+
+fn zip_files_blocking(app: AppHandle, paths: Vec<String>, name: Option<String>) -> Result<String, String> {
     if paths.is_empty() {
         return Err("no hay archivos".into());
     }
@@ -466,22 +506,20 @@ struct FileInfo {
 
 /// Tamaño y tipo de un archivo o carpeta soltado en el estante.
 #[tauri::command]
-fn file_size(path: String) -> Result<FileInfo, String> {
-    let m = std::fs::metadata(path).map_err(|e| e.to_string())?;
-    Ok(FileInfo { size: if m.is_dir() { None } else { Some(m.len()) }, dir: m.is_dir() })
+async fn file_size(path: String) -> Result<FileInfo, String> {
+    tauri::async_runtime::spawn_blocking(move || {
+        let m = std::fs::metadata(path).map_err(|e| e.to_string())?;
+        Ok(FileInfo { size: if m.is_dir() { None } else { Some(m.len()) }, dir: m.is_dir() })
+    }).await.map_err(|e| e.to_string())?
 }
 
 /// Abre un archivo con la aplicación predeterminada de Windows.
 #[tauri::command]
-fn open_path(path: String) -> Result<(), String> {
-    if !std::path::Path::new(&path).exists() {
-        return Err("el archivo ya no existe".into());
-    }
-    std::process::Command::new("explorer")
-        .arg(&path)
-        .spawn()
-        .map(|_| ())
-        .map_err(|e| e.to_string())
+async fn open_path(path: String) -> Result<(), String> {
+    tauri::async_runtime::spawn_blocking(move || {
+        if !std::path::Path::new(&path).exists() { return Err("el archivo ya no existe".into()); }
+        std::process::Command::new("explorer").arg(&path).spawn().map(|_| ()).map_err(|e| e.to_string())
+    }).await.map_err(|e| e.to_string())?
 }
 
 /// Sitios a los que la app puede mandarte (redes del desarrollador, donaciones y el repositorio).
@@ -489,16 +527,13 @@ const ALLOWED_HOSTS: [&str; 7] = ["instagram.com", "www.instagram.com", "faceboo
 
 /// Abre un enlace permitido en el navegador predeterminado.
 #[tauri::command]
-fn open_url(url: String) -> Result<(), String> {
+async fn open_url(url: String) -> Result<(), String> {
     let parsed = reqwest::Url::parse(&url).map_err(|_| "Enlace no válido".to_string())?;
     if parsed.scheme() != "https" || !parsed.host_str().is_some_and(|h| ALLOWED_HOSTS.contains(&h)) {
         return Err("Enlace no permitido".into());
     }
-    std::process::Command::new("explorer")
-        .arg(parsed.as_str())
-        .spawn()
-        .map(|_| ())
-        .map_err(|e| e.to_string())
+    let target = parsed.to_string();
+    tauri::async_runtime::spawn_blocking(move || std::process::Command::new("explorer").arg(target).spawn().map(|_| ()).map_err(|e| e.to_string())).await.map_err(|e| e.to_string())?
 }
 
 // ───────────────────────────── inactividad y copias de seguridad ─────────────────────────────
@@ -548,12 +583,18 @@ fn idle_seconds() -> u64 {
 /// Guarda ajustes y datos en un solo archivo JSON. Las claves de API NO se incluyen: viven en el
 /// Administrador de credenciales de este equipo y hay que escribirlas de nuevo en el otro.
 #[tauri::command]
-fn backup_export(state: State<NotchState>, store: State<store::Store>, path: String) -> Result<(), String> {
+async fn backup_export(state: State<'_, NotchState>, store: State<'_, store::Store>, path: String) -> Result<(), String> {
+    let settings = state.settings.lock().unwrap().clone().without_keys();
+    let data = store.all();
+    tauri::async_runtime::spawn_blocking(move || backup_export_blocking(settings, data, path)).await.map_err(|e| e.to_string())?
+}
+
+fn backup_export_blocking(settings: Settings, data: serde_json::Map<String, serde_json::Value>, path: String) -> Result<(), String> {
     let doc = serde_json::json!({
         "app": "noki",
         "version": env!("CARGO_PKG_VERSION"),
-        "settings": state.settings.lock().unwrap().without_keys(),
-        "data": store.all(),
+        "settings": settings,
+        "data": data,
     });
     let text = serde_json::to_string_pretty(&doc).map_err(|e| e.to_string())?;
     std::fs::write(path, text).map_err(|e| e.to_string())
@@ -561,7 +602,15 @@ fn backup_export(state: State<NotchState>, store: State<store::Store>, path: Str
 
 /// Restaura una copia: reemplaza ajustes y datos y reinicia la app para aplicarlos.
 #[tauri::command]
-fn backup_import(app: AppHandle, state: State<NotchState>, store: State<store::Store>, path: String) -> Result<(), String> {
+async fn backup_import(app: AppHandle, state: State<'_, NotchState>, store: State<'_, store::Store>, path: String) -> Result<(), String> {
+    let current = state.settings.lock().unwrap().clone();
+    let store = store.inner().clone();
+    let blocking_app = app.clone();
+    tauri::async_runtime::spawn_blocking(move || backup_import_blocking(&blocking_app, current, store, path)).await.map_err(|e| e.to_string())??;
+    app.restart()
+}
+
+fn backup_import_blocking(app: &AppHandle, current: Settings, store: store::Store, path: String) -> Result<(), String> {
     let text = std::fs::read_to_string(&path).map_err(|e| e.to_string())?;
     let doc: serde_json::Value = serde_json::from_str(text.trim_start_matches('\u{feff}'))
         .map_err(|_| "El archivo no es una copia válida.".to_string())?;
@@ -574,13 +623,12 @@ fn backup_import(app: AppHandle, state: State<NotchState>, store: State<store::S
     new.clamp();
     // Copias nuevas no traen claves: se conservan las de este equipo. Copias antiguas (≤0.5) sí las traen:
     // se pasan al Administrador de credenciales.
-    let current = state.settings.lock().unwrap().clone();
     new.keep_keys_missing_in(&current);
     new.sync_secrets(&current)?;
     let data = doc.get("data").and_then(|v| v.as_object()).cloned().unwrap_or_default();
     settings::save(&app, &new)?;
     store.replace(data)?;
-    app.restart()
+    Ok(())
 }
 
 // ───────────────────────────── bandeja ─────────────────────────────
@@ -608,12 +656,14 @@ fn build_tray(app: &AppHandle) -> tauri::Result<()> {
             "visible" => {
                 let mut s = app.state::<NotchState>().settings.lock().unwrap().clone();
                 s.general.visible = !s.general.visible;
-                let _ = commit_settings(app, s);
+                let handle = app.clone();
+                tauri::async_runtime::spawn(async move { let _ = commit_settings(&handle, s).await; });
             }
             "dnd" => {
                 let mut s = app.state::<NotchState>().settings.lock().unwrap().clone();
                 s.general.dnd = !s.general.dnd;
-                let _ = commit_settings(app, s);
+                let handle = app.clone();
+                tauri::async_runtime::spawn(async move { let _ = commit_settings(&handle, s).await; });
             }
             "quit" => app.exit(0),
             _ => {}
@@ -725,9 +775,51 @@ pub fn run() {
             files_exist,
             reveal_in_folder,
             zip_files,
+            topbar::command_user_avatar,
+            topbar::set_avatar_image,
+            topbar::command_user_info,
+            topbar::command_wifi_networks,
+            topbar::command_wifi_connect,
+            topbar::command_bt_devices,
+            topbar::command_audio_output_name,
+            topbar::command_send_keys,
+            topbar::command_open_bar_panel,
+            topbar::command_close_bar_panel,
+            topbar::command_resize_bar_panel,
+            topbar::command_battery_info,
+            topbar::command_open_system_uri,
+            topbar::command_lock_user,
+            topbar::command_logoff_user,
+            topbar::command_toggle_dark,
+            topbar::command_toggle_airplane,
+            topbar::command_open_task_manager,
+            topbar::command_bar_panel_state,
+            dock::dock_items,
+            dock::dock_set_hit,
+            dock::dock_resize,
+            dock::dock_activate,
+            dock::dock_launch,
+            dock::dock_close_windows,
+            dock::dock_pin,
+            dock::dock_unpin,
+            dock::dock_reorder,
+            dock::trash_state,
+            dock::trash_open,
+            dock::trash_empty,
+            dock::trash_drop,
+            launchpad::open_launchpad,
+            launchpad::toggle_launchpad,
+            launchpad::close_launchpad,
+            spotlight::toggle_spotlight,
+            spotlight::close_spotlight,
+            spotlight::spotlight_resize,
+            spotlight::spotlight_search,
+             popups::close_all_command,
         ])
         .setup(|app| {
             let handle = app.handle().clone();
+            #[cfg(debug_assertions)]
+            start_ui_watchdog(handle.clone());
             legacy::migrate_data(&handle);
             let loaded = settings::load(&handle);
             app.manage(NotchState::new(loaded.clone()));
@@ -736,10 +828,21 @@ pub fn run() {
             quick::start_keep_awake_thread();
             app.manage(clipboard::History::default());
             app.manage(launcher::AppCache::default());
+            // Precalienta el índice fuera del hilo que atiende las ventanas; Launchpad solo consume esta caché.
+            let launcher_cache = app.state::<launcher::AppCache>().inner().clone();
+            tauri::async_runtime::spawn_blocking(move || {
+                let apps = launcher::launcher_list(&launcher_cache);
+                icons::warm_paths(apps.into_iter().map(|app| app.path).collect());
+            });
             app.manage(viz::Viz::default());
             app.manage(updates::Pending::default());
-            app.manage(sysmon::SysMonState::new(sysmon::SysMon::new()));
+            app.manage(std::sync::Arc::new(std::sync::Mutex::new(sysmon::SysMon::new())) as sysmon::SysMonState);
             screentime::start(handle.clone());
+
+            std::panic::set_hook(Box::new(|info| {
+                eprintln!("[noki] panic: {info}");
+                crate::dock::restore_taskbar();
+            }));
 
             if let Some(msg) = apply_shortcut(&handle, &loaded) {
                 eprintln!("{msg}");
@@ -764,7 +867,22 @@ pub fn run() {
             if let Some(item) = handle.try_state::<TrayDnd>() {
                 let _ = item.0.set_checked(loaded.general.dnd);
             }
-            notch::start(handle);
+            let deferred_handle = handle.clone();
+            handle.listen("frontend-ready", move |event| {
+                let view = event.payload().trim_matches('"');
+                window_utils::mark_frontend_ready(view);
+                if view != "notch" { return; }
+                let app = deferred_handle.clone();
+                tauri::async_runtime::spawn(async move {
+                    tokio::time::sleep(std::time::Duration::from_millis(180)).await;
+                    launchpad::ensure(&app);
+                    spotlight::ensure(&app);
+                    spotlight::warm_cache(&app);
+                    topbar::ensure_panel(&app);
+                });
+            });
+            notch::start(handle.clone());
+            dock::start(handle.clone());
             Ok(())
         })
         .build(tauri::generate_context!())
@@ -773,6 +891,8 @@ pub fn run() {
     app.run(|app, event| {
         if let RunEvent::Exit = event {
             // Libera el espacio reservado en el escritorio.
+            dock::restore_taskbar();
+            topbar::remove();
             notch::appbar_remove(&app.state::<NotchState>());
         }
     });
