@@ -324,7 +324,11 @@ pub fn sync(app: &AppHandle, settings: &Settings, fullscreen: bool) {
         return;
     }
     let ui_window = window.clone();
-    let _ = window.run_on_main_thread(move || { let _ = ui_window.show(); });
+    let _ = window.run_on_main_thread(move || {
+        let _ = ui_window.show();
+        // Fuera de Alt+Tab aunque tao haya reescrito los estilos al mostrarla.
+        if let Ok(hwnd) = ui_window.hwnd() { window_utils::enforce_chrome_free_hwnd(hwnd); }
+    });
     ensure_mouse_style(&window);
     if let Some(h) = hwnd(&window) {
         raise(h, false);
@@ -647,8 +651,9 @@ fn open_bar_panel_impl(app: &AppHandle, kind: String, anchor_x: i32) -> Result<(
     let _ = panel.emit("bar-panel", &kind);
     let ui_panel = panel.clone();
     let _ = panel.run_on_main_thread(move || {
-        if let Ok(hwnd) = ui_panel.hwnd() { window_utils::enforce_chrome_free_hwnd(hwnd); }
         let _ = ui_panel.show();
+        // Después de show(): tao acaba de reescribir los estilos.
+        if let Ok(hwnd) = ui_panel.hwnd() { window_utils::enforce_chrome_free_hwnd(hwnd); }
         let _ = ui_panel.set_focus();
     });
     Ok(())

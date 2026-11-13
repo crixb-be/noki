@@ -135,7 +135,6 @@ fn focus(window: &WebviewWindow) {
     let ui_window = window.clone();
     let _ = window.run_on_main_thread(move || unsafe {
         let Ok(hwnd) = ui_window.hwnd() else { return };
-        window_utils::enforce_chrome_free_hwnd(hwnd);
         let ex = windows::Win32::UI::WindowsAndMessaging::GetWindowLongPtrW(hwnd, GWL_EXSTYLE);
         SetWindowLongPtrW(hwnd, GWL_EXSTYLE, ex & !(WS_EX_NOACTIVATE.0 as isize));
         let fg = GetForegroundWindow();
@@ -150,6 +149,8 @@ fn focus(window: &WebviewWindow) {
         let _ = AllowSetForegroundWindow(ASFW_ANY);
         // tao debe saber que está visible, o su hide() posterior no la ocultaría.
         let _ = ui_window.show();
+        // Después de show(): tao acaba de reescribir los estilos.
+        window_utils::enforce_chrome_free_hwnd(hwnd);
         let _ = ShowWindow(hwnd, SW_SHOW);
         let _ = BringWindowToTop(hwnd);
         let focused = SetForegroundWindow(hwnd).as_bool();

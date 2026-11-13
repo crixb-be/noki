@@ -77,28 +77,11 @@ use windows::Win32::{
     Foundation::HWND,
     Graphics::Gdi::SetWindowRgn,
     Graphics::Dwm::{DwmSetWindowAttribute, DWMWA_BORDER_COLOR, DWMWA_COLOR_NONE, DWMWA_WINDOW_CORNER_PREFERENCE, DWMWCP_DONOTROUND},
-    UI::WindowsAndMessaging::{
-        GetWindowLongPtrW, SetWindowLongPtrW, SetWindowPos, GWL_EXSTYLE, GWL_STYLE, SWP_FRAMECHANGED,
-        SWP_NOACTIVATE, SWP_NOMOVE, SWP_NOSIZE, SWP_NOZORDER, WS_BORDER, WS_CAPTION, WS_DLGFRAME, WS_EX_CLIENTEDGE,
-        WS_EX_DLGMODALFRAME, WS_EX_NOACTIVATE, WS_EX_STATICEDGE, WS_EX_WINDOWEDGE, WS_MAXIMIZEBOX,
-        WS_MINIMIZEBOX, WS_POPUP, WS_SYSMENU, WS_THICKFRAME,
-    },
+    UI::WindowsAndMessaging::{GetWindowLongPtrW, SetWindowLongPtrW, GWL_EXSTYLE, WS_EX_TOOLWINDOW},
 };
 
-/// Ventanas emergentes de Noki (paneles, lanzador, buscador, Dock y barra): siempre WS_POPUP.
-/// Como ventana «overlapped» sin marco, Windows 11 les dibujaba a veces una franja translúcida
-/// tipo barra de título del ancho de toda la ventana (el «rectángulo» detrás del Dock).
-static POPUPS: OnceLock<Mutex<HashSet<isize>>> = OnceLock::new();
-
-fn is_popup(hwnd: HWND) -> bool {
-    POPUPS.get().is_some_and(|set| set.lock().unwrap().contains(&(hwnd.0 as isize)))
-}
-
-/// Registra la ventana como emergente transparente (sin efectos de Windows) y le aplica el estilo.
+/// Ventana emergente transparente (sin efectos de Windows): sin acento y con el aspecto nativo de `enforce_chrome_free_hwnd`.
 pub fn mark_rounded<R: tauri::Runtime>(window: &tauri::WebviewWindow<R>) {
-    if let Ok(hwnd) = window.hwnd() {
-        POPUPS.get_or_init(|| Mutex::new(HashSet::new())).lock().unwrap().insert(hwnd.0 as isize);
-    }
     let w = window.clone();
     let _ = window.run_on_main_thread(move || {
         if let Ok(h) = w.hwnd() {
@@ -157,35 +140,24 @@ pub fn sync_panel_glass<R: tauri::Runtime>(app: &tauri::AppHandle<R>, panel_styl
     for label in PANEL_WINDOWS { crate::backdrop::set_enabled(app, label, light); }
 }
 
-/// Variante para una clausura que ya está ejecutándose en el hilo de UI.
+/// Aspecto nativo de las ventanas de Noki. Solo en el hilo de UI y siempre *después* de show/hide/
+/// set_ignore_cursor_events: tao (window_state.rs, `apply_diff`) reescribe GWL_STYLE y GWL_EXSTYLE enteros
+/// en cada cambio de sus flags. Su WM_NCCALCSIZE ya deja la ventana sin área no cliente, así que el estilo
+/// de ventana (WS_CAPTION o WS_POPUP) no se toca: forzarlo solo provocaba una guerra de estilos con
+/// SWP_FRAMECHANGED en cada vuelta. Aquí solo va lo que tao no gestiona, y es idempotente.
 pub fn enforce_chrome_free_hwnd(hwnd: HWND) {
     unsafe {
-        let style = GetWindowLongPtrW(hwnd, GWL_STYLE);
-        let standard = (WS_CAPTION | WS_THICKFRAME | WS_BORDER | WS_SYSMENU | WS_DLGFRAME | WS_MINIMIZEBOX | WS_MAXIMIZEBOX).0 as isize;
-        // Los paneles son ventanas emergentes (WS_POPUP): como ventana «overlapped» sin marco,
-        // DWM les dibujaba una franja de título y el WebView no se veía al usar vidrio.
-        let popup = if is_popup(hwnd) { WS_POPUP.0 as isize } else { 0 };
-        SetWindowLongPtrW(hwnd, GWL_STYLE, (style & !standard) | popup);
-
+        // Fuera de Alt+Tab (tao borra este bit en cada reescritura de GWL_EXSTYLE).
         let ex_style = GetWindowLongPtrW(hwnd, GWL_EXSTYLE);
-        let framed = (WS_EX_CLIENTEDGE | WS_EX_DLGMODALFRAME | WS_EX_STATICEDGE | WS_EX_WINDOWEDGE | WS_EX_NOACTIVATE).0 as isize;
-        SetWindowLongPtrW(hwnd, GWL_EXSTYLE, ex_style & !framed);
-
-        // Sin redondeo de DWM: en Windows 11 trae una sombra gris y un radio fijo de 8 px.
-        // Los paneles se recortan con una región propia (ver `mark_rounded`).
+        let tool = WS_EX_TOOLWINDOW.0 as isize;
+        if ex_style & tool == 0 {
+            SetWindowLongPtrW(hwnd, GWL_EXSTYLE, ex_style | tool);
+        }
+        // Sin redondeo ni borde de DWM: en Windows 11 traen una sombra gris y un radio fijo de 8 px.
+        // Son atributos de DWM: sobreviven a los cambios de estilo y no necesitan SWP_FRAMECHANGED.
         let preference = DWMWCP_DONOTROUND;
         let _ = DwmSetWindowAttribute(hwnd, DWMWA_WINDOW_CORNER_PREFERENCE, &preference as *const _ as _, std::mem::size_of_val(&preference) as u32);
         let border = DWMWA_COLOR_NONE;
         let _ = DwmSetWindowAttribute(hwnd, DWMWA_BORDER_COLOR, &border as *const _ as _, std::mem::size_of_val(&border) as u32);
-
-        let _ = SetWindowPos(
-            hwnd,
-            None,
-            0,
-            0,
-            0,
-            0,
-            SWP_FRAMECHANGED | SWP_NOMOVE | SWP_NOSIZE | SWP_NOZORDER | SWP_NOACTIVATE,
-        );
     }
 }
