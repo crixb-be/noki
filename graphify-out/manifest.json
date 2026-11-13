@@ -115,9 +115,9 @@
     "semantic_hash": "406005053b7709743710a7e713374502"
   },
   "src-tauri/src/lib.rs": {
-    "mtime": 1794545954.285364,
-    "seen": 1794546995.5394833,
-    "ast_hash": "9264cc4ff57207a070eb52b0ba792312",
+    "mtime": 1794548004.8207767,
+    "seen": 1794548294.4283786,
+    "ast_hash": "063f2f62348ca2e9b5e8ea4a4395f1c9",
     "semantic_hash": ""
   },
   "src-tauri/src/main.rs": {
@@ -577,9 +577,9 @@
     "semantic_hash": "26884a5a50a10e30d1b9f0dd555b35fe"
   },
   "src-tauri/src/dock.rs": {
-    "mtime": 1794545694.4268441,
-    "seen": 1794545860.834218,
-    "ast_hash": "b42fca7e3717e993ddc25ff7d71eed97",
+    "mtime": 1794548004.818771,
+    "seen": 1794548294.428372,
+    "ast_hash": "fffd9a6bdbb99ae86b35902ac937409a",
     "semantic_hash": ""
   },
   "src-tauri/src/launchpad.rs": {
@@ -589,27 +589,27 @@
     "semantic_hash": ""
   },
   "src-tauri/src/topbar.rs": {
-    "mtime": 1794546825.0740795,
-    "seen": 1794546995.5394983,
-    "ast_hash": "cdc8214255bbedac2301a6d7b0f3dd14",
+    "mtime": 1794548004.8178904,
+    "seen": 1794548294.4283922,
+    "ast_hash": "9223daf9cb9c307daa7aa49a38d8d901",
     "semantic_hash": ""
   },
   "src/components/dock/Dock.jsx": {
-    "mtime": 1794545680.741843,
-    "seen": 1794545860.8342614,
-    "ast_hash": "d56f50d20c89765904583b1d96a1c8af",
+    "mtime": 1794548067.5916178,
+    "seen": 1794548294.4284177,
+    "ast_hash": "92dd3e3346ce3a9b7e8d069696bbd93a",
     "semantic_hash": ""
   },
   "src/components/launchpad/Launchpad.jsx": {
-    "mtime": 1794545972.9839957,
-    "seen": 1794546995.539524,
-    "ast_hash": "3400a27052801e36c626d3e398ec3eb7",
+    "mtime": 1794548067.5932398,
+    "seen": 1794548294.428419,
+    "ast_hash": "d892d0d7cb5609f8c27356f304232051",
     "semantic_hash": ""
   },
   "src/components/topbar/BarPanel.jsx": {
-    "mtime": 1794546825.075595,
-    "seen": 1794546995.5395322,
-    "ast_hash": "37a5137f5612efc8ee35042393372850",
+    "mtime": 1794548067.5916178,
+    "seen": 1794548294.4284275,
+    "ast_hash": "30c10ae46835b37218906b7028a1ef7f",
     "semantic_hash": ""
   },
   "src/components/topbar/SymbolIcons.jsx": {
@@ -619,9 +619,9 @@
     "semantic_hash": ""
   },
   "src/components/topbar/TopBar.jsx": {
-    "mtime": 1794525257.4851792,
-    "seen": 1794525563.4863226,
-    "ast_hash": "bfdf4e98d42b42fedd010b8fa92caddb",
+    "mtime": 1794548077.9268281,
+    "seen": 1794548294.4284294,
+    "ast_hash": "53a1ad0648aa5e80c6bfb5a4e33e7681",
     "semantic_hash": ""
   },
   ".github/ISSUE_TEMPLATE/bug_report.md": {
@@ -1207,9 +1207,9 @@
     "semantic_hash": ""
   },
   "src/components/spotlight/Spotlight.jsx": {
-    "mtime": 1794545980.099401,
-    "seen": 1794546995.5395312,
-    "ast_hash": "89802f34d34a1e1ac36031449c24d61c",
+    "mtime": 1794548067.5932398,
+    "seen": 1794548294.4284265,
+    "ast_hash": "54a7f54d258932c8b628a2d0d876b4fc",
     "semantic_hash": ""
   },
   "src/components/topbar/barPaint.jsx": {
@@ -1291,9 +1291,21 @@
     "semantic_hash": ""
   },
   "src-tauri/src/window_utils.rs": {
-    "mtime": 1794546689.7268467,
-    "seen": 1794546995.5395017,
-    "ast_hash": "7e69635f8c9428c887baa9623503f680",
+    "mtime": 1794548026.6557274,
+    "seen": 1794548294.4283957,
+    "ast_hash": "0d0a1edf529423be7da537c920bcf1a4",
+    "semantic_hash": ""
+  },
+  "src-tauri/src/backdrop.rs": {
+    "mtime": 1794548207.8478572,
+    "seen": 1794548294.4283671,
+    "ast_hash": "95732e72f180330e7d1ef0ebe157a681",
+    "semantic_hash": ""
+  },
+  "src/lib/glass.js": {
+    "mtime": 1794548056.7561421,
+    "seen": 1794548294.4284472,
+    "ast_hash": "07865db440c34d295444de56769e1a66",
     "semantic_hash": ""
   },
   "package-lock.json": {

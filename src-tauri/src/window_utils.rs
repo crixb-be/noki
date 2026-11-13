@@ -75,8 +75,8 @@ pub fn schedule_app_recovery(window: &WebviewWindow, view: &'static str) {
 }
 use windows::Win32::{
     Foundation::HWND,
-    Graphics::Gdi::{CreateRoundRectRgn, SetWindowRgn},
-    Graphics::Dwm::{DwmSetWindowAttribute, DWMWA_BORDER_COLOR, DWMWA_COLOR_NONE, DWMWA_WINDOW_CORNER_PREFERENCE, DWMWCP_DONOTROUND, DWMWCP_ROUND},
+    Graphics::Gdi::SetWindowRgn,
+    Graphics::Dwm::{DwmSetWindowAttribute, DWMWA_BORDER_COLOR, DWMWA_COLOR_NONE, DWMWA_WINDOW_CORNER_PREFERENCE, DWMWCP_DONOTROUND},
     UI::WindowsAndMessaging::{
         GetWindowLongPtrW, SetWindowLongPtrW, SetWindowPos, GWL_EXSTYLE, GWL_STYLE, SWP_FRAMECHANGED,
         SWP_NOACTIVATE, SWP_NOMOVE, SWP_NOSIZE, SWP_NOZORDER, WS_BORDER, WS_CAPTION, WS_DLGFRAME, WS_EX_CLIENTEDGE,
@@ -85,54 +85,30 @@ use windows::Win32::{
     },
 };
 
-/// Radio (px lógicos) de las esquinas de los paneles: Launchpad, paneles de la barra y buscador.
-pub const PANEL_RADIUS: f64 = 16.0;
+/// Ventanas emergentes de Noki (paneles, lanzador, buscador, Dock y barra): siempre WS_POPUP.
+/// Como ventana «overlapped» sin marco, Windows 11 les dibujaba a veces una franja translúcida
+/// tipo barra de título del ancho de toda la ventana (el «rectángulo» detrás del Dock).
+static POPUPS: OnceLock<Mutex<HashSet<isize>>> = OnceLock::new();
 
-/// Recorta la ventana entera con una región redondeada: así ni el fondo de la ventana
-/// ni el vidrio nativo dejan asomar un rectángulo detrás de la tarjeta, y no hay sombra
-/// de DWM (el redondeo nativo de Windows 11 la añade y su radio es fijo de 8 px).
-/// La región se recalcula en cada cambio de tamaño.
-static PANELS: OnceLock<Mutex<HashSet<isize>>> = OnceLock::new();
-static LIGHT_GLASS: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBool::new(true);
-
-fn is_glass_panel(hwnd: HWND) -> bool {
-    LIGHT_GLASS.load(std::sync::atomic::Ordering::Relaxed)
-        && PANELS.get().is_some_and(|set| set.lock().unwrap().contains(&(hwnd.0 as isize)))
+fn is_popup(hwnd: HWND) -> bool {
+    POPUPS.get().is_some_and(|set| set.lock().unwrap().contains(&(hwnd.0 as isize)))
 }
 
-pub fn mark_rounded(window: &WebviewWindow) {
-    if let Ok(hwnd) = window.hwnd() { PANELS.get_or_init(|| Mutex::new(HashSet::new())).lock().unwrap().insert(hwnd.0 as isize); }
-    enforce_chrome_free(window);
+/// Registra la ventana como emergente transparente (sin efectos de Windows) y le aplica el estilo.
+pub fn mark_rounded<R: tauri::Runtime>(window: &tauri::WebviewWindow<R>) {
+    if let Ok(hwnd) = window.hwnd() {
+        POPUPS.get_or_init(|| Mutex::new(HashSet::new())).lock().unwrap().insert(hwnd.0 as isize);
+    }
     let w = window.clone();
-    let _ = window.run_on_main_thread(move || apply_round_region(&w));
-    let w = window.clone();
-    window.on_window_event(move |event| {
-        if matches!(event, tauri::WindowEvent::Resized(_) | tauri::WindowEvent::ScaleFactorChanged { .. }) { apply_round_region(&w); }
+    let _ = window.run_on_main_thread(move || {
+        if let Ok(h) = w.hwnd() {
+            unsafe { let _ = SetWindowRgn(h, None, true); }
+            set_acrylic(h, 0); // sin acento: la ventana visible es 100 % transparente
+            enforce_chrome_free_hwnd(h);
+        }
     });
 }
 
-fn apply_round_region_any<R: tauri::Runtime>(window: &tauri::WebviewWindow<R>) {
-    let (Ok(hwnd), Ok(size), Ok(scale)) = (window.hwnd(), window.inner_size(), window.scale_factor()) else { return };
-    if is_glass_panel(hwnd) { unsafe { let _ = SetWindowRgn(hwnd, None, true); } return; }
-    let r = ((PANEL_RADIUS - 4.0) * scale * 2.0).round() as i32;
-    unsafe {
-        let region = CreateRoundRectRgn(0, 0, size.width as i32 + 1, size.height as i32 + 1, r, r);
-        let _ = SetWindowRgn(hwnd, Some(region), true);
-    }
-}
-
-fn apply_round_region(window: &WebviewWindow) {
-    let (Ok(hwnd), Ok(size), Ok(scale)) = (window.hwnd(), window.inner_size(), window.scale_factor()) else { return };
-    if is_glass_panel(hwnd) { unsafe { let _ = SetWindowRgn(hwnd, None, true); } return; }
-    // Algo menos redondeada que la tarjeta CSS: el borde visible es el suavizado del CSS,
-    // no el escalonado de la región.
-    let r = ((PANEL_RADIUS - 4.0) * scale * 2.0).round() as i32;
-    unsafe {
-        let region = CreateRoundRectRgn(0, 0, size.width as i32 + 1, size.height as i32 + 1, r, r);
-        // El sistema pasa a ser dueño de la región: no se libera aquí.
-        let _ = SetWindowRgn(hwnd, Some(region), true);
-    }
-}
 #[repr(C)]
 struct AccentPolicy { state: u32, flags: u32, gradient: u32, animation: u32 }
 #[repr(C)]
@@ -159,56 +135,26 @@ fn set_wca() -> Option<SetWca> {
 const WCA_ACCENT_POLICY: u32 = 19;
 const ACCENT_DISABLED: u32 = 0;
 const ACCENT_ENABLE_ACRYLICBLURBEHIND: u32 = 4;
-/// Etiquetas de las ventanas de panel.
-pub const PANEL_WINDOWS: [&str; 3] = ["barpanel", "launchpad", "spotlight"];
 
-/// Vidrio acrílico real del escritorio (estilo «claro difuminado») o ninguno (estilo oscuro).
-/// Se usa SetWindowCompositionAttribute y no el «system backdrop» de DWM porque este ignora
-/// el tinte y exige el marco de DWM (que trae sombra y redondeo fijo de 8 px). El acrílico
-/// queda recortado por la región redondeada de `mark_rounded`.
-pub fn set_panel_glass_hwnd(hwnd: HWND, light: bool) {
-    // Tinte ABGR: gris neutro translúcido; el CSS añade encima el velo claro.
-    let (r, g, b, a) = (88u32, 88u32, 94u32, 0x66u32);
+/// Acento acrílico (tinte ABGR) o ninguno si `tint == 0`. Solo para las piezas de `backdrop`.
+pub fn set_acrylic(hwnd: HWND, tint: u32) {
     let mut policy = AccentPolicy {
-        state: if light { ACCENT_ENABLE_ACRYLICBLURBEHIND } else { ACCENT_DISABLED },
-        flags: 0,
-        gradient: (a << 24) | (b << 16) | (g << 8) | r,
+        state: if tint == 0 { ACCENT_DISABLED } else { ACCENT_ENABLE_ACRYLICBLURBEHIND },
+        flags: 2,
+        gradient: tint,
         animation: 0,
     };
     let mut data = CompositionData { attribute: WCA_ACCENT_POLICY, data: &mut policy as *mut _ as _, size: std::mem::size_of::<AccentPolicy>() };
     if let Some(set) = set_wca() { unsafe { let _ = set(hwnd, &mut data); } }
 }
 
-/// Aplica el estilo de paneles de Ajustes a las ventanas de panel ya creadas.
-pub fn sync_panel_glass<R: tauri::Runtime>(app: &tauri::AppHandle<R>, panel_style: &str) {
-    use tauri::Manager;
-    let light = panel_style != "dark";
-    LIGHT_GLASS.store(light, std::sync::atomic::Ordering::Relaxed);
-    for label in PANEL_WINDOWS {
-        let Some(window) = app.get_webview_window(label) else { continue };
-        let w = window.clone();
-        let _ = window.run_on_main_thread(move || {
-            if let Ok(h) = w.hwnd() {
-                set_panel_glass_hwnd(h, light);
-                let preference = if light { DWMWCP_ROUND } else { DWMWCP_DONOTROUND };
-                unsafe { let _ = DwmSetWindowAttribute(h, DWMWA_WINDOW_CORNER_PREFERENCE, &preference as *const _ as _, std::mem::size_of_val(&preference) as u32); }
-            }
-            apply_round_region_any(&w);
-        });
-    }
-}
+/// Etiquetas de las ventanas de panel.
+pub const PANEL_WINDOWS: [&str; 3] = ["barpanel", "launchpad", "spotlight"];
 
-/// Aplica el estilo de ventana sin marco en el hilo de UI.
-///
-/// Tao/WebView2 puede restaurar parte del estilo al crear la ventana o al mostrarla,
-/// por eso los callers lo invocan al crearla y justo antes de cada show.
-pub fn enforce_chrome_free(window: &WebviewWindow) {
-    let w = window.clone();
-    let _ = window.run_on_main_thread(move || {
-        if let Ok(hwnd) = w.hwnd() {
-            enforce_chrome_free_hwnd(hwnd);
-        }
-    });
+/// Estilo de paneles: «light» = desenfoque real debajo (ventanas auxiliares); «dark» = sin desenfoque.
+pub fn sync_panel_glass<R: tauri::Runtime>(app: &tauri::AppHandle<R>, panel_style: &str) {
+    let light = panel_style != "dark";
+    for label in PANEL_WINDOWS { crate::backdrop::set_enabled(app, label, light); }
 }
 
 /// Variante para una clausura que ya está ejecutándose en el hilo de UI.
@@ -218,7 +164,7 @@ pub fn enforce_chrome_free_hwnd(hwnd: HWND) {
         let standard = (WS_CAPTION | WS_THICKFRAME | WS_BORDER | WS_SYSMENU | WS_DLGFRAME | WS_MINIMIZEBOX | WS_MAXIMIZEBOX).0 as isize;
         // Los paneles son ventanas emergentes (WS_POPUP): como ventana «overlapped» sin marco,
         // DWM les dibujaba una franja de título y el WebView no se veía al usar vidrio.
-        let popup = if PANELS.get().is_some_and(|set| set.lock().unwrap().contains(&(hwnd.0 as isize))) { WS_POPUP.0 as isize } else { 0 };
+        let popup = if is_popup(hwnd) { WS_POPUP.0 as isize } else { 0 };
         SetWindowLongPtrW(hwnd, GWL_STYLE, (style & !standard) | popup);
 
         let ex_style = GetWindowLongPtrW(hwnd, GWL_EXSTYLE);
@@ -227,7 +173,7 @@ pub fn enforce_chrome_free_hwnd(hwnd: HWND) {
 
         // Sin redondeo de DWM: en Windows 11 trae una sombra gris y un radio fijo de 8 px.
         // Los paneles se recortan con una región propia (ver `mark_rounded`).
-        let preference = if is_glass_panel(hwnd) { DWMWCP_ROUND } else { DWMWCP_DONOTROUND };
+        let preference = DWMWCP_DONOTROUND;
         let _ = DwmSetWindowAttribute(hwnd, DWMWA_WINDOW_CORNER_PREFERENCE, &preference as *const _ as _, std::mem::size_of_val(&preference) as u32);
         let border = DWMWA_COLOR_NONE;
         let _ = DwmSetWindowAttribute(hwnd, DWMWA_BORDER_COLOR, &border as *const _ as _, std::mem::size_of_val(&border) as u32);

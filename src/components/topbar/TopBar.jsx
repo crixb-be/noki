@@ -1,10 +1,11 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import { useSettings } from "../../hooks/useSettings.js";
 import { isEn, presetLanguage, useLanguage } from "../../lib/i18n.js";
 import { BatteryIcon, BellIcon, BluetoothIcon, CameraIcon, ControlCenterIcon, RecordIcon, SearchIcon, SpeakerIcon, WifiIcon } from "./SymbolIcons.jsx";
 import { BarPaint, useBarPaint } from "./barPaint.jsx";
+import { GLASS_RADIUS, useGlassShape } from "../../lib/glass.js";
 
 function Item({ title, onClick, children, className = "" }) {
   return <button type="button" title={title} aria-label={title} onClick={onClick} className={`topbar-item ${className}`}>{children}</button>;
@@ -20,6 +21,9 @@ function formatClock(date) {
 
 export default function TopBar() {
   const { settings } = useSettings();
+  const shell = useRef(null);
+  // Desenfoque real debajo de la barra (solo en modo vidrio; el backend decide si se muestra).
+  useGlassShape(shell, GLASS_RADIUS.bar);
   const [now, setNow] = useState(() => new Date());
   const [avatar, setAvatar] = useState(null);
   const [battery, setBattery] = useState(null);
@@ -64,7 +68,7 @@ export default function TopBar() {
 
   if (!settings) return null;
   return (
-    <div className={`topbar-shell ${dark ? "topbar-dark" : "topbar-light"}`} style={{ "--notch-reserve": `${reserve}px` }}>
+    <div ref={shell} className={`topbar-shell ${dark ? "topbar-dark" : "topbar-light"}`} style={{ "--notch-reserve": `${reserve}px` }}>
       <BarPaint settings={settings} tint={paint.tint} />
       <div className="topbar-left" />
       <div className="topbar-center-reserve" aria-hidden="true" />

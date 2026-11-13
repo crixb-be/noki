@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
 
 import { useSettings } from "../../hooks/useSettings.js";
+import { GLASS_RADIUS, useGlassShape } from "../../lib/glass.js";
 
 export default function Spotlight() {
   const { settings } = useSettings();
@@ -11,6 +12,8 @@ export default function Spotlight() {
   const [results, setResults] = useState([]);
   const [selected, setSelected] = useState(0);
   const input = useRef(null);
+  const card = useRef(null);
+  useGlassShape(card, GLASS_RADIUS.panel);
   const requestId = useRef(0);
   useEffect(() => {
     input.current?.focus();
@@ -36,7 +39,7 @@ export default function Spotlight() {
     if (event.key === "ArrowUp") { setSelected((i) => Math.max(i - 1, 0)); event.preventDefault(); }
     if (event.key === "Enter") { choose(flat[selected], event.ctrlKey); event.preventDefault(); }
   };
-  return <div className="spotlight-shell" onKeyDown={onKey}><div className="spotlight-card noki-popup-card">
+  return <div className="spotlight-shell" onKeyDown={onKey}><div ref={card} className="spotlight-card noki-popup-card">
     <div className="spotlight-input"><span>⌕</span><input ref={input} value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Buscar en Noki" autoFocus /></div>
     <div className="spotlight-results">
       {apps.length > 0 && <ResultGroup title="Aplicaciones" items={apps} offset={0} selected={selected} onClick={choose} />}

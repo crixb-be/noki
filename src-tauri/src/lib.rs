@@ -22,6 +22,7 @@ mod translate;
 mod updates;
 mod viz;
 mod topbar;
+mod backdrop;
 mod dock;
 mod launchpad;
 mod spotlight;
@@ -808,6 +809,7 @@ pub fn run() {
             dock::trash_open,
             dock::trash_empty,
             dock::trash_drop,
+            backdrop::glass_shape,
             launchpad::open_launchpad,
             launchpad::toggle_launchpad,
             launchpad::close_launchpad,
@@ -884,6 +886,7 @@ pub fn run() {
             });
             notch::start(handle.clone());
             dock::start(handle.clone());
+            backdrop::start(handle.clone());
             Ok(())
         })
         .build(tauri::generate_context!())

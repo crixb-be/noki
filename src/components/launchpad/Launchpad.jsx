@@ -1,6 +1,7 @@
 import { memo, useEffect, useMemo, useRef, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { useSettings } from "../../hooks/useSettings.js";
+import { GLASS_RADIUS, useGlassShape } from "../../lib/glass.js";
 import { isEn, presetLanguage, useLanguage } from "../../lib/i18n.js";
 
 const CATEGORIES = ["Todas", "Productividad y finanzas", "Creatividad", "Utilidades", "Información y lectura", "Juegos", "Entretenimiento", "Social"];
@@ -66,6 +67,8 @@ export default function Launchpad() {
   const [query, setQuery] = useState("");
   const [category, setCategory] = useState("Todas");
   const [sort, setSort] = useState("az");
+  const card = useRef(null);
+  useGlassShape(card, GLASS_RADIUS.launcher);
 
   presetLanguage(settings?.general?.language);
   useLanguage(settings?.general?.language);
@@ -89,7 +92,7 @@ export default function Launchpad() {
   }, [query, filtered]);
 
   return <div className="launchpad-backdrop" onMouseDown={(event) => { if (event.target === event.currentTarget) invoke("close_launchpad").catch(() => {}); }}>
-    <div className="launchpad-layout launchpad-card noki-popup-card">
+    <div ref={card} className="launchpad-layout launchpad-card noki-popup-card">
       <div className="launchpad-head">
         <label className="launchpad-search"><span className="launchpad-app-mark">A</span><input autoFocus value={query} onChange={(event) => setQuery(event.target.value)} placeholder={isEn() ? "Applications" : "Aplicaciones"} /></label>
         <button className="launchpad-sort" onClick={() => setSort(sort === "az" ? "za" : "az")} aria-label="Ordenar aplicaciones">☷ {sort === "az" ? "A-Z" : "Z-A"}</button>

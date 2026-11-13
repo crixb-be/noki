@@ -40,7 +40,7 @@ use windows::{
         },
     },
 };
-use window_vibrancy::{apply_acrylic, apply_blur, clear_acrylic, clear_blur};
+use window_vibrancy::{clear_acrylic, clear_blur};
 use windows::Win32::System::Com::{CoCreateInstance, CLSCTX_INPROC_SERVER};
 use windows::Win32::System::Threading::{OpenProcess, QueryFullProcessImageNameW, PROCESS_NAME_FORMAT, PROCESS_QUERY_LIMITED_INFORMATION};
 use windows::Win32::System::WinRT::{RoInitialize, RO_INIT_MULTITHREADED};
@@ -104,7 +104,9 @@ fn create_topbar(app: &AppHandle) -> Option<WebviewWindow> {
         .build()
         .ok()?;
     let _ = window.set_background_color(Some(Color(0, 0, 0, 0)));
-    window_utils::enforce_chrome_free(&window);
+    let _ = clear_acrylic(&window);
+    let _ = clear_blur(&window);
+    window_utils::mark_rounded(&window);
     window_utils::schedule_app_recovery(&window, "topbar");
     Some(window)
 }
@@ -144,26 +146,16 @@ fn create_panel(app: &AppHandle) -> Option<WebviewWindow> {
 
 pub fn ensure_panel(app: &AppHandle) { let _ = create_panel(app); }
 
-fn apply_glass(window: &WebviewWindow, dark: bool) {
-    let color = if dark { (16, 16, 16, 110) } else { (242, 242, 242, 110) };
-    if apply_acrylic(window, Some(color)).is_err() {
-        let _ = apply_blur(window, Some(color));
-    }
-}
-
 fn glass_changed(settings: &Settings) -> bool {
     let mode = settings.appearance.bar_mode.clone();
     let tint = settings.topbar.tint.clone();
     glass_state().lock().unwrap().as_ref() != Some(&(mode, tint))
 }
 
-fn apply_glass_mode(window: &WebviewWindow, mode: &str, tint: &str) {
-    if mode == "none" {
-        apply_glass(window, tint != "light");
-    } else {
-        let _ = clear_acrylic(window);
-        let _ = clear_blur(window);
-    }
+/// Barra en modo vidrio («none»): desenfoque real debajo (ventanas auxiliares de `backdrop`);
+/// la ventana de la barra queda 100 % transparente y sin efectos de Windows.
+fn apply_glass_mode(window: &WebviewWindow, mode: &str, _tint: &str) {
+    crate::backdrop::set_enabled(window.app_handle(), "topbar", mode == "none");
 }
 
 fn set_owner(app: &AppHandle, enabled: bool) {

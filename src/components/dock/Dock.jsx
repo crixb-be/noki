@@ -3,6 +3,7 @@ import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import { useSettings } from "../../hooks/useSettings.js";
+import { GLASS_RADIUS, useGlassShape } from "../../lib/glass.js";
 
 function AppsIcon() { return <span className="apps-icon">{Array.from({ length: 9 }, (_, i) => <i key={i} />)}</span>; }
 
@@ -49,6 +50,8 @@ export default function Dock() {
     const timer = setInterval(report, 2000);
     return () => { observer.disconnect(); window.removeEventListener("resize", report); clearInterval(timer); };
   }, []);
+  // Desenfoque real debajo de la píldora, con su forma exacta (también al magnificar).
+  useGlassShape(pill, GLASS_RADIUS.dock);
   // Tamaño de la ventana: ancho natural de la píldora en reposo + holgura para la magnificación.
   // Antes la píldora se limitaba al ancho de la ventana y la ventana a la píldora: los iconos se recortaban.
   useEffect(() => {
