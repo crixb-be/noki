@@ -1,17 +1,17 @@
-# Graph Report - noki-dock  (2026-11-12)
+# Graph Report - noki-dock  (2026-11-13)
 
 ## Corpus Check
-- 109 files · ~104,128 words
+- 109 files · ~104,987 words
 - Verdict: corpus is large enough that graph structure adds value.
 - Unclassified: 6 file(s) not represented in the graph (top: (none) 3, .icns 1, .ico 1)
 
 ## Summary
-- 1734 nodes · 3969 edges · 88 communities (55 shown, 33 thin omitted)
-- Extraction: 99% EXTRACTED · 1% INFERRED · 0% AMBIGUOUS · INFERRED: 37 edges (avg confidence: 0.71)
+- 1754 nodes · 4014 edges · 89 communities (57 shown, 32 thin omitted)
+- Extraction: 99% EXTRACTED · 1% INFERRED · 0% AMBIGUOUS · INFERRED: 37 edges (avg confidence: 0.69)
 - Token cost: 0 input · 0 output
 
 ## Graph Freshness
-- Built from commit: `bfb40b3a`
+- Built from commit: `f4869282`
 - Run `git rev-parse HEAD` and compare to check if the graph is stale.
 - Run `graphify update .` after code changes (no API cost).
 
@@ -33,24 +33,24 @@
 - viz.rs
 - system.rs
 - screentime.rs
-- Settings
+- settings.rs
 - icons.rs
 - sysmon.rs
 - dayKey
 - ExpandedView.jsx
 - topbar.rs
 - useStore
-- media.rs
-- create_panel
+- popups.rs
+- sync_panel_glass
 - sync
 - TopBar.jsx
 - spotlight.rs
-- Store
-- settings.rs
+- window_utils.rs
+- Settings
 - fileops.rs
 - barPaint.jsx
-- RwLock
-- launcher.rs
+- blocking_with_timeout
+- media.rs
 - SystemView.jsx
 - run
 - State
@@ -59,21 +59,23 @@
 - MediaHandle
 - ambient.js
 - set_avatar_image
-- ProviderCfg
+- Cmd
+- duration
 - sync
+- appicon.rs
 - MediaPlayer.jsx
 - Lcd
 - contact_links
+- AppHandle
+- LPARAM
 - default.json
-- FileShelf.jsx
-- W
+- ScreenTime.jsx
+- Mutex
 - render
 - dock.rs
 - noki
-- backup_export_blocking
 - Mutex
 - window_app_user_model_id
-- SysHandle
 
 ## God Nodes (most connected - your core abstractions)
 1. `react` - 55 edges
@@ -85,32 +87,32 @@
 7. `dayKey()` - 23 edges
 8. `run_loop()` - 23 edges
 9. `SettingsWindow()` - 20 edges
-10. `Row()` - 19 edges
+10. `sync()` - 19 edges
 
 ## Surprising Connections (you probably didn't know these)
-- `dock_items()` --references--> `NotchState`  [INFERRED]
-  src-tauri/src/dock.rs → src-tauri/src/notch.rs
-- `dock_activate()` --references--> `NotchState`  [INFERRED]
-  src-tauri/src/dock.rs → src-tauri/src/notch.rs
-- `dock_close_windows()` --references--> `NotchState`  [INFERRED]
-  src-tauri/src/dock.rs → src-tauri/src/notch.rs
+- `shortcut_list()` --references--> `Shortcuts`  [INFERRED]
+  src-tauri/src/lib.rs → src-tauri/src/settings.rs
+- `store_all()` --references--> `Store`  [INFERRED]
+  src-tauri/src/lib.rs → src-tauri/src/store.rs
+- `store_set()` --references--> `Store`  [INFERRED]
+  src-tauri/src/lib.rs → src-tauri/src/store.rs
 - `backup_export()` --references--> `Store`  [INFERRED]
   src-tauri/src/lib.rs → src-tauri/src/store.rs
-- `store_all()` --references--> `Store`  [INFERRED]
+- `backup_import()` --references--> `Store`  [INFERRED]
   src-tauri/src/lib.rs → src-tauri/src/store.rs
 
 ## Import Cycles
 - None detected.
 
-## Communities (88 total, 33 thin omitted)
+## Communities (89 total, 32 thin omitted)
 
 ### Community 0 - "SettingsWindow.jsx"
 Cohesion: 0.10
 Nodes (56): NokiLogo(), About(), Ai(), Alerts(), Appearance(), Avatar(), CalendarSettings(), ColorPicker() (+48 more)
 
 ### Community 1 - "translate.rs"
-Cohesion: 0.08
-Nodes (27): bg_data(), bg_data_blocking(), bg_import(), bg_import_blocking(), dir(), EXTENSIONS, MAX_BYTES, mime() (+19 more)
+Cohesion: 0.16
+Nodes (9): client(), google(), joins_google_parts_and_detects_language(), ocr_file(), ocr_image(), parse_google(), recognize(), translate_text() (+1 more)
 
 ### Community 2 - "dropzone.rs"
 Cohesion: 0.07
@@ -125,12 +127,12 @@ Cohesion: 0.06
 Nodes (37): author, dependencies, @crabnebula/tauri-plugin-drag@^2.1.0, @huggingface/transformers@^4.3.2, react@^18.3.1, react-dom@^18.3.1, @tauri-apps/api@^2.1.1, @tauri-apps/plugin-dialog@^2.8.3 (+29 more)
 
 ### Community 5 - "ai.rs"
-Cohesion: 0.13
+Cohesion: 0.12
 Nodes (22): ai_cancel(), ai_chat(), AiJobs, base(), build(), ChatMsg, chunk_text(), client() (+14 more)
 
 ### Community 6 - "Recorder.jsx"
 Cohesion: 0.11
-Nodes (32): Detail(), fmtDur(), Live(), Options(), Recorder(), shape(), toBase64(), BARS (+24 more)
+Nodes (34): Detail(), fmtDur(), Live(), Options(), Recorder(), shape(), toBase64(), isEn() (+26 more)
 
 ### Community 7 - "calendar.rs"
 Cohesion: 0.11
@@ -142,7 +144,7 @@ Nodes (38): app, security, windows, withGlobalTauri, build, beforeBuildCommand, 
 
 ### Community 9 - "notch.rs"
 Cohesion: 0.05
-Nodes (42): remove(), ABE_TOP, ABM_NEW, ABM_QUERYPOS, ABM_REMOVE, ABM_SETPOS, appbar_remove(), appbar_remove_win() (+34 more)
+Nodes (43): remove(), ABE_TOP, ABM_NEW, ABM_QUERYPOS, ABM_REMOVE, ABM_SETPOS, appbar_remove(), appbar_remove_win() (+35 more)
 
 ### Community 10 - "statuswatch.rs"
 Cohesion: 0.09
@@ -150,107 +152,107 @@ Nodes (15): PERSONALIZE, alert(), bluetooth_loop(), connected_bluetooth(), MIC_K
 
 ### Community 11 - "App.jsx"
 Cohesion: 0.08
-Nodes (45): react, @tauri-apps/api, App(), isTextField(), Notch(), TABS, AIChat(), useBattery() (+37 more)
+Nodes (43): react, @tauri-apps/api, App(), isTextField(), Notch(), TABS, AIChat(), useBattery() (+35 more)
 
 ### Community 12 - "clipboard.rs"
-Cohesion: 0.09
+Cohesion: 0.10
 Nodes (12): CF_UNICODETEXT, clip_clear(), clip_copy(), clip_list(), clip_remove(), Entry, History, MAX_CHARS (+4 more)
 
 ### Community 13 - "lib.rs"
-Cohesion: 0.06
-Nodes (8): ALLOWED_HOSTS, detect_city(), DetectedCity, file_size(), FileInfo, list_monitors(), MonitorDto, TrayDnd
+Cohesion: 0.05
+Nodes (12): ALLOWED_HOSTS, detect_city(), DetectedCity, file_size(), FileInfo, list_monitors(), MonitorDto, set_brightness() (+4 more)
 
 ### Community 14 - "viz.rs"
 Cohesion: 0.09
 Nodes (13): a_tone_lights_the_matching_band(), bands(), BANDS, Capture, default_device_id(), drain(), EMIT_EVERY, fft() (+5 more)
 
 ### Community 15 - "system.rs"
-Cohesion: 0.07
+Cohesion: 0.08
 Nodes (11): audio_output_name(), AudioDevice, DisplayBrightness, Endpoint, endpoint(), friendly_name(), Hud, IOCTL_VIDEO_QUERY_DISPLAY_BRIGHTNESS (+3 more)
 
 ### Community 16 - "screentime.rs"
-Cohesion: 0.11
+Cohesion: 0.12
 Nodes (14): add(), CLEARED, enabled(), flush(), FLUSH_EVERY, foreground_app(), IDLE_LIMIT, idle_secs() (+6 more)
 
-### Community 17 - "Settings"
-Cohesion: 0.10
-Nodes (10): Clipboard, General, Health, Hud, Modules, Productivity, Settings, TopBar (+2 more)
+### Community 17 - "settings.rs"
+Cohesion: 0.06
+Nodes (23): Ai, Appearance, Calendar, CalSource, Clipboard, DEFAULT_UPDATE_URL, Dock, DockFolder (+15 more)
 
 ### Community 19 - "sysmon.rs"
-Cohesion: 0.19
+Cohesion: 0.18
 Nodes (15): DiskInfo, end_task(), end_task_blocking(), is_protected(), ProcInfo, PROTECTED, protects_system_and_self(), Stats (+7 more)
 
 ### Community 20 - "dayKey"
-Cohesion: 0.18
-Nodes (21): blank(), Editor(), HabitsView(), ICONS, PRESETS, AppList(), Bars(), colorOf() (+13 more)
+Cohesion: 0.12
+Nodes (32): CalendarView(), dayLabel(), monthTitle(), addPaths(), baseName(), dragIcon(), FileShelf(), fmtSize() (+24 more)
 
 ### Community 21 - "ExpandedView.jsx"
-Cohesion: 0.15
-Nodes (22): Battery(), CalendarView(), dayLabel(), monthTitle(), Clock(), Costume(), Eyes(), isNight() (+14 more)
+Cohesion: 0.22
+Nodes (15): Battery(), Clock(), Costume(), Eyes(), isNight(), Mascot(), Mouth(), STROKE (+7 more)
 
 ### Community 22 - "topbar.rs"
-Cohesion: 0.04
-Nodes (44): ABE_TOP, ABM_NEW, ABM_QUERYPOS, ABM_REMOVE, ABM_SETPOS, APPBAR_HWND, appbar_hwnd(), AVATAR_CACHE (+36 more)
+Cohesion: 0.05
+Nodes (16): ABE_TOP, ABM_NEW, ABM_QUERYPOS, ABM_REMOVE, ABM_SETPOS, battery_info(), BatteryInfo, command_battery_info() (+8 more)
 
 ### Community 23 - "useStore"
 Cohesion: 0.10
-Nodes (29): AppIcon(), cache, colorOf(), COLORS, failedAt, fetchIcon(), wait(), ACTIONS (+21 more)
+Nodes (31): AppIcon(), cache, colorOf(), COLORS, failedAt, fetchIcon(), wait(), ACTIONS (+23 more)
 
-### Community 24 - "media.rs"
-Cohesion: 0.07
-Nodes (31): apply(), ArtCache, Cmd, Next, Pause, Play, Prev, Seek (+23 more)
+### Community 24 - "popups.rs"
+Cohesion: 0.10
+Nodes (27): AppCache, AppEntry, EXTENSIONS, launch_app(), launch_app_blocking(), launcher_apps(), launcher_list(), SHELL_PREFIX (+19 more)
 
-### Community 25 - "create_panel"
-Cohesion: 0.13
-Nodes (21): create(), sync(), close_spotlight(), create(), ensure(), focus(), position(), spotlight_resize() (+13 more)
+### Community 25 - "sync_panel_glass"
+Cohesion: 0.29
+Nodes (7): apply_round_region(), apply_round_region_any(), enforce_chrome_free(), enforce_chrome_free_hwnd(), is_glass_panel(), mark_rounded(), sync_panel_glass()
 
 ### Community 26 - "sync"
-Cohesion: 0.13
-Nodes (26): appbar(), AppBarState, child_callback(), commit_pin(), create(), dock_pin(), dock_reorder(), dock_resize() (+18 more)
+Cohesion: 0.19
+Nodes (17): appbar(), AppBarState, commit_pin(), create(), dock_pin(), dock_reorder(), dock_resize(), dock_unpin() (+9 more)
 
 ### Community 27 - "TopBar.jsx"
 Cohesion: 0.06
 Nodes (67): AppsIcon(), Dock(), apply(), measureRest(), onMouseMove(), resetMagnification(), start(), tick() (+59 more)
 
 ### Community 28 - "spotlight.rs"
-Cohesion: 0.07
-Nodes (23): close_launchpad(), ensure(), focus_window(), open(), open_launchpad(), position(), remove_noactivate(), toggle_launchpad() (+15 more)
+Cohesion: 0.06
+Nodes (32): close_launchpad(), create(), ensure(), focus_window(), open(), open_launchpad(), position(), remove_noactivate() (+24 more)
 
-### Community 29 - "Store"
-Cohesion: 0.23
-Nodes (4): backup_import(), backup_import_blocking(), Store, StoreInner
+### Community 29 - "window_utils.rs"
+Cohesion: 0.05
+Nodes (19): ACCENT_DISABLED, ACCENT_ENABLE_ACRYLICBLURBEHIND, AccentPolicy, CompositionData, corrected_app_url(), GetModuleHandleW(), GetProcAddress(), mark_frontend_ready() (+11 more)
 
-### Community 30 - "settings.rs"
-Cohesion: 0.11
-Nodes (18): shortcut_list(), Appearance, Calendar, CalSource, config_dir(), DEFAULT_UPDATE_URL, Dock, DockFolder (+10 more)
+### Community 30 - "Settings"
+Cohesion: 0.17
+Nodes (10): backup_import_blocking(), data_dir(), config_dir(), load(), path(), save(), Settings, Shortcuts (+2 more)
 
 ### Community 31 - "fileops.rs"
 Cohesion: 0.05
-Nodes (36): apply(), ATARDECER, AURORA, DEFAULT, every_icon_decodes(), image(), OCEANO, PASTEL_ATARDECER (+28 more)
+Nodes (39): bg_data(), bg_data_blocking(), bg_import(), bg_import_blocking(), dir(), EXTENSIONS, MAX_BYTES, mime() (+31 more)
 
 ### Community 32 - "barPaint.jsx"
 Cohesion: 0.28
 Nodes (12): StripDecor(), BarPaint(), useBarPaint(), cache, fillFor(), rgba(), useBgImage(), inRange() (+4 more)
 
-### Community 33 - "RwLock"
-Cohesion: 0.33
-Nodes (4): app_icon(), cache(), CACHE, warm_paths()
+### Community 33 - "blocking_with_timeout"
+Cohesion: 0.12
+Nodes (17): blocking_with_timeout(), bt_devices(), collect_networks(), command_audio_output_name(), command_bt_devices(), command_lock_user(), command_logoff_user(), command_open_system_uri() (+9 more)
 
-### Community 34 - "launcher.rs"
-Cohesion: 0.21
-Nodes (11): AppCache, AppEntry, EXTENSIONS, launch_app(), launch_app_blocking(), launcher_apps(), launcher_list(), SHELL_PREFIX (+3 more)
+### Community 34 - "media.rs"
+Cohesion: 0.15
+Nodes (5): ArtCache, now_filetime(), pretty_source(), read_state(), read_thumbnail()
 
 ### Community 35 - "SystemView.jsx"
 Cohesion: 0.29
 Nodes (12): clean(), gb(), mb(), Performance(), Processes(), rate(), Ring(), Spark() (+4 more)
 
 ### Community 36 - "run"
-Cohesion: 0.29
-Nodes (13): apply_autostart(), apply_shortcut(), build_tray(), commit_settings(), data_dir(), open_settings(), open_settings_async(), reset_settings() (+5 more)
+Cohesion: 0.15
+Nodes (19): add_to_zip(), apply_autostart(), apply_shortcut(), build_tray(), commit_settings(), open_settings(), open_settings_async(), quit_app() (+11 more)
 
 ### Community 37 - "State"
-Cohesion: 0.32
-Nodes (11): backup_export(), get_settings(), notch_state(), request_open(), set_greeting(), set_media_pill(), set_peek(), set_pinned() (+3 more)
+Cohesion: 0.22
+Nodes (14): backup_export(), backup_export_blocking(), backup_import(), broadcast_notify(), get_settings(), notch_state(), set_greeting(), set_media_pill() (+6 more)
 
 ### Community 38 - "items"
 Cohesion: 0.20
@@ -265,52 +267,64 @@ Cohesion: 0.32
 Nodes (5): media_control(), media_seek(), media_state(), MediaHandle, MediaState
 
 ### Community 41 - "ambient.js"
-Cohesion: 0.09
-Nodes (38): DAY, fmtMin(), FocusStats(), hourLabel(), lastDays(), Ctl(), ZEN_EXTRA_H, ZenPill() (+30 more)
+Cohesion: 0.11
+Nodes (31): Ctl(), ZEN_EXTRA_H, ZenPill(), Notes(), title(), FocusView(), Productivity(), SUBTABS (+23 more)
 
 ### Community 42 - "set_avatar_image"
-Cohesion: 0.33
-Nodes (11): data_url(), encode_avatar_png(), extract_embedded_images(), image_data(), is_jpeg(), is_png(), read_image(), save_avatar_png() (+3 more)
+Cohesion: 0.23
+Nodes (14): avatar_cache(), command_user_avatar(), data_url(), encode_avatar_png(), extract_embedded_images(), image_data(), is_jpeg(), is_png() (+6 more)
 
-### Community 43 - "ProviderCfg"
-Cohesion: 0.47
-Nodes (4): Ai, LegacyModels, provider(), ProviderCfg
+### Community 43 - "Cmd"
+Cohesion: 0.18
+Nodes (10): apply(), Cmd, Next, Pause, Play, Prev, Seek, Toggle (+2 more)
+
+### Community 44 - "duration"
+Cohesion: 0.33
+Nodes (7): check(), endpoint(), Pending, start_auto(), update_check(), update_install(), UpdateInfo
 
 ### Community 46 - "sync"
-Cohesion: 0.16
-Nodes (24): apply_glass(), apply_glass_mode(), check_z_order(), close_bar_panel_impl(), command_bar_panel_state(), command_close_bar_panel(), command_open_bar_panel(), command_resize_bar_panel() (+16 more)
+Cohesion: 0.17
+Nodes (20): appbar_hwnd(), apply_glass(), apply_glass_mode(), check_z_order(), create_topbar(), ensure_mouse_style(), foreign_window_at(), glass_changed() (+12 more)
+
+### Community 47 - "appicon.rs"
+Cohesion: 0.19
+Nodes (10): apply(), ATARDECER, AURORA, DEFAULT, every_icon_decodes(), image(), OCEANO, PASTEL_ATARDECER (+2 more)
 
 ### Community 48 - "MediaPlayer.jsx"
-Cohesion: 0.17
-Nodes (18): LyricsPanel(), MediaPlayer(), useArtColor(), Ctl(), Eq(), Icon(), MediaPill(), PILL_EXTRA_H (+10 more)
+Cohesion: 0.18
+Nodes (17): LyricsPanel(), MediaPlayer(), useArtColor(), Ctl(), Eq(), Icon(), MediaPill(), PILL_EXTRA_H (+9 more)
 
 ### Community 53 - "contact_links"
 Cohesion: 0.33
 Nodes (5): blank_issues_enabled, contact_links, about, name, url
 
+### Community 54 - "AppHandle"
+Cohesion: 0.33
+Nodes (11): close_bar_panel_impl(), command_bar_panel_state(), command_close_bar_panel(), command_open_bar_panel(), command_resize_bar_panel(), create_panel(), ensure_panel(), open_bar_panel_impl() (+3 more)
+
+### Community 55 - "LPARAM"
+Cohesion: 0.33
+Nodes (8): child_callback(), enum_callback(), hwnd(), restore_taskbar(), sync_taskbar(), taskbar_state(), taskbars(), title()
+
 ### Community 56 - "default.json"
 Cohesion: 0.33
 Nodes (5): description, identifier, permissions, $schema, windows
 
-### Community 57 - "FileShelf.jsx"
-Cohesion: 0.46
-Nodes (7): addPaths(), baseName(), dragIcon(), FileShelf(), fmtSize(), iconFor(), ICONS
+### Community 57 - "ScreenTime.jsx"
+Cohesion: 0.38
+Nodes (9): AppList(), Bars(), colorOf(), COLORS, fmt(), lastDays(), mergeApps(), ScreenTime() (+1 more)
 
-### Community 59 - "W"
-Cohesion: 0.33
-Nodes (3): add_to_zip(), zip_files(), zip_files_blocking()
+### Community 58 - "Mutex"
+Cohesion: 0.43
+Nodes (5): APPBAR_HWND, AVATAR_CACHE, GLASS, PANEL, PanelState
 
 ### Community 61 - "render"
-Cohesion: 0.21
-Nodes (10): bitmap_png(), fallback_png(), glyph(), hicon_png(), png_data(), render(), resolve_program(), shell_extension_png() (+2 more)
+Cohesion: 0.17
+Nodes (13): app_icon(), bitmap_png(), cache(), fallback_png(), glyph(), hicon_png(), png_data(), render() (+5 more)
 
 ### Community 66 - "dock.rs"
-Cohesion: 0.04
-Nodes (16): ABE_BOTTOM, ABM_GETSTATE, ABM_NEW, ABM_QUERYPOS, ABM_REMOVE, ABM_SETPOS, ABM_SETSTATE, ABS_AUTOHIDE (+8 more)
-
-### Community 76 - "backup_export_blocking"
-Cohesion: 0.50
-Nodes (3): backup_export_blocking(), broadcast_notify(), store_all()
+Cohesion: 0.06
+Nodes (12): ABE_BOTTOM, ABM_GETSTATE, ABM_NEW, ABM_QUERYPOS, ABM_REMOVE, ABM_SETPOS, ABM_SETSTATE, ABS_AUTOHIDE (+4 more)
 
 ### Community 79 - "Mutex"
 Cohesion: 0.33
@@ -320,29 +334,25 @@ Nodes (7): APPBAR, dock_set_hit(), Hit, HIT, hit(), SIZE, TASKBAR_STATE
 Cohesion: 0.33
 Nodes (6): app_user_model_id(), link_targets(), process_app_user_model_id(), process_image_path(), utf16_string(), window_app_user_model_id()
 
-### Community 87 - "SysHandle"
-Cohesion: 0.29
-Nodes (4): set_brightness(), set_mute(), set_volume(), SysHandle
-
 ## Knowledge Gaps
 - **12 isolated node(s):** `Next`, `Pause`, `Play`, `Prev`, `Seek` (+7 more)
-  These have ≤1 connection - possible missing edges. (Counts symbols only; 501 node(s) total have ≤1 connection when file, concept and rationale nodes are included.)
-- **33 thin communities (<3 nodes) omitted from report** — run `graphify query` to explore isolated nodes.
+  These have ≤1 connection - possible missing edges. (Counts symbols only; 507 node(s) total have ≤1 connection when file, concept and rationale nodes are included.)
+- **32 thin communities (<3 nodes) omitted from report** — run `graphify query` to explore isolated nodes.
 
 ## Suggested Questions
 _Questions this graph is uniquely positioned to answer:_
 
-- **Why does `react` connect `App.jsx` to `SettingsWindow.jsx`, `barPaint.jsx`, `SystemView.jsx`, `package.json`, `Recorder.jsx`, `ambient.js`, `MediaPlayer.jsx`, `dayKey`, `ExpandedView.jsx`, `useStore`, `FileShelf.jsx`, `TopBar.jsx`?**
-  _High betweenness centrality (0.022) - this node is a cross-community bridge._
+- **Why does `Settings` connect `Settings` to `dock.rs`, `run`, `State`, `items`, `notch.rs`, `set_avatar_image`, `lib.rs`, `sync`, `settings.rs`, `topbar.rs`, `LPARAM`, `sync`, `spotlight.rs`?**
+  _High betweenness centrality (0.026) - this node is a cross-community bridge._
 - **What connects `Next`, `Pause`, `Play` to the rest of the system?**
   _12 weakly-connected nodes found - possible missing edges._
 - **Should `SettingsWindow.jsx` be split into smaller, more focused modules?**
   _Cohesion score 0.09643483343074226 - nodes in this community are weakly interconnected._
-- **Why does `Settings` connect `Settings` to `dock.rs`, `run`, `State`, `items`, `notch.rs`, `set_avatar_image`, `ProviderCfg`, `backup_export_blocking`, `lib.rs`, `sync`, `topbar.rs`, `create_panel`, `sync`, `spotlight.rs`, `Store`, `settings.rs`?**
-  _High betweenness centrality (0.020) - this node is a cross-community bridge._
-- **Should `translate.rs` be split into smaller, more focused modules?**
-  _Cohesion score 0.07535460992907801 - nodes in this community are weakly interconnected._
-- **Why does `NotchState` connect `State` to `translate.rs`, `ai.rs`, `items`, `calendar.rs`, `notch.rs`, `set_avatar_image`, `clipboard.rs`, `lib.rs`, `screentime.rs`, `Settings`, `topbar.rs`, `Store`?**
-  _High betweenness centrality (0.013) - this node is a cross-community bridge._
+- **Why does `react` connect `App.jsx` to `SettingsWindow.jsx`, `barPaint.jsx`, `SystemView.jsx`, `package.json`, `Recorder.jsx`, `ambient.js`, `MediaPlayer.jsx`, `dayKey`, `ExpandedView.jsx`, `useStore`, `ScreenTime.jsx`, `TopBar.jsx`?**
+  _High betweenness centrality (0.023) - this node is a cross-community bridge._
 - **Should `dropzone.rs` be split into smaller, more focused modules?**
-  _Cohesion score 0.06866002214839424 - nodes in this community are weakly interconnected._
+  _Cohesion score 0.07084785133565621 - nodes in this community are weakly interconnected._
+- **Why does `NotchState` connect `State` to `ai.rs`, `items`, `calendar.rs`, `notch.rs`, `set_avatar_image`, `clipboard.rs`, `lib.rs`, `duration`, `screentime.rs`, `Settings`?**
+  _High betweenness centrality (0.012) - this node is a cross-community bridge._
+- **Should `quick.rs` be split into smaller, more focused modules?**
+  _Cohesion score 0.07435897435897436 - nodes in this community are weakly interconnected._

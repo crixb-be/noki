@@ -572,6 +572,9 @@ function Appearance({ s, set }) {
   return (
     <Page title="Apariencia" subtitle="Tamaño, posición y transparencia. Los cambios se ven al instante en el notch.">
       <IconPicker value={a.appIcon} onChange={(v) => ap({ appIcon: v })} />
+      <Row title="Estilo de paneles" hint="Lanzador, buscador y paneles de la barra superior (Wi-Fi, Bluetooth, batería, centro de control, usuario).">
+        <Select value={a.panelStyle ?? "light"} onChange={(v) => ap({ panelStyle: v })} options={[["light", "Claro difuminado (macOS)"], ["dark", "Oscuro"]]} />
+      </Row>
       <Row title="Personaje en el notch" hint="Una carita que parpadea, te mira y reacciona: se alegra al terminar tareas, hábitos o un Pomodoro, baila con la música y se adormece de noche.">
         <Toggle checked={a.mascot} onChange={(v) => ap({ mascot: v })} />
       </Row>

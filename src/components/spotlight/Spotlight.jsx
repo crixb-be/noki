@@ -1,7 +1,12 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
 
+import { useSettings } from "../../hooks/useSettings.js";
+
 export default function Spotlight() {
+  const { settings } = useSettings();
+  // Estilo de paneles (Ajustes > Apariencia).
+  useEffect(() => { document.documentElement.dataset.panels = settings?.appearance?.panelStyle === "dark" ? "dark" : "light"; }, [settings?.appearance?.panelStyle]);
   const [query, setQuery] = useState("");
   const [results, setResults] = useState([]);
   const [selected, setSelected] = useState(0);

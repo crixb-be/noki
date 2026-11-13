@@ -18,6 +18,8 @@ fn create(app: &AppHandle) -> Option<WebviewWindow> {
     let _ = clear_blur(&window);
     popups::register_window(app, &window, "launchpad", || {});
     window_utils::mark_rounded(&window);
+    let style = app.state::<crate::notch::NotchState>().settings.try_lock().map(|s| s.appearance.panel_style.clone()).unwrap_or_else(|_| "light".into());
+    window_utils::sync_panel_glass(app, &style);
     window_utils::schedule_app_recovery(&window, "launchpad");
     Some(window)
 }

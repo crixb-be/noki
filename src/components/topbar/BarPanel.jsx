@@ -13,6 +13,8 @@ function Tile({ title, subtitle, icon, onClick, active = false }) {
 
 export default function BarPanel() {
   const { settings } = useSettings();
+  // Estilo de paneles (Ajustes > Apariencia): «light» vidrio claro difuminado, «dark» oscuro opaco.
+  useEffect(() => { document.documentElement.dataset.panels = settings?.appearance?.panelStyle === "dark" ? "dark" : "light"; }, [settings?.appearance?.panelStyle]);
   const [kind, setKind] = useState(null);
   const [wifi, setWifi] = useState([]);
   const [devices, setDevices] = useState([]);
@@ -26,11 +28,12 @@ export default function BarPanel() {
   const [loading, setLoading] = useState(false);
   const ref = useRef(null);
   const body = useRef(null);
+  const [openCount, setOpenCount] = useState(0);
 
   useEffect(() => {
     let stop;
     invoke("command_bar_panel_state").then((value) => value && setKind(value)).catch(() => {});
-    listen("bar-panel", (event) => setKind(typeof event.payload === "string" ? event.payload : event.payload?.kind ?? null)).then((fn) => { stop = fn; });
+    listen("bar-panel", (event) => { setKind(typeof event.payload === "string" ? event.payload : event.payload?.kind ?? null); setOpenCount((n) => n + 1); }).then((fn) => { stop = fn; });
     return () => stop?.();
   }, []);
   useEffect(() => {
@@ -63,12 +66,20 @@ export default function BarPanel() {
     const observer = new ResizeObserver(report);
     observer.observe(inner);
     return () => observer.disconnect();
-  }, [kind]);
+  }, [kind, openCount]);
 
   if (!kind) return null;
   const panelDark = settings?.topbar?.tint === "dark" || (settings?.topbar?.tint !== "light" && window.matchMedia?.("(prefers-color-scheme: dark)").matches !== false);
   return <div ref={ref} className={`bar-panel noki-popup-card ${panelDark ? "bar-panel-dark" : "bar-panel-light"}`} onMouseDown={(e) => e.stopPropagation()}><div ref={body} className="bar-panel-body">
-    {kind === "wifi" && <><header><WifiIcon level={3} /><div><h2>Wi-Fi</h2><p>{wifi.find((x) => x.connected)?.ssid ? `Conectado a ${wifi.find((x) => x.connected).ssid}` : "Sin conexión"}</p></div><Switch checked onChange={(v) => invoke("quick_set", { kind: "wifi", on: v })} /></header><PanelLabel>REDES</PanelLabel>{loading && !wifi.length ? <p className="panel-empty">Buscando redes…</p> : wifi.length ? wifi.map((n) => <button className="panel-row" key={n.ssid} onClick={() => invoke("command_wifi_connect", { ssid: n.ssid })}><WifiIcon level={Math.ceil(n.signal / 25)} /><span className="panel-check-slot">{n.connected ? <span className="panel-check">✓</span> : null}</span><span className="panel-name">{n.ssid}</span><span className="panel-lock">{n.secure ? "🔒" : null}</span></button>) : <p className="panel-empty">No se ven redes cerca</p>}<PanelLink onClick={() => action("ms-settings:network-wifi")}>Configuración de red…</PanelLink></>}
+    {kind === "wifi" && <>
+      <header className="panel-head-mac"><h2>Wi-Fi</h2><Switch checked onChange={(v) => invoke("quick_set", { kind: "wifi", on: v })} /></header>
+      <div className="panel-status"><span>Estado</span><span>{wifi.find((x) => x.connected)?.ssid ? `Conectado a ${wifi.find((x) => x.connected).ssid}` : "Sin conexión"}</span></div>
+      <div className="panel-divider" />
+      <PanelLabel>REDES</PanelLabel>
+      {loading && !wifi.length ? <p className="panel-empty">Buscando redes…</p> : wifi.length ? wifi.map((n) => <button className="panel-row" key={n.ssid} onClick={() => invoke("command_wifi_connect", { ssid: n.ssid })}><span className="panel-check-slot">{n.connected ? <span className="panel-check">✓</span> : null}</span><span className="panel-name">{n.ssid}</span></button>) : <p className="panel-empty">No se ven redes cerca</p>}
+      <div className="panel-divider" />
+      <button type="button" className="panel-link panel-link-plain" onClick={() => action("ms-settings:network-wifi")}>Configuración de red…</button>
+    </>}
     {kind === "bluetooth" && <><header><BluetoothIcon /><div><h2>Bluetooth</h2><p>{loading ? "Buscando…" : devices.length ? "Activado" : "Ningún dispositivo conectado"}</p></div><Switch checked onChange={(v) => invoke("quick_set", { kind: "bluetooth", on: v })} /></header><PanelLabel>DISPOSITIVOS CONECTADOS</PanelLabel>{loading ? <p className="panel-empty">Buscando…</p> : devices.map((d) => <div className="panel-row" key={d}><BluetoothIcon /><span>{d}</span></div>)}{!loading && !devices.length && <p className="panel-empty">Ninguno conectado</p>}<PanelLink onClick={() => action("ms-settings:bluetooth")}>Configuración de Bluetooth…</PanelLink></>}
     {kind === "sound" && <><header><SpeakerIcon level={3} muted={muted} /><div><h2>Sonido</h2><p>{output}</p></div><Switch checked={!muted} onChange={(v) => { setMuted(!v); invoke("set_mute", { muted: !v }); }} /></header><PanelLabel>VOLUMEN</PanelLabel><div className="panel-slider"><SpeakerIcon level={3} muted={muted} /><input type="range" min="0" max="100" value={volume} onChange={(e) => { const v = Number(e.target.value); setVolume(v); invoke("set_volume", { value: v }); }} /><span>{volume}%</span></div><PanelLink onClick={() => action("ms-settings:sound")}>Configuración de sonido…</PanelLink></>}
     {kind === "battery" && <><header><BatteryIcon pct={battery?.level ?? 100} charging={battery?.charging} /><div><h2>Batería</h2><p>{battery?.charging ? "Conectado, cargando" : "Usando batería"}</p></div></header><div className="battery-big">{battery?.level ?? "—"}%</div><p className="panel-muted">Fuente de energía: {battery?.ac ? "Corriente alterna" : "Batería"}</p><PanelLink onClick={() => action("ms-settings:batterysaver")}>Configuración de batería…</PanelLink></>}

@@ -136,6 +136,8 @@ fn create_panel(app: &AppHandle) -> Option<WebviewWindow> {
         panel_state().lock().unwrap().kind = None;
     });
     window_utils::mark_rounded(&window);
+    let style = app.state::<crate::notch::NotchState>().settings.try_lock().map(|s| s.appearance.panel_style.clone()).unwrap_or_else(|_| "light".into());
+    window_utils::sync_panel_glass(app, &style);
     window_utils::schedule_app_recovery(&window, "barpanel");
     Some(window)
 }
@@ -644,7 +646,8 @@ fn open_bar_panel_impl(app: &AppHandle, kind: String, anchor_x: i32) -> Result<(
         let mut state = panel_state().lock().unwrap();
         state.kind = Some(kind.clone());
         state.anchor_x = anchor_x;
-        state.height = 320;
+        // Se conserva el último alto medido: si el contenido no cambia, el panel no vuelve a informar.
+        if state.height <= 0 { state.height = 320; }
     }
     position_panel(app, &panel);
     let _ = panel.emit("bar-panel", &kind);

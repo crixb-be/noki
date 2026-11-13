@@ -3,6 +3,9 @@
  * y, si hay traducción, se sustituye (ver i18n.js). Lo que no esté aquí se queda en español.
  */
 export const EN = {
+  "Estilo de paneles": "Panel style",
+  "Lanzador, buscador y paneles de la barra superior (Wi-Fi, Bluetooth, batería, centro de control, usuario).": "Launcher, search and top bar panels (Wi-Fi, Bluetooth, battery, control center, user).",
+  "Claro difuminado (macOS)": "Light blurred (macOS)",
   // icono de Noki
   "Personaje en el notch": "Character in the notch",
   "Una carita que parpadea, te mira y reacciona: se alegra al terminar tareas, hábitos o un Pomodoro, baila con la música y se adormece de noche.": "A little face that blinks, looks at you and reacts: it cheers when you finish tasks, habits or a Pomodoro, dances to music and gets sleepy at night.",

@@ -60,6 +60,8 @@ function loadApps() {
 
 export default function Launchpad() {
   const { settings } = useSettings();
+  // Estilo de paneles (Ajustes > Apariencia): «light» vidrio claro difuminado, «dark» oscuro opaco.
+  useEffect(() => { document.documentElement.dataset.panels = settings?.appearance?.panelStyle === "dark" ? "dark" : "light"; }, [settings?.appearance?.panelStyle]);
   const [apps, setApps] = useState(() => cachedApps ?? []);
   const [query, setQuery] = useState("");
   const [category, setCategory] = useState("Todas");

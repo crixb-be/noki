@@ -106,6 +106,7 @@ pub(crate) async fn commit_settings(app: &AppHandle, mut new: Settings) -> Resul
     topbar::sync(app, &new, false);
     dock::sync(app, &new, false);
     launchpad::sync(app, &new, false);
+    window_utils::sync_panel_glass(app, &new.appearance.panel_style);
     let payload = new.masked();
     let _ = app.emit("settings-updated", &payload);
     let _ = app.emit("settings-changed", &payload);
