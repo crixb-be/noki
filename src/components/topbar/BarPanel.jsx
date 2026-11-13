@@ -37,7 +37,7 @@ function ControlCenter({ brightness, setBrightness, volume, setVolume }) {
         <CcPill title="Bluetooth" subtitle={quick.bluetooth ? "Activado" : "Desactivado"} on={!!quick.bluetooth} icon={<BluetoothIcon />} onClick={() => toggle("bluetooth", !quick.bluetooth)} />
         <CcPill title="Concentración" subtitle="Ajustes" icon="◐" onClick={() => action("ms-settings:quiethours")} />
         <CcPill title="Luz nocturna" subtitle="Ajustes" icon="☼" onClick={() => action("ms-settings:nightlight")} />
-        <CcPill title="Ahorro de batería" subtitle="Ajustes" icon="▭" onClick={() => action("ms-settings:batterysaver")} />
+        <CcPill title="Ahorro batería" subtitle="Ajustes" icon="▭" onClick={() => action("ms-settings:batterysaver")} />
         <CcPill title="Captura" subtitle="Recortar pantalla" icon="⌗" onClick={() => action("ms-screenclip:")} />
         <CcPill title="Modo oscuro" subtitle={dark ? "Activado" : "Desactivado"} on={dark} icon="◑" onClick={() => { setQuick((q) => ({ ...q, dark: !dark })); invoke("command_toggle_dark", { dark: !dark }).catch(() => {}); }} />
       </div>
@@ -45,7 +45,7 @@ function ControlCenter({ brightness, setBrightness, volume, setVolume }) {
         <div data-glass className="cc-module cc-media">
           <div className="cc-media-top">
             <span className="cc-art" style={track.art ? { backgroundImage: `url(${track.art})` } : undefined} />
-            <span className="cc-media-text"><strong>{media.available && track.title ? track.title : "Sin reproducción"}</strong><small>{media.available ? track.artist || track.source || "" : "Multimedia"}</small></span>
+            <span className="cc-media-text"><strong>{media.available && track.title ? track.title : "Sin música"}</strong><small>{media.available ? track.artist || track.source || "" : "Multimedia"}</small></span>
           </div>
           <div className="cc-media-controls">
             <button type="button" aria-label="Anterior" disabled={!media.can?.prev} onClick={() => media.control("prev")}>⏮</button>
