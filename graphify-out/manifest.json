@@ -1297,9 +1297,9 @@
     "semantic_hash": ""
   },
   "src-tauri/src/backdrop.rs": {
-    "mtime": 1794548207.8478572,
-    "seen": 1794548294.4283671,
-    "ast_hash": "95732e72f180330e7d1ef0ebe157a681",
+    "mtime": 1794548733.7097387,
+    "seen": 1794548816.029743,
+    "ast_hash": "af8ceeb112837bc1f2e95c8243aca1bf",
     "semantic_hash": ""
   },
   "src/lib/glass.js": {

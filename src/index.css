@@ -254,3 +254,26 @@ html, body, #root {
 .panel-link-plain { margin-top: 0; justify-content: flex-start; font-size: 14px; }
 .panel-row .panel-check { color: inherit; font-weight: 600; }
 [data-panels="light"] .bar-panel .panel-row { font-size: 14px; padding: 7px 8px; }
+
+/* ── «Liquid glass» (como macdock-wifi.png). Capas, de abajo arriba:
+   1) desenfoque real del escritorio (ventanas auxiliares de backdrop.rs, con tinte oscuro suave);
+   2) tinte suave; 3) brillo que se desvanece en el primer tercio; 4) borde de 1 px más vivo arriba.
+   Sin sombra. ── */
+:root { --glass-tint: rgba(255,255,255,.14); --glass-sheen: rgba(255,255,255,.10); --glass-rim: rgba(255,255,255,.18); --glass-rim-top: rgba(255,255,255,.34); --glass-hover: rgba(255,255,255,.15); --glass-muted: rgba(235,235,245,.62); }
+[data-panels="light"] .noki-popup-card,
+[data-panels="light"] .bar-panel-light,
+[data-panels="light"] .bar-panel-dark,
+.dock-pill {
+  background: linear-gradient(to bottom, var(--glass-sheen), rgba(255,255,255,0) 33%), var(--glass-tint);
+  border: 1px solid var(--glass-rim);
+  border-top-color: var(--glass-rim-top);
+  box-shadow: none;
+  color: #fff;
+}
+[data-panels="light"] .bar-panel p, [data-panels="light"] .panel-muted, [data-panels="light"] .panel-status span:first-child,
+[data-panels="light"] .control-tile small, [data-panels="light"] .panel-label { color: var(--glass-muted); }
+[data-panels="light"] .panel-divider { background: rgba(255,255,255,.16); }
+.topbar-item:hover, .topbar-item:active, .topbar-light .topbar-item:hover,
+.panel-row:hover, .panel-row:active, .panel-link:hover, .panel-link:active,
+.launchpad-app:hover, .launchpad-app:active, .spotlight-result:hover, .spotlight-result.active { background: var(--glass-hover); }
+[data-panels="light"] .bar-panel, [data-panels="light"] .launchpad-card, [data-panels="light"] .spotlight-card { text-shadow: none; }

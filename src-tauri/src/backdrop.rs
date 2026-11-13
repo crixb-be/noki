@@ -66,6 +66,9 @@ fn register_class() -> bool {
             lpfnWndProc: Some(wnd_proc),
             hInstance: windows::Win32::Foundation::HINSTANCE(GetModuleHandleW(std::ptr::null())),
             lpszClassName: w!("NokiGlassBackdrop"),
+            // Fondo negro: con el acento acrílico, el negro deja ver el desenfoque. Sin pincel, la
+            // superficie podía quedar sin inicializar (blanca) y se veía una franja blanca.
+            hbrBackground: windows::Win32::Graphics::Gdi::HBRUSH(windows::Win32::Graphics::Gdi::GetStockObject(windows::Win32::Graphics::Gdi::BLACK_BRUSH).0),
             ..Default::default()
         };
         RegisterClassExW(&class) != 0
@@ -95,8 +98,9 @@ fn create_piece(tint: u32) -> Option<isize> {
     }
 }
 
-/// Tinte del acrílico de las piezas: casi transparente; el tinte visible lo pinta el CSS encima.
-const PIECE_TINT: u32 = 0x10_FF_FF_FF;
+/// Tinte del acrílico de las piezas (ABGR): oscuro y translúcido, como el material de macOS; así el
+/// texto blanco se lee también sobre fondos claros. El tinte suave, el brillo y el borde los pinta el CSS.
+const PIECE_TINT: u32 = 0x60_4C_48_46;
 
 /// Rectángulos (físicos) que cubren la forma redondeada sin salirse de ella.
 fn pieces_for(rect: RECT, r: i32) -> Vec<RECT> {
