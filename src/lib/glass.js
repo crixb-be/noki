@@ -104,7 +104,7 @@ export function useGlass(settings, name) {
  * dentro `d` px para que la curva nativa de 8 px quede dentro de la del CSS (d ≥ (R − r)·(1 − 1/√2))
  * y el aro `--glass-band` del propio elemento cubre esa franja.
  */
-function nativeShape(el, native) {
+function nativeShape(el, native, anchorBottom = false) {
   const r = el.getBoundingClientRect();
   const css = parseFloat(getComputedStyle(el).borderTopLeftRadius) || 0;
   const radius = Math.min(css, r.width / 2, r.height / 2);
@@ -117,6 +117,7 @@ function nativeShape(el, native) {
   }
   const value = `${band}px`;
   if (el.style.getPropertyValue("--glass-band") !== value) el.style.setProperty("--glass-band", value);
+  if (anchorBottom) shape.bottom = window.innerHeight - (shape.y + shape.h);
   return shape;
 }
 
@@ -126,7 +127,7 @@ function nativeShape(el, native) {
  * escritorio, así que fuera de ellas la ventana queda 100 % transparente. `selector`: varias formas
  * dentro de `ref` (el Centro de control modular); sin él, la forma es el propio `ref`.
  */
-export function useGlassShape(ref, glass, deps = [], selector = null) {
+export function useGlassShape(ref, glass, deps = [], selector = null, anchorBottom = false) {
   const { dark = false, native = true } = typeof glass === "number" ? {} : glass;
   useEffect(() => {
     let node = null;
@@ -141,7 +142,7 @@ export function useGlassShape(ref, glass, deps = [], selector = null) {
       frame = 0;
       if (!node?.isConnected) { node = null; attach(); return; }
       const nodes = selector ? Array.from(node.querySelectorAll(selector)) : [node];
-      const shapes = nodes.map((el) => nativeShape(el, native));
+      const shapes = nodes.map((el) => nativeShape(el, native, anchorBottom));
       const key = JSON.stringify([shapes, dark, native]);
       if (key === last) return;
       last = key;
@@ -185,5 +186,5 @@ export function useGlassShape(ref, glass, deps = [], selector = null) {
       stopReveal?.();
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [ref, dark, native, selector, ...deps]);
+  }, [ref, dark, native, selector, anchorBottom, ...deps]);
 }

@@ -42,7 +42,12 @@ extern "system" {
 
 /// Forma de vidrio que informa cada vista, en px lógicos relativos a su ventana.
 #[derive(Clone, Copy, PartialEq, Debug, Default)]
-pub struct Shape { pub x: f64, pub y: f64, pub w: f64, pub h: f64, pub radius: f64 }
+pub struct Shape {
+    pub x: f64, pub y: f64, pub w: f64, pub h: f64, pub radius: f64,
+    /// Distancia (px lógicos) del borde inferior de la forma al de la ventana, si la forma va anclada
+    /// abajo (la píldora del Dock): al crecer la ventana hacia arriba sigue en su sitio sin esperar a la vista.
+    pub bottom: Option<f64>,
+}
 
 #[derive(Default)]
 struct Entry {
@@ -162,13 +167,19 @@ fn apply<R: Runtime>(window: &WebviewWindow<R>, label: &str) {
         let mut win = RECT::default();
         let usable = entry.enabled && entry.native && visible && !entry.shapes.is_empty() && unsafe { GetWindowRect(owner, &mut win) }.is_ok();
         let targets: Vec<(RECT, DWM_WINDOW_CORNER_PREFERENCE)> = if !usable { Vec::new() } else {
-            entry.shapes.iter().filter(|s| s.w > 1.0 && s.h > 1.0).map(|s| (RECT {
+            entry.shapes.iter().filter(|s| s.w > 1.0 && s.h > 1.0).map(|s| {
+                let (top, bottom) = match s.bottom {
+                    Some(b) => (win.bottom - ((b + s.h) * scale).round() as i32, win.bottom - (b * scale).round() as i32),
+                    None => (win.top + (s.y * scale).round() as i32, win.top + ((s.y + s.h) * scale).round() as i32),
+                };
                 // Nunca fuera de su ventana (el redondeo a 125 % podía dar 1 px de más).
-                left: (win.left + (s.x * scale).round() as i32).max(win.left),
-                top: (win.top + (s.y * scale).round() as i32).max(win.top),
-                right: (win.left + ((s.x + s.w) * scale).round() as i32).min(win.right),
-                bottom: (win.top + ((s.y + s.h) * scale).round() as i32).min(win.bottom),
-            }, corner_for(s.radius))).collect()
+                (RECT {
+                    left: (win.left + (s.x * scale).round() as i32).max(win.left),
+                    top: top.max(win.top),
+                    right: (win.left + ((s.x + s.w) * scale).round() as i32).min(win.right),
+                    bottom: bottom.min(win.bottom),
+                }, corner_for(s.radius))
+            }).collect()
         };
         if targets.is_empty() { hide_piece(entry); return; }
         if !entry.ready {
@@ -247,14 +258,14 @@ pub fn set_enabled<R: Runtime>(app: &AppHandle<R>, label: &str, enabled: bool) {
 
 /// Forma tal como llega de la vista.
 #[derive(serde::Deserialize, Clone, Copy)]
-pub struct ShapeArg { x: f64, y: f64, w: f64, h: f64, radius: f64 }
+pub struct ShapeArg { x: f64, y: f64, w: f64, h: f64, radius: f64, #[serde(default)] bottom: Option<f64> }
 
 /// La vista informa de sus formas de vidrio (px lógicos relativos a su ventana), del modo (noche o
 /// día) y de si quiere el desenfoque nativo o solo el vidrio CSS.
 #[tauri::command]
 pub fn glass_shapes(window: WebviewWindow, shapes: Vec<ShapeArg>, dark: Option<bool>, native: Option<bool>) {
     let label = window.label().to_string();
-    let shapes: Vec<Shape> = shapes.into_iter().take(32).map(|s| Shape { x: s.x, y: s.y, w: s.w, h: s.h, radius: s.radius }).collect();
+    let shapes: Vec<Shape> = shapes.into_iter().take(32).map(|s| Shape { x: s.x, y: s.y, w: s.w, h: s.h, radius: s.radius, bottom: s.bottom }).collect();
     let (dark, native) = (dark.unwrap_or(false), native.unwrap_or(true));
     let stale = {
         let mut map = entries().lock().unwrap();
@@ -279,7 +290,7 @@ pub fn glass_shapes(window: WebviewWindow, shapes: Vec<ShapeArg>, dark: Option<b
 /// Una sola forma (compatibilidad).
 #[tauri::command]
 pub fn glass_shape(window: WebviewWindow, x: f64, y: f64, w: f64, h: f64, radius: f64, dark: Option<bool>, native: Option<bool>) {
-    glass_shapes(window, vec![ShapeArg { x, y, w, h, radius }], dark, native);
+    glass_shapes(window, vec![ShapeArg { x, y, w, h, radius, bottom: None }], dark, native);
 }
 
 /// La vista confirma que ya ha pintado un fotograma estando visible: desde ahora puede verse su vidrio.

@@ -7,7 +7,7 @@ use crate::{icons, notch, settings::{DockPinned, Settings}, window_utils};
 use serde::Serialize;
 use std::{path::Path, sync::{Mutex, OnceLock}, time::{Duration, Instant}};
 use tauri::{window::Color, AppHandle, Emitter, Manager, PhysicalPosition, PhysicalSize, WebviewUrl, WebviewWindow, WebviewWindowBuilder};
-use windows::{core::{w, PCWSTR}, Win32::{Foundation::{HWND, LPARAM, RECT}, Graphics::{Gdi::{GetMonitorInfoW, MonitorFromWindow, MONITORINFO, MONITOR_DEFAULTTONEAREST}}, UI::{Shell::{SHAppBarMessage, SHEmptyRecycleBinW, SHFileOperationW, SHQueryRecycleBinW, APPBARDATA, SHFILEOPSTRUCTW, FO_DELETE, FOF_ALLOWUNDO, FOF_NOCONFIRMATION, FOF_NOERRORUI, FOF_SILENT}, WindowsAndMessaging::{EnumChildWindows, EnumWindows, FindWindowExW, FindWindowW, GetClassNameW, GetWindowRect, GetAncestor, GetCursorPos, GetWindowLongPtrW, GetWindowTextLengthW, GetWindowTextW, GetWindowThreadProcessId, GetForegroundWindow, IsIconic, IsWindowVisible, SetForegroundWindow, SetWindowPos, ShowWindow, ShowWindowAsync, GA_ROOT, GWL_EXSTYLE, HWND_TOPMOST, SW_MINIMIZE, SW_RESTORE, SW_HIDE, SW_SHOW, SW_SHOWNA, SWP_ASYNCWINDOWPOS, SWP_NOACTIVATE, SWP_NOMOVE, SWP_NOSIZE, WS_EX_TOOLWINDOW}}}};
+use windows::{core::{w, PCWSTR}, Win32::{Foundation::{HWND, LPARAM, RECT}, Graphics::{Gdi::{GetMonitorInfoW, MonitorFromWindow, MONITORINFO, MONITOR_DEFAULTTONEAREST}}, UI::{Shell::{SHAppBarMessage, SHEmptyRecycleBinW, SHFileOperationW, SHQueryRecycleBinW, APPBARDATA, SHFILEOPSTRUCTW, FO_DELETE, FOF_ALLOWUNDO, FOF_NOCONFIRMATION, FOF_NOERRORUI, FOF_SILENT}, WindowsAndMessaging::{EnumChildWindows, EnumWindows, FindWindowExW, FindWindowW, GetClassNameW, GetWindowRect, GetAncestor, GetCursorPos, GetWindowLongPtrW, GetWindowTextLengthW, GetWindowTextW, GetWindowThreadProcessId, GetForegroundWindow, IsIconic, IsWindowVisible, SetForegroundWindow, SetWindowPos, ShowWindow, ShowWindowAsync, GA_ROOT, GWL_EXSTYLE, HWND_TOPMOST, SW_MINIMIZE, SW_RESTORE, SW_HIDE, SW_SHOW, SW_SHOWNA, SWP_ASYNCWINDOWPOS, SWP_NOACTIVATE, SWP_NOMOVE, SWP_NOSIZE, SWP_NOZORDER, WS_EX_TOOLWINDOW}}}};
 
 const ABM_NEW: u32 = 0;
 const ABM_REMOVE: u32 = 1;
@@ -256,8 +256,13 @@ pub fn sync(app: &AppHandle, settings: &Settings, fullscreen: bool) {
     hit().lock().unwrap().scale = scale;
     let w = window.clone();
     let _ = window.run_on_main_thread(move || {
-        let _ = w.set_position(PhysicalPosition::new(left, top));
-        let _ = w.set_size(PhysicalSize::new(width as u32, height as u32));
+        // Posición y tamaño en un solo SetWindowPos: con set_position y luego set_size la ventana
+        // pasaba un instante por un estado intermedio (desplazada) y el vidrio daba un salto al
+        // crecer hacia arriba (p. ej. al abrir el menú contextual).
+        match w.hwnd() {
+            Ok(h) => unsafe { let _ = SetWindowPos(h, None, left, top, width, height, SWP_NOZORDER | SWP_NOACTIVATE); },
+            Err(_) => { let _ = w.set_position(PhysicalPosition::new(left, top)); let _ = w.set_size(PhysicalSize::new(width as u32, height as u32)); }
+        }
         let _ = w.show();
         if let Ok(h) = w.hwnd() {
             // Después de show(): tao acaba de reescribir los estilos si la visibilidad cambió.
