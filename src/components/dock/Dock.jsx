@@ -17,8 +17,12 @@ export default function Dock() {
   const pointerX = useRef(null);
   const frame = useRef(0);
   const dock = settings?.dock ?? { enabled: true, iconSize: 40, magnify: true, magnifyScale: 1.6, showApps: true, showRunning: true, showTrash: true, autohide: false, pinned: [], folders: [] };
-  const size = Math.min(46, Math.max(44, dock.iconSize || 44));
-  const maxSize = 62;
+  // Tamaño y escala vienen de Ajustes (antes estaban fijos: 44-46 px y 62 px máximo).
+  const size = Math.min(96, Math.max(32, Math.round(dock.iconSize || 48)));
+  const scale = dock.magnify ? Math.min(2.5, Math.max(1, Number(dock.magnifyScale) || 1.6)) : 1;
+  const maxSize = Math.round(size * scale);
+  const sizes = useRef([]);
+  const rest = useRef(null);
 
   const refresh = async () => {
     try { if (!(await getCurrentWindow().isVisible())) return; } catch { /* El navegador de desarrollo no expone visibilidad nativa. */ }
@@ -56,49 +60,66 @@ export default function Dock() {
   }, [all.length, size, maxSize, dock.magnify]);
 
   if (settings && !dock.enabled) return null;
-  function resetMagnification() {
-    pointerX.current = null;
-    iconRefs.current.forEach((node) => {
-      if (!node) return;
-      node.style.transition = "width 180ms ease-out, height 180ms ease-out";
-      node.style.width = `${size}px`;
-      node.style.height = `${size}px`;
-      node.style.zIndex = "";
-    });
-    itemRefs.current.forEach((node) => {
-      if (!node) return;
-      node.style.transition = "width 180ms ease-out, height 180ms ease-out";
-      node.style.width = `${size}px`;
-      node.style.height = `${size + 8}px`;
-    });
+  function apply(index, value) {
+    const item = itemRefs.current[index];
+    const icon = iconRefs.current[index];
+    if (!item || !icon) return;
+    item.style.width = `${value}px`;
+    item.style.height = `${value + 8}px`;
+    icon.style.width = `${value}px`;
+    icon.style.height = `${value}px`;
   }
 
-  function updateMagnification() {
+  // Centros de cada icono en reposo, relativos al centro de la píldora (siempre centrada en
+  // la ventana). Medir sobre posiciones en reposo evita el temblor de medir iconos en movimiento.
+  function measureRest() {
+    const node = pill.current;
+    if (!node) return null;
+    const gap = parseFloat(getComputedStyle(node).columnGap) || 8;
+    const count = itemRefs.current.filter(Boolean).length;
+    const total = count * size + Math.max(0, count - 1) * gap;
+    return { centers: Array.from({ length: count }, (_, i) => i * (size + gap) + size / 2 - total / 2) };
+  }
+  // Curva tipo macOS: el icono bajo el cursor llega a tamaño × escala y los vecinos
+  // crecen menos (campana coseno, alcance ≈ 3 iconos). Interpolación por fotograma.
+  function tick() {
     frame.current = 0;
+    const node = pill.current;
+    if (!node) return;
+    const box = node.getBoundingClientRect();
+    const center = box.left + box.width / 2;
     const x = pointerX.current;
-    if (x == null || !dock.magnify) { resetMagnification(); return; }
+    const reach = size * 3;
+    let moving = false;
     itemRefs.current.forEach((item, index) => {
-      const icon = iconRefs.current[index];
-      if (!item || !icon) return;
-      const rect = item.getBoundingClientRect();
-      const distance = Math.abs(x - (rect.left + rect.width / 2));
-      const ratio = Math.min(1, distance / (size * 3));
-      const itemSize = size + (maxSize - size) * Math.cos(ratio * Math.PI / 2);
-      item.style.transition = "none";
-      item.style.width = `${itemSize}px`;
-      item.style.height = `${itemSize + 8}px`;
-      icon.style.transition = "none";
-      icon.style.width = `${itemSize}px`;
-      icon.style.height = `${itemSize}px`;
-      item.style.zIndex = String(Math.round(itemSize));
+      if (!item) return;
+      let target = size;
+      if (x != null && dock.magnify && rest.current?.centers[index] != null) {
+        const d = Math.abs(x - (center + rest.current.centers[index]));
+        if (d < reach) target = size + (maxSize - size) * (0.5 + 0.5 * Math.cos(Math.PI * d / reach));
+      }
+      const current = sizes.current[index] ?? size;
+      const next = Math.abs(target - current) < 0.4 ? target : current + (target - current) * 0.35;
+      if (next !== target) moving = true;
+      sizes.current[index] = next;
+      apply(index, next);
+      item.style.zIndex = String(Math.round(next));
     });
+    if (moving || x != null) frame.current = requestAnimationFrame(tick);
+  }
+
+  function start() { if (!frame.current) frame.current = requestAnimationFrame(tick); }
+
+  function resetMagnification() {
+    pointerX.current = null;
+    start();
   }
 
   function onMouseMove(event) {
+    if (pointerX.current == null) rest.current = measureRest();
     pointerX.current = event.clientX;
-    if (!frame.current) frame.current = requestAnimationFrame(updateMagnification);
-  }
-  function activate(item) {
+    start();
+  }  function activate(item) {
     if (item.kind === "apps") return invoke("toggle_launchpad");
     if (item.kind === "trash") return invoke("trash_open");
     if (item.kind === "folder") return invoke("open_path", { path: item.path });

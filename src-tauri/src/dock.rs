@@ -189,7 +189,7 @@ fn register_appbar(window: &WebviewWindow, monitor: notch::Rect, height: i32, sc
 pub fn sync(app: &AppHandle, settings: &Settings, fullscreen: bool) {
     if !window_utils::frontend_ready("notch") { return; }
     let Some(window) = create(app) else { return };
-    let icon_size = settings.dock.icon_size.clamp(38, 40);
+    let icon_size = settings.dock.icon_size.clamp(32, 96);
     sync_taskbar(settings);
     let enabled = settings.dock.enabled && !fullscreen && settings.general.visible;
     if !enabled {
@@ -201,7 +201,7 @@ pub fn sync(app: &AppHandle, settings: &Settings, fullscreen: bool) {
     let Some((fallback, monitor)) = notch::assignments(settings, &notch::monitors(app)).into_iter().find(|(l, _)| l == "main").map(|(_, m)| (m.rect, m.scale)) else { return };
     let scale = work_area_with_monitor(app, settings.dock.hide_taskbar).map(|(_, scale)| scale).unwrap_or(monitor);
     let reserve = settings.dock.reserve_space && !settings.dock.autohide;
-    let granted = if reserve { register_appbar(&window, fallback, physical(icon_size + 12, scale), scale) } else { remove_appbar(); None };
+    let granted = if reserve { register_appbar(&window, fallback, physical(icon_size + 26, scale), scale) } else { remove_appbar(); None };
     let (work, _) = if let Some(rect) = granted {
         (rect, scale)
     } else {
