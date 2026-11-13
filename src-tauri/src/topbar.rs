@@ -825,18 +825,99 @@ fn tray_closed_at() -> &'static Mutex<Option<std::time::Instant>> {
     AT.get_or_init(|| Mutex::new(None))
 }
 
+/// Destino del panel de iconos ocultos mientras se abre: (HWND, centro x, y, hasta cuándo se fija).
+/// Lo usa la función de `SetWinEventHook`, que no admite capturas.
+static TRAY_TARGET: Mutex<Option<(isize, i32, i32, i32, i32)>> = Mutex::new(None);
+
+/// Coloca el panel centrado en `cx` (limitado al monitor `[min_x, max_x]`) con su borde superior en
+/// `top`, si no está ya ahí. Devuelve si estaba visible.
+fn place_tray_overflow(h: HWND, cx: i32, top: i32, min_x: i32, max_x: i32) -> bool {
+    use windows::Win32::UI::WindowsAndMessaging::{GetWindowRect, IsWindowVisible, SWP_NOZORDER};
+    let mut r = windows::Win32::Foundation::RECT::default();
+    unsafe {
+        if GetWindowRect(h, &mut r).is_err() { return false; }
+        let width = r.right - r.left;
+        let left = (cx - width / 2).clamp(min_x, (max_x - width).max(min_x));
+        if r.left != left || r.top != top {
+            let _ = SetWindowPos(h, None, left, top, 0, 0, SWP_NOSIZE | SWP_NOZORDER | SWP_NOACTIVATE);
+        }
+        IsWindowVisible(h).as_bool()
+    }
+}
+
+/// Explorer muestra o mueve el panel: se devuelve arriba en el mismo instante (sin esperar al sondeo).
+unsafe extern "system" fn tray_win_event(_hook: windows::Win32::UI::Accessibility::HWINEVENTHOOK, _event: u32, hwnd: HWND, id_object: i32, _id_child: i32, _thread: u32, _time: u32) {
+    if id_object != 0 || hwnd.0.is_null() { return; }
+    let Some((target, cx, top, min_x, max_x)) = *TRAY_TARGET.lock().unwrap() else { return };
+    if hwnd.0 as isize == target { place_tray_overflow(hwnd, cx, top, min_x, max_x); }
+}
+
+/// Atiende los mensajes del hilo (los eventos de `SetWinEventHook` llegan por la cola de mensajes)
+/// durante `ms` milisegundos, recolocando el panel cada ~1 ms. Devuelve si llegó a estar visible.
+fn pump_tray(h: HWND, place: (i32, i32, i32, i32), ms: u64) -> bool {
+    use windows::Win32::UI::WindowsAndMessaging::{DispatchMessageW, PeekMessageW, TranslateMessage, MSG, PM_REMOVE};
+    let end = std::time::Instant::now() + Duration::from_millis(ms);
+    let mut seen = false;
+    while std::time::Instant::now() < end {
+        unsafe {
+            let mut msg = MSG::default();
+            while PeekMessageW(&mut msg, None, 0, 0, PM_REMOVE).as_bool() {
+                let _ = TranslateMessage(&msg);
+                DispatchMessageW(&msg);
+            }
+        }
+        seen |= place_tray_overflow(h, place.0, place.1, place.2, place.3);
+        std::thread::sleep(Duration::from_millis(1));
+    }
+    seen
+}
+
+fn set_cloak(h: HWND, cloak: bool) -> bool {
+    use windows::Win32::Graphics::Dwm::{DwmSetWindowAttribute, DWMWA_CLOAK};
+    let value = windows::core::BOOL::from(cloak);
+    unsafe { DwmSetWindowAttribute(h, DWMWA_CLOAK, &value as *const _ as _, std::mem::size_of_val(&value) as u32).is_ok() }
+}
+
 /// Abre el panel nativo de iconos ocultos (Win+B enfoca el botón «Mostrar iconos ocultos» de la
 /// bandeja y Enter lo abre; funciona aunque Noki oculte la barra de tareas) y lo coloca justo debajo
 /// de la barra superior, centrado en el botón «^». Los iconos son los reales: clic izquierdo y
 /// derecho los gestiona Windows. Comprobado en Windows 11: la bandeja XAML no se expone por UI
 /// Automation con la barra de tareas oculta, pero el panel abierto sí, y se puede mover.
+///
+/// Sin parpadeo: Explorer lo abre en su sitio habitual (abajo a la derecha). Antes se movía tras un
+/// sondeo de 50 ms y se veía saltar. Ahora se coloca arriba ya oculto, se recoloca en el mismo
+/// instante en que Explorer lo muestra o lo mueve (WinEvent EVENT_OBJECT_SHOW / LOCATIONCHANGE +
+/// bucle de 1 ms; medido: ~5 ms abajo, menos de un fotograma) y se mantiene fijo durante la
+/// animación. DWMWA_CLOAK se intenta, pero Windows no deja ocultar ventanas de otro proceso.
 fn open_tray_overflow(app: &AppHandle, anchor_x: i32) -> Result<(), String> {
+    use windows::Win32::UI::Accessibility::{SetWinEventHook, UnhookWinEvent};
+    use windows::Win32::UI::WindowsAndMessaging::{EVENT_OBJECT_LOCATIONCHANGE, EVENT_OBJECT_SHOW, WINEVENT_OUTOFCONTEXT};
     // Un segundo clic en «^» lo cierra: el propio clic ya lo ha cerrado (pierde el foco).
     if tray_overflow_visible().is_some() || tray_closed_at().lock().unwrap().is_some_and(|at| at.elapsed() < Duration::from_millis(400)) {
         return Ok(());
     }
     let settings = app.state::<crate::notch::NotchState>().settings.lock().unwrap().clone();
     let Some((_, monitor)) = notch::assignments(&settings, &notch::monitors(app)).into_iter().find(|(l, _)| l == "main") else { return Err("Sin monitor.".into()) };
+    let scale = monitor.scale;
+    let place = (
+        monitor.rect.left + physical(anchor_x, scale),
+        monitor.rect.top + physical(settings.topbar.height, scale) + physical(4, scale),
+        monitor.rect.left + physical(TOPBAR_MARGIN, scale),
+        monitor.rect.right - physical(TOPBAR_MARGIN, scale),
+    );
+    // La ventana del panel existe (oculta) desde que arranca Explorer: se prepara arriba y oculta.
+    let panel = tray_overflow();
+    let mut cloaked = false;
+    let mut hook = None;
+    if let Some(h) = panel {
+        cloaked = set_cloak(h, true);
+        place_tray_overflow(h, place.0, place.1, place.2, place.3);
+        *TRAY_TARGET.lock().unwrap() = Some((h.0 as isize, place.0, place.1, place.2, place.3));
+        let mut pid = 0u32;
+        unsafe { GetWindowThreadProcessId(h, Some(&mut pid)); }
+        let handle = unsafe { SetWinEventHook(EVENT_OBJECT_SHOW, EVENT_OBJECT_LOCATIONCHANGE, None, Some(tray_win_event), pid, 0, WINEVENT_OUTOFCONTEXT) };
+        if !handle.is_invalid() { hook = Some(handle); }
+    }
     let inputs = [
         key_input(VK_LWIN, KEYEVENTF_EXTENDEDKEY),
         key_input(VIRTUAL_KEY(0x42), Default::default()),
@@ -844,24 +925,31 @@ fn open_tray_overflow(app: &AppHandle, anchor_x: i32) -> Result<(), String> {
         key_input(VK_LWIN, KEYEVENTF_EXTENDEDKEY | KEYEVENTF_KEYUP),
     ];
     unsafe { SendInput(&inputs, std::mem::size_of::<INPUT>() as i32); }
-    std::thread::sleep(Duration::from_millis(220));
+    let wait = |ms| match panel { Some(h) => pump_tray(h, place, ms), None => { std::thread::sleep(Duration::from_millis(ms)); false } };
+    wait(220);
     let enter = [key_input(VIRTUAL_KEY(0x0D), Default::default()), key_input(VIRTUAL_KEY(0x0D), KEYEVENTF_KEYUP)];
     unsafe { SendInput(&enter, std::mem::size_of::<INPUT>() as i32); }
-    // Espera a que aparezca (hasta ~1,5 s) y lo coloca bajo la barra.
-    let mut panel = None;
-    for _ in 0..30 {
-        std::thread::sleep(Duration::from_millis(50));
-        if let Some(h) = tray_overflow_visible() { panel = Some(h); break; }
+    // Espera a que aparezca y la mantiene fija arriba 250 ms más (animación de apertura). Si Windows
+    // no lo abre en 700 ms (a veces Win+B no llega a enfocar la bandeja), se repite una vez.
+    let mut shown = None;
+    for attempt in 0..2 {
+        for _ in 0..if attempt == 0 { 14 } else { 30 } {
+            if wait(50) { shown = tray_overflow_visible(); }
+            if shown.is_some() { break; }
+        }
+        if shown.is_some() { break; }
+        unsafe { SendInput(&inputs, std::mem::size_of::<INPUT>() as i32); }
+        wait(220);
+        unsafe { SendInput(&enter, std::mem::size_of::<INPUT>() as i32); }
     }
-    let Some(panel) = panel else { return Err("Windows no abrió el panel de iconos ocultos.".into()) };
-    let mut rect = windows::Win32::Foundation::RECT::default();
-    unsafe { let _ = windows::Win32::UI::WindowsAndMessaging::GetWindowRect(panel, &mut rect); }
-    let width = rect.right - rect.left;
-    let scale = monitor.scale;
-    let left = (monitor.rect.left + physical(anchor_x, scale) - width / 2)
-        .clamp(monitor.rect.left + physical(TOPBAR_MARGIN, scale), monitor.rect.right - width - physical(TOPBAR_MARGIN, scale));
-    let top = monitor.rect.top + physical(settings.topbar.height, scale) + physical(6, scale);
-    unsafe { let _ = SetWindowPos(panel, None, left, top, 0, 0, SWP_NOSIZE | windows::Win32::UI::WindowsAndMessaging::SWP_NOZORDER | SWP_NOACTIVATE); }
+    if let Some(h) = shown {
+        if cloaked { place_tray_overflow(h, place.0, place.1, place.2, place.3); set_cloak(h, false); cloaked = false; }
+        pump_tray(h, place, 250);
+    }
+    if let Some(handle) = hook { unsafe { let _ = UnhookWinEvent(handle); } }
+    *TRAY_TARGET.lock().unwrap() = None;
+    if let (true, Some(h)) = (cloaked, panel) { set_cloak(h, false); }
+    let Some(panel) = shown else { return Err("Windows no abrió el panel de iconos ocultos.".into()) };
     // Vigila su cierre (lo cierra Windows al hacer clic fuera o al elegir un icono).
     let raw = panel.0 as isize;
     std::thread::spawn(move || {
