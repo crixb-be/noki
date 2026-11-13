@@ -569,7 +569,8 @@ function GlassSettings({ glass, onChange }) {
   const cfg = { ...MACDOCK_GLASS[tab], ...(glass?.[tab] ?? {}) };
   const dark = useGlassDark(glass?.mode ?? "light");
   const set = (patch) => onChange({ [tab]: patch });
-  const vars = glassVars(cfg, dark);
+  const engine = glass?.engine === "css" ? "css" : "native";
+  const vars = glassVars(cfg, dark, engine);
   return (
     <div className={`${CARD} px-4 py-3`}>
       <div className="mb-2 flex items-center justify-between gap-3">
@@ -579,6 +580,9 @@ function GlassSettings({ glass, onChange }) {
         </div>
         <button type="button" onClick={() => onChange(MACDOCK_GLASS)} className="shrink-0 rounded-lg bg-white/10 px-3 py-1.5 text-[13px] text-white hover:bg-white/15">Restablecer valores de MacDock</button>
       </div>
+      <Row grouped title="Material" hint={engine === "native" ? "Desenfoque acrílico de Windows 11: una superficie continua con las esquinas suavizadas por Windows (su radio es fijo)." : "Sin desenfoque de Windows: solo un fondo translúcido con borde especular. Cero artefactos de DWM."}>
+        <Select value={engine} onChange={(v) => onChange({ engine: v })} options={[["native", "Vidrio nativo de Windows (desenfoque)"], ["css", "Vidrio suave sin blur nativo"]]} />
+      </Row>
       <Row grouped title="Modo" hint="Automático sigue al tema claro u oscuro de Windows.">
         <Select value={glass?.mode ?? "light"} onChange={(v) => onChange({ mode: v })} options={[["light", "Claro (día)"], ["dark", "Oscuro (noche)"], ["auto", "Automático (sigue a Windows)"]]} />
       </Row>
@@ -591,7 +595,7 @@ function GlassSettings({ glass, onChange }) {
         <div className="relative mb-2 h-[150px] w-full overflow-hidden rounded-xl" style={{ background: "linear-gradient(135deg,#ff9a3c 0%,#e8487a 35%,#5b6cff 70%,#22c3a6 100%)" }}>
           <div className="absolute left-[18%] top-5 h-16 w-16 rounded-full bg-white/80" />
           <div className="absolute bottom-4 right-[18%] h-10 w-28 rounded-lg bg-black/60" />
-          <div className="absolute left-1/2 top-1/2 w-[230px] -translate-x-1/2 -translate-y-1/2 p-3 text-white" style={{ ...vars, borderRadius: vars["--glass-radius"], background: `linear-gradient(to bottom, ${vars["--glass-sheen"]}, rgba(255,255,255,0) 33%), ${vars["--glass-tint"]}, rgba(${dark ? "40,42,50" : "90,90,96"},.35)`, border: `1px solid ${vars["--glass-rim"]}`, borderTopColor: vars["--glass-rim-top"], boxShadow: vars["--glass-shadow"], backdropFilter: `blur(${BLUR_PX[cfg.blur] ?? 16}px) saturate(140%)` }}>
+          <div className="absolute left-1/2 top-1/2 w-[230px] -translate-x-1/2 -translate-y-1/2 p-3 text-white" style={{ ...vars, borderRadius: vars["--glass-radius"], background: `linear-gradient(to bottom, ${vars["--glass-sheen"]}, rgba(255,255,255,0) 33%), ${vars["--glass-tint"]}, rgba(${dark ? "40,42,50" : "90,90,96"},.35)`, border: `1px solid ${vars["--glass-rim"]}`, borderTopColor: vars["--glass-rim-top"], boxShadow: vars["--glass-shadow"], backdropFilter: engine === "native" ? `blur(${BLUR_PX.high}px) saturate(140%)` : "none" }}>
             <div className="flex items-center justify-between text-[13px] font-semibold">Wi-Fi<span className="h-4 w-7 rounded-full bg-[#34C759]" /></div>
             <div className="mt-1 text-[11px] text-white/60">Conectado</div>
             <div className="mt-2 rounded-[10px] bg-white/15 px-2 py-1 text-[12px]">✓ Mi red</div>
@@ -599,8 +603,7 @@ function GlassSettings({ glass, onChange }) {
         </div>
       <div>
         <Row grouped title="Opacidad del tinte"><Slider value={cfg.tintOpacity} min={0} max={100} unit=" %" onChange={(v) => set({ tintOpacity: v })} /></Row>
-        <Row grouped title="Intensidad del desenfoque"><Select value={cfg.blur} onChange={(v) => set({ blur: v })} options={[["low", "Bajo"], ["medium", "Medio"], ["high", "Alto"]]} /></Row>
-        <Row grouped title="Radio de esquinas"><Slider value={cfg.radius} min={0} max={40} unit=" px" onChange={(v) => set({ radius: v })} /></Row>
+        {engine === "css" && <Row grouped title="Radio de esquinas"><Slider value={cfg.radius} min={0} max={40} unit=" px" onChange={(v) => set({ radius: v })} /></Row>}
         <Row grouped title="Borde brillante"><Toggle checked={cfg.rim} onChange={(v) => set({ rim: v })} /></Row>
         <Row grouped title="Sombra"><Toggle checked={cfg.shadow} onChange={(v) => set({ shadow: v })} /></Row>
       </div>

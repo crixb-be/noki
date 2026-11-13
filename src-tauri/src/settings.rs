@@ -68,7 +68,7 @@ pub struct GlassSurface {
 }
 
 impl GlassSurface {
-    pub fn macdock(radius: i32) -> Self { Self { tint_opacity: 14, blur: "medium".into(), radius, rim: true, shadow: false } }
+    pub fn macdock(radius: i32) -> Self { Self { tint_opacity: 14, blur: "medium".into(), radius, rim: true, shadow: true } }
     fn clamp(&mut self) {
         self.tint_opacity = self.tint_opacity.clamp(0, 100);
         self.radius = self.radius.clamp(0, 40);
@@ -84,6 +84,9 @@ impl Default for GlassSurface { fn default() -> Self { Self::macdock(18) } }
 pub struct Glass {
     /// "light" (día) | "dark" (noche) | "auto" (sigue a Windows).
     pub mode: String,
+    /// "native": desenfoque acrílico de Windows 11 (una ventana continua por superficie, esquinas de
+    /// DWM). "css": «Vidrio suave sin blur nativo», solo fondo CSS translúcido (cero artefactos de DWM).
+    pub engine: String,
     pub dock: GlassSurface,
     pub bar: GlassSurface,
     pub panels: GlassSurface,
@@ -92,13 +95,14 @@ pub struct Glass {
 
 impl Default for Glass {
     fn default() -> Self {
-        Self { mode: "light".into(), dock: GlassSurface::macdock(20), bar: GlassSurface::macdock(0), panels: GlassSurface::macdock(18), launcher: GlassSurface::macdock(24) }
+        Self { mode: "light".into(), engine: "native".into(), dock: GlassSurface::macdock(20), bar: GlassSurface::macdock(0), panels: GlassSurface::macdock(18), launcher: GlassSurface::macdock(24) }
     }
 }
 
 impl Glass {
     pub fn clamp(&mut self) {
         if !matches!(self.mode.as_str(), "light" | "dark" | "auto") { self.mode = "light".into(); }
+        if !matches!(self.engine.as_str(), "native" | "css") { self.engine = "native".into(); }
         for s in [&mut self.dock, &mut self.bar, &mut self.panels, &mut self.launcher] { s.clamp(); }
     }
 }

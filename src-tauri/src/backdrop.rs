@@ -1,14 +1,18 @@
 //! Desenfoque real del escritorio debajo de las formas de vidrio (Dock, barra, paneles, lanzador).
 //!
-//! Las ventanas WebView de Noki son 100 % transparentes y sin efectos de Windows: dibujan el tinte,
-//! el brillo y el borde con CSS. El desenfoque lo ponen ventanas auxiliares propias, colocadas justo
-//! debajo de cada ventana visible, sin clics (WS_EX_TRANSPARENT + HTTRANSPARENT), sin activarse y
-//! fuera de Alt+Tab, con el acento acrílico de Windows.
+//! Las ventanas WebView de Noki son 100 % transparentes: dibujan el tinte, el brillo y el borde con
+//! CSS. El desenfoque lo pone **una sola ventana auxiliar por superficie**, colocada justo debajo de
+//! la ventana visible, con el acento acrílico de Windows y las esquinas redondeadas y suavizadas por
+//! DWM (`DWMWA_WINDOW_CORNER_PREFERENCE`). Sin clics, sin activarse y fuera de Alt+Tab.
 //!
-//! El acrílico ignora las regiones de ventana y el redondeo nativo de Windows 11 es de radio fijo con
-//! sombra, así que la forma redondeada se aproxima con un rectángulo central y franjas finas cuya
-//! anchura sigue el arco de cada esquina; las franjas quedan siempre DENTRO de la forma, de modo que
-//! fuera de ella no se ve nada. (Técnica descrita en MacDock; implementación propia.)
+//! Antes la forma redondeada se aproximaba apilando ~20 ventanas rectangulares: cada esquina era una
+//! escalera de 1 px y cada tira fina se difuminaba por separado (rayas horizontales y bases «sin
+//! blur»). Se suponía que DWM no redondea las ventanas con acento acrílico; comprobado en Windows 11
+//! que sí, con antialiasing. Por qué no el material del sistema (`DWMSBT_TRANSIENTWINDOW`):
+//! comprobado también que en una ventana inactiva cae a un color plano sin desenfoque, y el Dock y
+//! la barra nunca están activos. El precio de la superficie continua es que el radio lo fija Windows
+//! (≈ 8 px lógicos): el CSS usa ese mismo radio en el modo nativo (`src/lib/glass.js`). Con el modo
+//! «Vidrio suave sin blur nativo» no se crea ninguna ventana.
 
 use std::{collections::{HashMap, HashSet}, sync::{Mutex, OnceLock}};
 use tauri::{AppHandle, Emitter, Manager, Runtime, WebviewWindow, WindowEvent};
@@ -16,11 +20,17 @@ use windows::{
     core::w,
     Win32::{
         Foundation::{HWND, LPARAM, LRESULT, RECT, WPARAM},
-        Graphics::Dwm::{DwmSetWindowAttribute, DWMWA_BORDER_COLOR, DWMWA_COLOR_NONE, DWMWA_WINDOW_CORNER_PREFERENCE, DWMWCP_DONOTROUND},
-        UI::WindowsAndMessaging::{
-            BeginDeferWindowPos, CreateWindowExW, DeferWindowPos, DefWindowProcW, DestroyWindow, EndDeferWindowPos, GetWindowRect, IsWindowVisible, RegisterClassExW, SetWindowPos, HTTRANSPARENT,
-            SWP_HIDEWINDOW, SWP_NOACTIVATE, SWP_NOMOVE, SWP_NOSIZE, SWP_NOZORDER, SWP_SHOWWINDOW, WM_NCACTIVATE,
-            WM_NCHITTEST, WNDCLASSEXW, WS_EX_NOACTIVATE, WS_EX_TOOLWINDOW, WS_EX_TOPMOST, WS_EX_TRANSPARENT, WS_POPUP,
+        Graphics::Dwm::{
+            DwmSetWindowAttribute, DWMWA_BORDER_COLOR, DWMWA_COLOR_NONE, DWMWA_WINDOW_CORNER_PREFERENCE, DWMWCP_DONOTROUND,
+            DWMWCP_ROUND, DWMWCP_ROUNDSMALL, DWM_WINDOW_CORNER_PREFERENCE,
+        },
+        UI::{
+            WindowsAndMessaging::{
+                CreateWindowExW, DefWindowProcW, DestroyWindow, GetWindowRect, IsWindowVisible, RegisterClassExW, SendMessageW,
+                SetWindowPos, HTTRANSPARENT, SWP_HIDEWINDOW, SWP_NOACTIVATE, SWP_NOMOVE, SWP_NOSIZE, SWP_NOZORDER, SWP_SHOWWINDOW,
+                WM_NCACTIVATE, WM_NCHITTEST, WNDCLASSEXW, WS_EX_NOACTIVATE, WS_EX_TOOLWINDOW, WS_EX_TOPMOST, WS_EX_TRANSPARENT,
+                WS_POPUP,
+            },
         },
     },
 };
@@ -37,19 +47,24 @@ pub struct Shape { pub x: f64, pub y: f64, pub w: f64, pub h: f64, pub radius: f
 #[derive(Default)]
 struct Entry {
     shape: Option<Shape>,
+    /// Estilo de paneles (Ajustes > Apariencia): «oscuro opaco» = sin desenfoque.
     enabled: bool,
-    /// HWND de las piezas: [cuerpo, franjas...]
-    pieces: Vec<isize>,
-    /// Último rectángulo físico y radio colocados (para no recolocar si nada cambió).
-    placed: Option<(RECT, i32)>,
+    /// Vidrio nativo de Windows (`true`) o solo CSS («Vidrio suave sin blur nativo»).
+    native: bool,
+    /// Material oscuro (modo noche) o claro.
+    dark: bool,
+    /// La ventana del desenfoque (una por superficie).
+    piece: Option<isize>,
+    /// Atributos aplicados a la pieza: (oscuro, esquinas).
+    applied: Option<(bool, i32)>,
+    /// Último rectángulo físico colocado (para no recolocar si nada cambió).
+    placed: Option<RECT>,
     shown: bool,
-    /// Tinte (ABGR) que deben tener las piezas y el que tienen aplicado.
-    tint: u32,
-    applied_tint: u32,
     /// La vista ha pintado un fotograma estando visible (`glass_ready`): hasta entonces no hay vidrio.
     ready: bool,
-    /// Ya se le pidió esa confirmación (evento `glass-reveal`).
-    reveal_asked: bool,
+    /// Cuándo se pidió esa confirmación (evento `glass-reveal`); se repite si no llega respuesta
+    /// (antes se pedía una sola vez y, si la vista aún no escuchaba, el Dock se quedaba sin vidrio).
+    reveal_at: Option<std::time::Instant>,
 }
 
 static ENTRIES: OnceLock<Mutex<HashMap<String, Entry>>> = OnceLock::new();
@@ -59,7 +74,7 @@ unsafe extern "system" fn wnd_proc(hwnd: HWND, msg: u32, wparam: WPARAM, lparam:
     match msg {
         // Los clics atraviesan la pieza: los recibe la ventana de vidrio o lo que haya debajo.
         WM_NCHITTEST => LRESULT(HTTRANSPARENT as isize),
-        // Siempre «activa»: si no, el acrílico cae a un relleno plano al perder el foco.
+        // Siempre «activa» (nunca se activa de verdad: WS_EX_NOACTIVATE).
         WM_NCACTIVATE => DefWindowProcW(hwnd, msg, WPARAM(1), lparam),
         _ => DefWindowProcW(hwnd, msg, wparam, lparam),
     }
@@ -73,8 +88,7 @@ fn register_class() -> bool {
             lpfnWndProc: Some(wnd_proc),
             hInstance: windows::Win32::Foundation::HINSTANCE(GetModuleHandleW(std::ptr::null())),
             lpszClassName: w!("NokiGlassBackdrop"),
-            // Fondo negro: con el acento acrílico, el negro deja ver el desenfoque. Sin pincel, la
-            // superficie podía quedar sin inicializar (blanca) y se veía una franja blanca.
+            // Negro: con el acento acrílico, el negro deja ver el desenfoque.
             hbrBackground: windows::Win32::Graphics::Gdi::HBRUSH(windows::Win32::Graphics::Gdi::GetStockObject(windows::Win32::Graphics::Gdi::BLACK_BRUSH).0),
             ..Default::default()
         };
@@ -82,8 +96,14 @@ fn register_class() -> bool {
     })
 }
 
-/// Crea una pieza (en el hilo de UI).
-fn create_piece(tint: u32) -> Option<isize> {
+/// Tinte del acento acrílico (ABGR): gris medio uniforme como el de las capturas de referencia
+/// (macdock-*.png); más oscuro y denso en modo noche. El tinte fino, el brillo y el borde, en CSS.
+fn piece_tint(dark: bool) -> u32 {
+    if dark { 0xA0_20_1C_1C } else { 0x88_54_50_50 }
+}
+
+/// Crea la ventana del desenfoque (en el hilo de UI). El acento se aplica en `apply_attributes`.
+fn create_piece() -> Option<isize> {
     if !register_class() { return None; }
     unsafe {
         let hwnd = CreateWindowExW(
@@ -96,104 +116,35 @@ fn create_piece(tint: u32) -> Option<isize> {
             Some(windows::Win32::Foundation::HINSTANCE(GetModuleHandleW(std::ptr::null()))),
             None,
         ).ok()?;
-        let corner = DWMWCP_DONOTROUND;
-        let _ = DwmSetWindowAttribute(hwnd, DWMWA_WINDOW_CORNER_PREFERENCE, &corner as *const _ as _, std::mem::size_of_val(&corner) as u32);
+        // Sin el borde de 1 px de DWM: el borde lo dibuja el CSS.
         let border = DWMWA_COLOR_NONE;
         let _ = DwmSetWindowAttribute(hwnd, DWMWA_BORDER_COLOR, &border as *const _ as _, std::mem::size_of_val(&border) as u32);
-        crate::window_utils::set_acrylic(hwnd, tint);
+        let _ = SendMessageW(hwnd, WM_NCACTIVATE, Some(WPARAM(1)), Some(LPARAM(0)));
         Some(hwnd.0 as isize)
     }
 }
 
-/// Tinte del acrílico de las piezas (ABGR): gris translúcido, como el material de macOS; así el texto
-/// blanco se lee también sobre fondos claros. El tinte suave, el brillo y el borde los pinta el CSS.
-/// Windows no deja cambiar el radio real del acrílico: la «intensidad» se emula con el alfa del tinte
-/// (más alfa = más esmerilado). Modo oscuro: color más oscuro y algo más de alfa.
-pub fn piece_tint(dark: bool, blur: &str) -> u32 {
-    let alpha: u32 = match blur { "low" => 0x40, "high" => 0x90, _ => 0x60 } + if dark { 0x20 } else { 0 };
-    let bgr: u32 = if dark { 0x28_20_1E } else { 0x4C_48_46 };
-    (alpha.min(0xFF) << 24) | bgr
+/// Esquinas nativas según el radio pedido por la vista: sin redondeo (barra), pequeñas o normales.
+fn corner_for(radius: f64) -> DWM_WINDOW_CORNER_PREFERENCE {
+    if radius < 1.0 { DWMWCP_DONOTROUND } else if radius < 6.0 { DWMWCP_ROUNDSMALL } else { DWMWCP_ROUND }
 }
 
-/// Margen inferior extra (px físicos) del acrílico respecto a la forma informada por la vista.
-const BOTTOM_TOLERANCE_PX: i32 = 2;
-
-/// Rectángulos (físicos) que cubren la forma redondeada sin salirse de ella.
-fn pieces_for(rect: RECT, r: i32) -> Vec<RECT> {
-    let (w, h) = (rect.right - rect.left, rect.bottom - rect.top);
-    let r = r.min(w / 2).min(h / 2).max(0);
-    if r < 2 { return vec![rect]; }
-    let mut out = vec![RECT { left: rect.left, top: rect.top + r, right: rect.right, bottom: rect.bottom - r }];
-    // Hueco del arco a la altura y (desde el borde): cuánto hay que meter la franja hacia dentro.
-    let inset = |y: i32| -> f64 { let dy = (r - y) as f64; r as f64 - ((r * r) as f64 - dy * dy).max(0.0).sqrt() };
-    // Franjas adaptativas: cada una termina cuando el arco se ha desplazado ≤ 1 px, así que el
-    // escalón entre el acrílico y el borde suavizado del CSS nunca pasa de un píxel físico (con
-    // 1,5 px se notaban dientes en el Dock, el lanzador y los paneles). El acento acrílico no admite
-    // antialiasing ni regiones: este escalón de 1 px es el mínimo posible con esta técnica.
-    // Se usa el hueco del borde más cercano al vértice: la franja nunca sobresale de la forma.
-    let mut y0 = 0;
-    while y0 < r {
-        let start = inset(y0);
-        let mut y1 = y0 + 1;
-        while y1 < r && start - inset(y1) <= 1.0 { y1 += 1; }
-        let i = start.ceil() as i32;
-        out.push(RECT { left: rect.left + i, top: rect.top + y0, right: rect.right - i, bottom: rect.top + y1 });
-        out.push(RECT { left: rect.left + i, top: rect.bottom - y1, right: rect.right - i, bottom: rect.bottom - y0 });
-        y0 = y1;
-    }
-    out
+fn apply_attributes(piece: HWND, dark: bool, corner: DWM_WINDOW_CORNER_PREFERENCE) {
+    crate::window_utils::set_acrylic(piece, piece_tint(dark));
+    unsafe { let _ = DwmSetWindowAttribute(piece, DWMWA_WINDOW_CORNER_PREFERENCE, &corner as *const _ as _, std::mem::size_of_val(&corner) as u32); }
 }
 
-/// Esconde todas las piezas de una entrada (en el hilo de UI).
-fn hide_pieces(entry: &mut Entry) {
+fn hide_piece(entry: &mut Entry) {
     if !entry.shown { return; }
-    for &p in &entry.pieces { unsafe { let _ = SetWindowPos(HWND(p as *mut _), None, 0, 0, 0, 0, SWP_HIDEWINDOW | SWP_NOACTIVATE | SWP_NOMOVE | SWP_NOSIZE | SWP_NOZORDER); } }
+    if let Some(p) = entry.piece {
+        unsafe { let _ = SetWindowPos(HWND(p as *mut _), None, 0, 0, 0, 0, SWP_HIDEWINDOW | SWP_NOACTIVATE | SWP_NOMOVE | SWP_NOSIZE | SWP_NOZORDER); }
+    }
     entry.shown = false;
     entry.placed = None;
 }
 
-/// Coloca las piezas en un único lote, todas justo debajo de su ventana. Nunca pasan por
-/// HWND_TOPMOST: antes cada pieza subía primero encima de todo y luego bajaba, y DWM podía componer
-/// un fotograma con el acrílico tapando el Dock o el lanzador (el parpadeo y la franja clara).
-/// `rects == None` solo reafirma el orden sin mover nada.
-fn place_batch(owner: HWND, pieces: &[isize], rects: Option<&[RECT]>) {
-    let one = |h: HWND, i: usize| unsafe {
-        match rects {
-            None => { let _ = SetWindowPos(h, Some(owner), 0, 0, 0, 0, SWP_NOACTIVATE | SWP_NOMOVE | SWP_NOSIZE); }
-            Some(rects) => match rects.get(i) {
-                Some(r) => { let _ = SetWindowPos(h, Some(owner), r.left, r.top, r.right - r.left, r.bottom - r.top, SWP_NOACTIVATE | SWP_SHOWWINDOW); }
-                None => { let _ = SetWindowPos(h, None, 0, 0, 0, 0, SWP_HIDEWINDOW | SWP_NOACTIVATE | SWP_NOMOVE | SWP_NOSIZE | SWP_NOZORDER); }
-            },
-        }
-    };
-    unsafe {
-        let Ok(mut batch) = BeginDeferWindowPos(pieces.len() as i32) else {
-            for (i, &p) in pieces.iter().enumerate() { one(HWND(p as *mut _), i); }
-            return;
-        };
-        for (i, &p) in pieces.iter().enumerate() {
-            let h = HWND(p as *mut _);
-            let next = match rects {
-                None => DeferWindowPos(batch, h, Some(owner), 0, 0, 0, 0, SWP_NOACTIVATE | SWP_NOMOVE | SWP_NOSIZE),
-                Some(rects) => match rects.get(i) {
-                    Some(r) => DeferWindowPos(batch, h, Some(owner), r.left, r.top, r.right - r.left, r.bottom - r.top, SWP_NOACTIVATE | SWP_SHOWWINDOW),
-                    None => DeferWindowPos(batch, h, None, 0, 0, 0, 0, SWP_HIDEWINDOW | SWP_NOACTIVATE | SWP_NOMOVE | SWP_NOSIZE | SWP_NOZORDER),
-                },
-            };
-            match next {
-                Ok(b) => batch = b,
-                // Si el lote falla, Windows lo libera: se termina pieza a pieza (sin pasar por TOPMOST).
-                Err(_) => {
-                    for (j, &q) in pieces.iter().enumerate().skip(i) { one(HWND(q as *mut _), j); }
-                    return;
-                }
-            }
-        }
-        let _ = EndDeferWindowPos(batch);
-    }
-}
-
-/// Recoloca (o esconde) las piezas de una ventana. Solo en el hilo de UI.
+/// Recoloca (o esconde) el desenfoque de una ventana. Solo en el hilo de UI. La pieza va siempre
+/// justo debajo de su ventana y nunca pasa por HWND_TOPMOST (un fotograma encima tapaba el Dock).
 fn apply<R: Runtime>(window: &WebviewWindow<R>, label: &str) {
     let Ok(owner) = window.hwnd() else { return };
     let scale = window.scale_factor().unwrap_or(1.0);
@@ -205,56 +156,50 @@ fn apply<R: Runtime>(window: &WebviewWindow<R>, label: &str) {
         if !visible {
             // Oculta: al volver a mostrarse, el vidrio espera a que la vista haya pintado otra vez.
             entry.ready = false;
-            entry.reveal_asked = false;
+            entry.reveal_at = None;
         }
-        let target = match (entry.enabled && visible, entry.shape) {
+        let target = match (entry.enabled && entry.native && visible, entry.shape) {
             (true, Some(s)) if s.w > 1.0 && s.h > 1.0 => {
                 let mut win = RECT::default();
                 if unsafe { GetWindowRect(owner, &mut win) }.is_err() { None } else {
-                    // Nunca fuera de su ventana: el redondeo a píxeles físicos (125 %) podía dar 1 px de
-                    // más y el acrílico asomaba como una línea clara bajo la barra.
-                    // Abajo, 2 px físicos de tolerancia (siempre dentro de la ventana): a 125 % el borde
-                    // inferior del acrílico quedaba algo más corto que la base redondeada que pinta
-                    // WebView2 y esa franja se veía sin difuminar.
-                    let rect = RECT {
+                    // Nunca fuera de su ventana (el redondeo a 125 % podía dar 1 px de más).
+                    Some((RECT {
                         left: (win.left + (s.x * scale).round() as i32).max(win.left),
                         top: (win.top + (s.y * scale).round() as i32).max(win.top),
                         right: (win.left + ((s.x + s.w) * scale).round() as i32).min(win.right),
-                        bottom: (win.top + ((s.y + s.h) * scale).ceil() as i32 + BOTTOM_TOLERANCE_PX).min(win.bottom),
-                    };
-                    Some((rect, (s.radius * scale).round() as i32))
+                        bottom: (win.top + ((s.y + s.h) * scale).round() as i32).min(win.bottom),
+                    }, corner_for(s.radius)))
                 }
             }
             _ => None,
         };
-        let Some((rect, radius)) = target else { hide_pieces(entry); return };
+        let Some((rect, corner)) = target else { hide_piece(entry); return };
         if !entry.ready {
             // Visible pero sin un fotograma pintado confirmado: sin vidrio (si no, se veía medio
             // segundo un recuadro gris vacío al abrir el lanzador). Se pide la confirmación una vez.
-            hide_pieces(entry);
-            if !entry.reveal_asked { entry.reveal_asked = true; reveal = true; }
-        } else if entry.shown && entry.placed == Some((rect, radius)) && entry.applied_tint == entry.tint {
-            // Solo reafirmar el orden: justo debajo de la ventana visible.
-            place_batch(owner, &entry.pieces, None);
-            return;
+            hide_piece(entry);
+            if entry.reveal_at.is_none_or(|at| at.elapsed() >= std::time::Duration::from_millis(400)) {
+                entry.reveal_at = Some(std::time::Instant::now());
+                reveal = true;
+            }
         } else {
-            if entry.applied_tint != entry.tint {
-                for &p in &entry.pieces { crate::window_utils::set_acrylic(HWND(p as *mut _), entry.tint); }
-                entry.applied_tint = entry.tint;
+            if entry.piece.is_none() { entry.piece = create_piece(); }
+            let Some(p) = entry.piece else { return };
+            let piece = HWND(p as *mut _);
+            if entry.applied != Some((entry.dark, corner.0)) {
+                apply_attributes(piece, entry.dark, corner);
+                entry.applied = Some((entry.dark, corner.0));
             }
-            let rects = pieces_for(rect, radius);
-            while entry.pieces.len() < rects.len() {
-                let Some(p) = create_piece(entry.tint) else { return };
-                entry.pieces.push(p);
-                entry.applied_tint = entry.tint;
+            unsafe {
+                if entry.shown && entry.placed == Some(rect) {
+                    // Solo reafirmar el orden: justo debajo de la ventana visible.
+                    let _ = SetWindowPos(piece, Some(owner), 0, 0, 0, 0, SWP_NOACTIVATE | SWP_NOMOVE | SWP_NOSIZE);
+                } else {
+                    let _ = SetWindowPos(piece, Some(owner), rect.left, rect.top, rect.right - rect.left, rect.bottom - rect.top, SWP_NOACTIVATE | SWP_SHOWWINDOW);
+                    entry.shown = true;
+                    entry.placed = Some(rect);
+                }
             }
-            // Las que sobran se destruyen: cada pieza es una ventana acrílica que DWM compone.
-            while entry.pieces.len() > rects.len() {
-                if let Some(p) = entry.pieces.pop() { unsafe { let _ = DestroyWindow(HWND(p as *mut _)); } }
-            }
-            place_batch(owner, &entry.pieces, Some(&rects));
-            entry.shown = true;
-            entry.placed = Some((rect, radius));
         }
     }
     if reveal { let _ = window.emit("glass-reveal", label); }
@@ -267,8 +212,7 @@ fn schedule<R: Runtime>(app: &AppHandle<R>, label: &str) {
     let _ = window.run_on_main_thread(move || apply(&w, &label));
 }
 
-/// Recoloca el vidrio en cuanto su ventana se mueve, cambia de tamaño o de escala (antes solo lo
-/// hacía el sondeo de 120 ms y, mientras tanto, el acrílico asomaba desplazado).
+/// Recoloca el vidrio en cuanto su ventana se mueve, cambia de tamaño o de escala.
 fn follow_window(window: &WebviewWindow, label: &str) {
     static FOLLOWED: OnceLock<Mutex<HashSet<String>>> = OnceLock::new();
     if !FOLLOWED.get_or_init(|| Mutex::new(HashSet::new())).lock().unwrap().insert(label.to_string()) { return; }
@@ -285,29 +229,38 @@ fn follow_window(window: &WebviewWindow, label: &str) {
 pub fn set_enabled<R: Runtime>(app: &AppHandle<R>, label: &str, enabled: bool) {
     {
         let mut map = entries().lock().unwrap();
-        let entry = map.entry(label.to_string()).or_default();
+        let entry = map.entry(label.to_string()).or_insert_with(|| Entry { native: true, ..Default::default() });
         if entry.enabled == enabled { return; }
         entry.enabled = enabled;
     }
     schedule(app, label);
 }
 
-/// La vista informa de su forma de vidrio (px lógicos relativos a su ventana).
+/// La vista informa de su forma de vidrio (px lógicos relativos a su ventana), del modo (noche o
+/// día) y de si quiere el desenfoque nativo o solo el vidrio CSS.
 #[tauri::command]
-pub fn glass_shape(window: WebviewWindow, x: f64, y: f64, w: f64, h: f64, radius: f64, dark: Option<bool>, blur: Option<String>) {
+pub fn glass_shape(window: WebviewWindow, x: f64, y: f64, w: f64, h: f64, radius: f64, dark: Option<bool>, native: Option<bool>) {
     let label = window.label().to_string();
     let shape = Shape { x, y, w, h, radius };
-    {
+    let (dark, native) = (dark.unwrap_or(false), native.unwrap_or(true));
+    let stale = {
         let mut map = entries().lock().unwrap();
-        let entry = map.entry(label.clone()).or_insert_with(|| Entry { enabled: true, ..Default::default() });
-        let tint = piece_tint(dark.unwrap_or(false), blur.as_deref().unwrap_or("medium"));
-        if entry.shape == Some(shape) && entry.tint == tint && entry.shown { return; }
+        let entry = map.entry(label.clone()).or_insert_with(|| Entry { enabled: true, native: true, ..Default::default() });
+        let unchanged = entry.shape == Some(shape) && entry.dark == dark && entry.native == native;
         entry.shape = Some(shape);
-        entry.tint = tint;
-    }
+        entry.dark = dark;
+        entry.native = native;
+        // Sin desenfoque nativo, la ventana auxiliar sobra: se destruye.
+        let stale = if native { None } else { entry.shown = false; entry.placed = None; entry.applied = None; entry.piece.take() };
+        if unchanged && stale.is_none() && (entry.shown || !native) { return; }
+        stale
+    };
     follow_window(&window, &label);
     let w = window.clone();
-    let _ = window.run_on_main_thread(move || apply(&w, &label));
+    let _ = window.run_on_main_thread(move || {
+        if let Some(p) = stale { unsafe { let _ = DestroyWindow(HWND(p as *mut _)); } }
+        apply(&w, &label);
+    });
 }
 
 /// La vista confirma que ya ha pintado un fotograma estando visible: desde ahora puede verse su vidrio.
@@ -316,15 +269,16 @@ pub fn glass_ready(window: WebviewWindow) {
     let label = window.label().to_string();
     {
         let mut map = entries().lock().unwrap();
-        let Some(entry) = map.get_mut(&label) else { return };
+        // Puede llegar antes que la primera forma: se recuerda igualmente.
+        let entry = map.entry(label.clone()).or_insert_with(|| Entry { enabled: true, native: true, ..Default::default() });
         entry.ready = true;
-        entry.reveal_asked = false;
+        entry.reveal_at = None;
     }
     let w = window.clone();
     let _ = window.run_on_main_thread(move || apply(&w, &label));
 }
 
-/// Sigue a las ventanas visibles: si se muestran o se esconden, las piezas las acompañan (los
+/// Sigue a las ventanas visibles: si se muestran o se esconden, el desenfoque las acompaña (los
 /// movimientos llegan al momento por `follow_window`). Sondeo ligero cada 120 ms.
 pub fn start(app: AppHandle) {
     std::thread::spawn(move || {

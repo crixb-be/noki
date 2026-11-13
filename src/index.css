@@ -270,9 +270,7 @@ html, body, #root {
   background: linear-gradient(to bottom, var(--glass-sheen), rgba(255,255,255,0) 33%), var(--glass-tint);
   border: 1px solid var(--glass-rim);
   border-top-color: var(--glass-rim-top);
-  /* Aro interior de 1 px: tapa el escalón (≤ 1 px físico) entre el acrílico nativo, que no admite
-     antialiasing, y el borde redondeado suavizado del CSS. */
-  box-shadow: inset 0 0 0 1px rgba(255,255,255,.07), var(--glass-shadow, 0 0 #0000);
+  box-shadow: var(--glass-shadow, 0 0 #0000);
   color: #fff;
 }
 /* Barra superior: el mismo vidrio en todos los modos (borde solo abajo). */
@@ -288,3 +286,29 @@ html, body, #root {
 .panel-row:hover, .panel-row:active, .panel-link:hover, .panel-link:active,
 .launchpad-app:hover, .launchpad-app:active, .spotlight-result:hover, .spotlight-result.active { background: var(--glass-hover); }
 [data-panels="light"] .bar-panel, [data-panels="light"] .launchpad-card, [data-panels="light"] .spotlight-card { text-shadow: none; }
+
+/* ── Acabado de las capturas de referencia (Capturas/macdock-*.png) ──
+   Tinte gris medio uniforme (lo pone --glass-tint), borde de 1 px rgba(255,255,255,.22), texto
+   blanco nítido con pesos ligeros y etiquetas secundarias en gris claro. */
+.bar-panel, .launchpad-card, .spotlight-card, .topbar-shell, .dock-pill {
+  font-family: "Segoe UI Variable Text", "Segoe UI", system-ui, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+[data-panels="light"] .bar-panel { padding: 12px 14px 10px; }
+[data-panels="light"] .bar-panel h2 { font-size: 18px; font-weight: 500; letter-spacing: -.005em; }
+[data-panels="light"] .bar-panel header { margin-bottom: 10px; }
+[data-panels="light"] .bar-panel .panel-label { margin: 10px 4px 4px; font-size: 11.5px; font-weight: 600; letter-spacing: .04em; color: rgba(235,235,245,.55); }
+[data-panels="light"] .bar-panel .panel-row { font-size: 15px; font-weight: 400; padding: 7px 8px; }
+[data-panels="light"] .panel-status { font-size: 15px; }
+[data-panels="light"] .panel-status span:first-child, [data-panels="light"] .panel-muted { color: rgba(235,235,245,.62); }
+[data-panels="light"] .panel-link { font-size: 15px; font-weight: 400; color: rgba(255,255,255,.92); }
+[data-panels="light"] .panel-divider { height: 1px; margin: 6px 4px; background: rgba(255,255,255,.18); }
+/* Lanzador: búsqueda grande y ligera, categorías en píldoras grises, nombres de app nítidos. */
+[data-panels="light"] .launchpad-search { background: rgba(255,255,255,.14); border-radius: 22px; }
+[data-panels="light"] .launchpad-search input { font-size: 26px; font-weight: 300; }
+[data-panels="light"] .launchpad-chips button { font-size: 13px; font-weight: 500; color: rgba(255,255,255,.85); background: rgba(255,255,255,.14); }
+[data-panels="light"] .launchpad-chips button.selected { color: #1d1d1f; background: rgba(255,255,255,.95); }
+[data-panels="light"] .launchpad-app > span:last-child { font-size: 12px; font-weight: 400; color: rgba(255,255,255,.92); }
+/* Barra superior: el mismo vidrio, texto con peso normal y cifras tabulares. */
+.topbar-shell { font-weight: 400; }
