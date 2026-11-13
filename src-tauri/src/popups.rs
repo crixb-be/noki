@@ -85,7 +85,8 @@ pub fn close(app: &AppHandle, id: &str) -> bool {
         current.opened_at = None;
         current.generation = current.generation.wrapping_add(1);
     }
-    if was_active || id == "bar_panel" { hide_window(app, window_name(id)); }
+    // Se oculta siempre: si el estado se hubiera desincronizado, cerrar debe seguir funcionando.
+    hide_window(app, window_name(id));
     was_active
 }
 
@@ -95,8 +96,11 @@ pub fn toggle(app: &AppHandle, id: &str) -> Result<bool, String> {
     if !matches!(id, "launchpad" | "spotlight") && !id.starts_with("bar_panel:") {
         return Err("Popup desconocido.".into());
     }
+    // Visibilidad real de la ventana (fuera del candado): si quedó oculta por otra vía,
+    // el siguiente clic debe abrirla en vez de «cerrarla» sin efecto visible.
+    let shown = app.get_webview_window(window_name(id)).and_then(|w| w.is_visible().ok()).unwrap_or(false);
     let mut current = state().lock().unwrap();
-    if current.active_popup.as_deref().is_some_and(|value| value == id) {
+    if shown && current.active_popup.as_deref().is_some_and(|value| value == id) {
         current.active_popup = None;
         current.opened_at = None;
         current.generation = current.generation.wrapping_add(1);

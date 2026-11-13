@@ -146,6 +146,8 @@ fn focus(window: &WebviewWindow) {
             attached = AttachThreadInput(source, me, true).as_bool();
         }
         let _ = AllowSetForegroundWindow(ASFW_ANY);
+        // tao debe saber que está visible, o su hide() posterior no la ocultaría.
+        let _ = ui_window.show();
         let _ = ShowWindow(hwnd, SW_SHOW);
         let _ = BringWindowToTop(hwnd);
         let focused = SetForegroundWindow(hwnd).as_bool();

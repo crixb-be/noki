@@ -30,6 +30,9 @@ fn focus_window(window: &WebviewWindow) {
     let ui_window = window.clone();
     let _ = window.run_on_main_thread(move || unsafe {
         let Ok(hwnd) = ui_window.hwnd() else { return };
+        // Mostrar con tao primero: si solo se usa ShowWindow, tao cree que sigue oculta
+        // y su hide() posterior no hace nada (el Launchpad no se cerraba).
+        let _ = ui_window.show();
         window_utils::enforce_chrome_free_hwnd(hwnd);
         remove_noactivate(hwnd);
         let fg = GetForegroundWindow();
