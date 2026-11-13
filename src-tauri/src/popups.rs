@@ -236,6 +236,9 @@ where
                 (current.generation, left.max(BLUR_SETTLE))
             };
             std::thread::sleep(wait);
+            // Recorte de pantalla (Win+Shift+S, Impr Pant, Recortes): su superposición se lleva el
+            // foco, pero el popup debe seguir visible para poder capturarlo.
+            if crate::dock::capture_in_progress() { return; }
             // Solo cierra si el primer plano es de otra app (no nula: durante un cambio de foco
             // GetForegroundWindow devuelve NULL un instante y antes eso también cerraba).
             let foreign = unsafe {
@@ -281,6 +284,8 @@ pub fn start(app: AppHandle) {
             let pressed = down && !was_down;
             was_down = down;
             if !pressed { continue; }
+            // Seleccionar la zona del recorte también es un clic «fuera»: no cierra nada.
+            if crate::dock::capture_in_progress() { continue; }
             let mut cursor = POINT::default();
             if unsafe { GetCursorPos(&mut cursor) }.is_err() { continue; }
             let inside = ["launchpad", "spotlight", "barpanel", "dock", "topbar"]

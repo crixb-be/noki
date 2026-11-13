@@ -115,6 +115,9 @@ pub fn piece_tint(dark: bool, blur: &str) -> u32 {
     (alpha.min(0xFF) << 24) | bgr
 }
 
+/// Margen inferior extra (px físicos) del acrílico respecto a la forma informada por la vista.
+const BOTTOM_TOLERANCE_PX: i32 = 2;
+
 /// Rectángulos (físicos) que cubren la forma redondeada sin salirse de ella.
 fn pieces_for(rect: RECT, r: i32) -> Vec<RECT> {
     let (w, h) = (rect.right - rect.left, rect.bottom - rect.top);
@@ -210,11 +213,14 @@ fn apply<R: Runtime>(window: &WebviewWindow<R>, label: &str) {
                 if unsafe { GetWindowRect(owner, &mut win) }.is_err() { None } else {
                     // Nunca fuera de su ventana: el redondeo a píxeles físicos (125 %) podía dar 1 px de
                     // más y el acrílico asomaba como una línea clara bajo la barra.
+                    // Abajo, 2 px físicos de tolerancia (siempre dentro de la ventana): a 125 % el borde
+                    // inferior del acrílico quedaba algo más corto que la base redondeada que pinta
+                    // WebView2 y esa franja se veía sin difuminar.
                     let rect = RECT {
                         left: (win.left + (s.x * scale).round() as i32).max(win.left),
                         top: (win.top + (s.y * scale).round() as i32).max(win.top),
                         right: (win.left + ((s.x + s.w) * scale).round() as i32).min(win.right),
-                        bottom: (win.top + ((s.y + s.h) * scale).round() as i32).min(win.bottom),
+                        bottom: (win.top + ((s.y + s.h) * scale).ceil() as i32 + BOTTOM_TOLERANCE_PX).min(win.bottom),
                     };
                     Some((rect, (s.radius * scale).round() as i32))
                 }

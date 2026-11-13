@@ -123,6 +123,28 @@ pub fn sync_taskbar(settings: &Settings) {
 /// es una ventana TOPMOST a pantalla completa: no hay que confundirla con un juego o un vídeo ni
 /// subir ninguna ventana de Noki por encima de ella.
 pub(crate) fn capture_overlay_active() -> bool {
+    let active = capture_overlay_now();
+    if active { *last_capture().lock().unwrap() = Some(Instant::now()); }
+    active
+}
+
+fn last_capture() -> &'static Mutex<Option<Instant>> {
+    static LAST: OnceLock<Mutex<Option<Instant>>> = OnceLock::new();
+    LAST.get_or_init(|| Mutex::new(None))
+}
+
+/// ¿Se está lanzando o acaba de usarse una captura? Atajo pulsado ahora mismo (Win+Shift+S o
+/// Impr Pant, que en Windows 11 abre el recorte), superposición visible, o vista hace menos de 1,5 s
+/// (el foco salta antes de que la superposición exista y vuelve un instante después de cerrarla).
+pub(crate) fn capture_in_progress() -> bool {
+    use windows::Win32::UI::Input::KeyboardAndMouse::{GetAsyncKeyState, VK_LWIN, VK_RWIN, VK_SHIFT, VK_SNAPSHOT};
+    let down = |k: u16| unsafe { GetAsyncKeyState(k as i32) < 0 };
+    let hotkey = down(VK_SNAPSHOT.0) || ((down(VK_LWIN.0) || down(VK_RWIN.0)) && down(VK_SHIFT.0) && down(b'S' as u16));
+    if hotkey { *last_capture().lock().unwrap() = Some(Instant::now()); return true; }
+    capture_overlay_active() || last_capture().lock().unwrap().is_some_and(|at| at.elapsed() < Duration::from_millis(1500))
+}
+
+fn capture_overlay_now() -> bool {
     const CAPTURE_CLASSES: [&str; 2] = ["Microsoft-Windows-SnipperToolbar", "Microsoft-Windows-SnipperCaptureForm"];
     unsafe {
         for class in CAPTURE_CLASSES {
