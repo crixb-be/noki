@@ -236,9 +236,22 @@ fn fallback_png(name: &str) -> String {
     png_data(bytes)
 }
 
+/// Convierte un nombre suelto como `explorer.exe` o `notepad.exe` en su ruta completa
+/// (carpeta de Windows o System32); con eso el icono y la identificación de ventanas funcionan.
+pub(crate) fn resolve_program(path: &str) -> String {
+    let path = path.trim();
+    if path.is_empty() || path.contains(['\\', '/']) || !path.to_ascii_lowercase().ends_with(".exe") { return path.to_string(); }
+    let windir = std::env::var("WINDIR").or_else(|_| std::env::var("SystemRoot")).unwrap_or_else(|_| "C:\\Windows".into());
+    for dir in [windir.clone(), format!("{windir}\\System32")] {
+        let candidate = format!("{dir}\\{path}");
+        if std::path::Path::new(&candidate).exists() { return candidate; }
+    }
+    path.to_string()
+}
+
 fn render(path: &str) -> String {
     unsafe { let _ = CoInitializeEx(None, COINIT_APARTMENTTHREADED); }
-    let normalized = path.replace('/', "\\");
+    let normalized = resolve_program(path).replace('/', "\\");
     let mut candidates = vec![normalized.clone()];
     candidates.extend(link_targets(&normalized));
     for candidate in candidates {

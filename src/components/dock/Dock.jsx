@@ -27,21 +27,30 @@ export default function Dock() {
   };
   useEffect(() => { refresh(); const timer = setInterval(refresh, 1000); return () => clearInterval(timer); }, []);
   useEffect(() => { let stops = []; Promise.all([listen("settings-updated", refresh), listen("settings-changed", refresh), listen("dock-windows", (event) => setItems(event.payload ?? []))]).then((fns) => { stops = fns; }); return () => stops.forEach((stop) => stop()); }, []);
+  const all = useMemo(() => [ ...(dock.showApps ? [{ key: "apps", name: "Aplicaciones", kind: "apps" }] : []), ...items, ...(dock.showTrash ? [{ key: "trash", name: "Papelera", kind: "trash", running: trash.items > 0 }] : []) ], [dock.showApps, dock.showTrash, items, trash.items]);
+  // Área de clic: sigue a la píldora (también mientras se magnifica).
   useEffect(() => {
-    if (!pill.current) return;
+    const node = pill.current;
+    if (!node) return undefined;
     const report = () => {
-      const r = pill.current?.getBoundingClientRect();
-      if (!r) return;
+      const r = node.getBoundingClientRect();
       invoke("dock_set_hit", { x: Math.round(r.left), y: Math.round(r.top), w: Math.round(r.width), h: Math.round(r.height) }).catch(() => {});
-      invoke("dock_resize", { width: Math.ceil(r.width + 16), height: Math.ceil(Math.max(r.height + 8, maxSize + 16)) }).catch(() => {});
     };
     report();
     const observer = new ResizeObserver(report);
-    observer.observe(pill.current);
+    observer.observe(node);
     return () => observer.disconnect();
-  }, [items, dock.iconSize, maxSize]);
+  }, []);
+  // Tamaño de la ventana: ancho natural de la píldora en reposo + holgura para la magnificación.
+  // Antes la píldora se limitaba al ancho de la ventana y la ventana a la píldora: los iconos se recortaban.
+  useEffect(() => {
+    const node = pill.current;
+    if (!node || pointerX.current != null) return;
+    const width = Math.ceil(node.scrollWidth + (dock.magnify ? (maxSize - size) * 4 : 0) + 24);
+    const height = Math.ceil(maxSize + 8 + 24);
+    invoke("dock_resize", { width, height }).catch(() => {});
+  }, [all.length, size, maxSize, dock.magnify]);
 
-  const all = useMemo(() => [ ...(dock.showApps ? [{ key: "apps", name: "Aplicaciones", kind: "apps" }] : []), ...items, ...(dock.showTrash ? [{ key: "trash", name: "Papelera", kind: "trash", running: trash.items > 0 }] : []) ], [dock.showApps, dock.showTrash, items, trash.items]);
   if (settings && !dock.enabled) return null;
   function resetMagnification() {
     pointerX.current = null;

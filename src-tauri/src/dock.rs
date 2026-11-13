@@ -7,7 +7,7 @@ use crate::{icons, notch, settings::{DockPinned, Settings}, window_utils};
 use serde::Serialize;
 use std::{path::Path, sync::{Mutex, OnceLock}, time::{Duration, Instant}};
 use tauri::{window::Color, AppHandle, Emitter, Manager, PhysicalPosition, PhysicalSize, WebviewUrl, WebviewWindow, WebviewWindowBuilder};
-use windows::{core::{w, PCWSTR}, Win32::{Foundation::{HWND, LPARAM, RECT}, Graphics::{Dwm::{DwmSetWindowAttribute, DWMWA_BORDER_COLOR, DWMWA_COLOR_NONE, DWMWA_WINDOW_CORNER_PREFERENCE, DWMWCP_DONOTROUND}, Gdi::{GetMonitorInfoW, MonitorFromWindow, MONITORINFO, MONITOR_DEFAULTTONEAREST}}, UI::{Shell::{SHAppBarMessage, SHEmptyRecycleBinW, SHFileOperationW, SHQueryRecycleBinW, APPBARDATA, SHFILEOPSTRUCTW, FO_DELETE, FOF_ALLOWUNDO, FOF_NOCONFIRMATION, FOF_NOERRORUI, FOF_SILENT}, WindowsAndMessaging::{EnumChildWindows, EnumWindows, FindWindowW, GetAncestor, GetCursorPos, GetWindowLongPtrW, GetWindowTextLengthW, GetWindowTextW, GetWindowThreadProcessId, IsWindowVisible, SetWindowLongPtrW, SetWindowPos, ShowWindow, GA_ROOT, GWL_EXSTYLE, GWL_STYLE, HWND_TOPMOST, SW_SHOW, SWP_FRAMECHANGED, SWP_NOACTIVATE, SWP_NOMOVE, SWP_NOSIZE, SWP_SHOWWINDOW, WS_BORDER, WS_CAPTION, WS_DLGFRAME, WS_EX_CLIENTEDGE, WS_EX_DLGMODALFRAME, WS_EX_NOACTIVATE, WS_EX_STATICEDGE, WS_EX_TOOLWINDOW, WS_EX_TOPMOST, WS_EX_WINDOWEDGE, WS_MAXIMIZEBOX, WS_MINIMIZEBOX, WS_SYSMENU, WS_THICKFRAME}}}};
+use windows::{core::{w, PCWSTR}, Win32::{Foundation::{HWND, LPARAM, RECT}, Graphics::{Dwm::{DwmSetWindowAttribute, DWMWA_BORDER_COLOR, DWMWA_COLOR_NONE, DWMWA_WINDOW_CORNER_PREFERENCE, DWMWCP_DONOTROUND}, Gdi::{GetMonitorInfoW, MonitorFromWindow, MONITORINFO, MONITOR_DEFAULTTONEAREST}}, UI::{Shell::{SHAppBarMessage, SHEmptyRecycleBinW, SHFileOperationW, SHQueryRecycleBinW, APPBARDATA, SHFILEOPSTRUCTW, FO_DELETE, FOF_ALLOWUNDO, FOF_NOCONFIRMATION, FOF_NOERRORUI, FOF_SILENT}, WindowsAndMessaging::{EnumChildWindows, EnumWindows, FindWindowW, GetAncestor, GetCursorPos, GetWindowLongPtrW, GetWindowTextLengthW, GetWindowTextW, GetWindowThreadProcessId, GetForegroundWindow, IsIconic, IsWindowVisible, SetForegroundWindow, SetWindowLongPtrW, SetWindowPos, ShowWindow, GA_ROOT, GWL_EXSTYLE, GWL_STYLE, HWND_TOPMOST, SW_MINIMIZE, SW_RESTORE, SW_SHOW, SWP_FRAMECHANGED, SWP_NOACTIVATE, SWP_NOMOVE, SWP_NOSIZE, SWP_SHOWWINDOW, WS_BORDER, WS_CAPTION, WS_DLGFRAME, WS_EX_CLIENTEDGE, WS_EX_DLGMODALFRAME, WS_EX_NOACTIVATE, WS_EX_STATICEDGE, WS_EX_TOOLWINDOW, WS_EX_TOPMOST, WS_EX_WINDOWEDGE, WS_MAXIMIZEBOX, WS_MINIMIZEBOX, WS_SYSMENU, WS_THICKFRAME}}}};
 
 const ABM_NEW: u32 = 0;
 const ABM_REMOVE: u32 = 1;
@@ -26,13 +26,11 @@ struct AppBarState { hwnd: isize, rect: RECT, monitor: notch::Rect, height: i32,
 
 static HIT: OnceLock<Mutex<Hit>> = OnceLock::new();
 static APPBAR: OnceLock<Mutex<Option<AppBarState>>> = OnceLock::new();
-static WINDOWS: OnceLock<Mutex<Vec<(String, isize)>>> = OnceLock::new();
 static SIZE: OnceLock<Mutex<Option<(i32, i32)>>> = OnceLock::new();
 static TASKBAR_STATE: OnceLock<Mutex<Option<u32>>> = OnceLock::new();
 
 fn hit() -> &'static Mutex<Hit> { HIT.get_or_init(|| Mutex::new(Hit { scale: 1.0, ..Hit::default() })) }
 fn appbar() -> &'static Mutex<Option<AppBarState>> { APPBAR.get_or_init(|| Mutex::new(None)) }
-fn windows_cache() -> &'static Mutex<Vec<(String, isize)>> { WINDOWS.get_or_init(|| Mutex::new(Vec::new())) }
 fn requested_size() -> &'static Mutex<Option<(i32, i32)>> { SIZE.get_or_init(|| Mutex::new(None)) }
 fn taskbar_state() -> &'static Mutex<Option<u32>> { TASKBAR_STATE.get_or_init(|| Mutex::new(None)) }
 
@@ -267,27 +265,53 @@ unsafe extern "system" fn enum_callback(hwnd: HWND, lparam: LPARAM) -> windows::
     true.into()
 }
 
-fn running_windows() -> Vec<(String, isize, String, String)> {
-    let mut list = Vec::new();
+/// Ventana abierta de otra app: título, HWND, ruta del ejecutable y AUMID.
+struct Running { title: String, hwnd: isize, path: String, aumid: String }
+
+fn running_windows() -> Vec<Running> {
+    let mut list: Vec<(String, isize, String, String)> = Vec::new();
     unsafe { let _ = EnumWindows(Some(enum_callback), LPARAM(&mut list as *mut _ as isize)); }
-    list
+    list.into_iter().map(|(title, hwnd, path, aumid)| Running { title, hwnd, path, aumid }).collect()
 }
+
+fn file_name(path: &str) -> String { path.rsplit(['\\', '/']).next().unwrap_or(path).to_ascii_lowercase() }
+
+/// Identidad estable de una app: AUMID si lo hay; si no, la ruta del ejecutable.
+fn identity(path: &str, aumid: &str) -> String {
+    if !aumid.trim().is_empty() { format!("aumid:{}", aumid.to_ascii_lowercase()) } else { format!("exe:{}", icons::resolve_program(path).to_ascii_lowercase()) }
+}
+
+/// ¿Esta ventana pertenece al elemento anclado? Por AUMID, ruta o nombre del ejecutable.
+fn pin_matches(pin: &DockPinned, w: &Running) -> bool {
+    if !pin.aumid.is_empty() { return w.aumid.eq_ignore_ascii_case(&pin.aumid); }
+    let pinned = icons::resolve_program(&pin.path);
+    !pinned.is_empty() && (w.path.eq_ignore_ascii_case(&pinned) || (!w.path.is_empty() && file_name(&w.path) == file_name(&pinned)))
+}
+
+fn pin_key(pin: &DockPinned) -> String { format!("pin:{}", pin.name) }
 
 pub fn items(settings: &Settings) -> Vec<DockItem> {
     let running = running_windows();
-    *windows_cache().lock().unwrap() = running.iter().map(|(n, h, _, _)| (n.clone(), *h)).collect();
+    let mut used = vec![false; running.len()];
     let mut out = Vec::new();
     for p in &settings.dock.pinned {
-        let count = running.iter().filter(|(n, _, _, aumid)| n.eq_ignore_ascii_case(&p.name) || (!p.aumid.is_empty() && aumid.eq_ignore_ascii_case(&p.aumid))).count();
-        out.push(DockItem { key: format!("pin:{}", p.name), name: p.name.clone(), path: p.path.clone(), args: p.args.clone(), aumid: p.aumid.clone(), running: count > 0, window_count: count, kind: "pinned".into() });
+        let mut count = 0;
+        for (i, w) in running.iter().enumerate() { if pin_matches(p, w) { used[i] = true; count += 1; } }
+        out.push(DockItem { key: pin_key(p), name: p.name.clone(), path: icons::resolve_program(&p.path), args: p.args.clone(), aumid: p.aumid.clone(), running: count > 0, window_count: count, kind: "pinned".into() });
     }
     if settings.dock.show_running {
-        for (i, (name, _, path, aumid)) in running.iter().enumerate() {
-            if !out.iter().any(|x| x.name.eq_ignore_ascii_case(name)) {
-                let icon_path = if aumid.is_empty() { path.clone() } else { format!("shell:AppsFolder\\{aumid}") };
-                out.push(DockItem { key: format!("window:{i}"), name: name.clone(), path: icon_path, args: String::new(), aumid: aumid.clone(), running: true, window_count: 1, kind: "running".into() });
-            }
+        // Una entrada por app (no por ventana), en el orden en que aparecen.
+        let mut groups: Vec<(String, usize)> = Vec::new();
+        for (i, w) in running.iter().enumerate() {
+            if used[i] { continue; }
+            let id = identity(&w.path, &w.aumid);
+            if let Some(group) = groups.iter_mut().find(|(g, _)| *g == id) { group.1 += 1; continue; }
+            groups.push((id, 1));
+            let icon_path = if w.aumid.is_empty() { w.path.clone() } else { format!("shell:AppsFolder\\{}", w.aumid) };
+            out.push(DockItem { key: String::new(), name: w.title.clone(), path: icon_path, args: String::new(), aumid: w.aumid.clone(), running: true, window_count: 1, kind: "running".into() });
         }
+        let first_running = out.len() - groups.len();
+        for (item, (id, count)) in out[first_running..].iter_mut().zip(groups) { item.key = format!("app:{id}"); item.window_count = count; }
     }
     for folder in &settings.dock.folders {
         out.push(DockItem { key: format!("folder:{}", folder.path), name: folder.name.clone(), path: folder.path.clone(), args: String::new(), aumid: String::new(), running: false, window_count: 0, kind: "folder".into() });
@@ -295,6 +319,17 @@ pub fn items(settings: &Settings) -> Vec<DockItem> {
     out
 }
 
+/// Ventanas abiertas que corresponden a una clave del Dock (`pin:` o `app:`).
+fn windows_for(settings: &Settings, key: &str) -> Vec<isize> {
+    let running = running_windows();
+    if let Some(pin) = settings.dock.pinned.iter().find(|p| pin_key(p) == key) {
+        return running.iter().filter(|w| pin_matches(pin, w)).map(|w| w.hwnd).collect();
+    }
+    if let Some(id) = key.strip_prefix("app:") {
+        return running.iter().filter(|w| identity(&w.path, &w.aumid) == id).map(|w| w.hwnd).collect();
+    }
+    Vec::new()
+}
 pub fn remove() { remove_appbar(); }
 
 #[tauri::command]
@@ -334,29 +369,37 @@ fn dock_launch_blocking(path: String, args: String, aumid: String) -> Result<(),
 pub async fn dock_activate(key: String, state: tauri::State<'_, notch::NotchState>) -> Result<(), String> {
     let settings = state.settings.lock().unwrap().clone();
     tauri::async_runtime::spawn_blocking(move || {
-        if let Some(pin) = settings.dock.pinned.iter().find(|p| format!("pin:{}", p.name) == key) { return dock_launch_blocking(pin.path.clone(), pin.args.clone(), pin.aumid.clone()); }
-        let raw = windows_cache().lock().unwrap()
-            .get(key.strip_prefix("window:").and_then(|v| v.parse::<usize>().ok()).unwrap_or(usize::MAX))
-            .map(|(_, raw)| *raw);
-        if let Some(raw) = raw {
-            unsafe { let h = HWND(raw as *mut _); let _ = ShowWindow(h, SW_SHOW); let _ = windows::Win32::UI::WindowsAndMessaging::SetForegroundWindow(h); }
+        let windows = windows_for(&settings, &key);
+        if windows.is_empty() {
+            // Sin ventanas: lanzar si es un elemento anclado.
+            if let Some(pin) = settings.dock.pinned.iter().find(|p| pin_key(p) == key) { return dock_launch_blocking(pin.path.clone(), pin.args.clone(), pin.aumid.clone()); }
+            return Ok(());
+        }
+        unsafe {
+            let fg = GetForegroundWindow().0 as isize;
+            let target = match windows.iter().position(|h| *h == fg) {
+                // Una sola ventana y ya está delante: minimizar.
+                Some(_) if windows.len() == 1 => { let _ = ShowWindow(HWND(fg as *mut _), SW_MINIMIZE); return Ok(()); }
+                // Varias: alternar a la siguiente.
+                Some(i) => windows[(i + 1) % windows.len()],
+                None => windows[0],
+            };
+            let h = HWND(target as *mut _);
+            let _ = ShowWindow(h, if IsIconic(h).as_bool() { SW_RESTORE } else { SW_SHOW });
+            let _ = SetForegroundWindow(h);
         }
         Ok(())
     }).await.map_err(|e| e.to_string())?
 }
 
 #[tauri::command]
-pub fn dock_close_windows(key: String) {
-    let raw = {
-        let cache = windows_cache().lock().unwrap();
-        key.strip_prefix("window:").and_then(|v| v.parse::<usize>().ok()).and_then(|i| cache.get(i).map(|(_, raw)| *raw))
-            .or_else(|| cache.iter().find(|(n, _)| key.ends_with(n)).map(|(_, raw)| *raw))
-    };
-    if let Some(raw) = raw {
+pub async fn dock_close_windows(key: String, state: tauri::State<'_, notch::NotchState>) -> Result<(), String> {
+    let settings = state.settings.lock().unwrap().clone();
+    for raw in windows_for(&settings, &key) {
         unsafe { let _ = windows::Win32::UI::WindowsAndMessaging::PostMessageW(Some(HWND(raw as *mut _)), windows::Win32::UI::WindowsAndMessaging::WM_CLOSE, windows::Win32::Foundation::WPARAM(0), windows::Win32::Foundation::LPARAM(0)); }
     }
+    Ok(())
 }
-
 async fn commit_pin(app: &AppHandle, mut s: Settings) -> Result<(), String> { crate::commit_settings(app, { s.clamp(); s }).await.map(|_| ()) }
 
 #[tauri::command]
