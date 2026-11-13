@@ -75,6 +75,7 @@ pub fn schedule_app_recovery(window: &WebviewWindow, view: &'static str) {
 }
 use windows::Win32::{
     Foundation::HWND,
+    Graphics::Gdi::{CreateRoundRectRgn, SetWindowRgn},
     Graphics::Dwm::{DwmSetWindowAttribute, DWMWA_BORDER_COLOR, DWMWA_COLOR_NONE, DWMWA_WINDOW_CORNER_PREFERENCE, DWMWCP_DONOTROUND},
     UI::WindowsAndMessaging::{
         GetWindowLongPtrW, SetWindowLongPtrW, SetWindowPos, GWL_EXSTYLE, GWL_STYLE, SWP_FRAMECHANGED,
@@ -84,6 +85,34 @@ use windows::Win32::{
     },
 };
 
+/// Radio (px lógicos) de las esquinas de los paneles: Launchpad, paneles de la barra y buscador.
+pub const PANEL_RADIUS: f64 = 16.0;
+
+/// Recorta la ventana entera con una región redondeada: así ni el fondo de la ventana
+/// ni el vidrio nativo dejan asomar un rectángulo detrás de la tarjeta, y no hay sombra
+/// de DWM (el redondeo nativo de Windows 11 la añade y su radio es fijo de 8 px).
+/// La región se recalcula en cada cambio de tamaño.
+pub fn mark_rounded(window: &WebviewWindow) {
+    enforce_chrome_free(window);
+    let w = window.clone();
+    let _ = window.run_on_main_thread(move || apply_round_region(&w));
+    let w = window.clone();
+    window.on_window_event(move |event| {
+        if matches!(event, tauri::WindowEvent::Resized(_) | tauri::WindowEvent::ScaleFactorChanged { .. }) { apply_round_region(&w); }
+    });
+}
+
+fn apply_round_region(window: &WebviewWindow) {
+    let (Ok(hwnd), Ok(size), Ok(scale)) = (window.hwnd(), window.inner_size(), window.scale_factor()) else { return };
+    // Algo menos redondeada que la tarjeta CSS: el borde visible es el suavizado del CSS,
+    // no el escalonado de la región.
+    let r = ((PANEL_RADIUS - 4.0) * scale * 2.0).round() as i32;
+    unsafe {
+        let region = CreateRoundRectRgn(0, 0, size.width as i32 + 1, size.height as i32 + 1, r, r);
+        // El sistema pasa a ser dueño de la región: no se libera aquí.
+        let _ = SetWindowRgn(hwnd, Some(region), true);
+    }
+}
 /// Aplica el estilo de ventana sin marco en el hilo de UI.
 ///
 /// Tao/WebView2 puede restaurar parte del estilo al crear la ventana o al mostrarla,
@@ -108,6 +137,8 @@ pub fn enforce_chrome_free_hwnd(hwnd: HWND) {
         let framed = (WS_EX_CLIENTEDGE | WS_EX_DLGMODALFRAME | WS_EX_STATICEDGE | WS_EX_WINDOWEDGE | WS_EX_NOACTIVATE).0 as isize;
         SetWindowLongPtrW(hwnd, GWL_EXSTYLE, ex_style & !framed);
 
+        // Sin redondeo de DWM: en Windows 11 trae una sombra gris y un radio fijo de 8 px.
+        // Los paneles se recortan con una región propia (ver `mark_rounded`).
         let preference = DWMWCP_DONOTROUND;
         let _ = DwmSetWindowAttribute(hwnd, DWMWA_WINDOW_CORNER_PREFERENCE, &preference as *const _ as _, std::mem::size_of_val(&preference) as u32);
         let border = DWMWA_COLOR_NONE;

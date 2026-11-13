@@ -583,15 +583,15 @@
     "semantic_hash": ""
   },
   "src-tauri/src/launchpad.rs": {
-    "mtime": 1794543005.4397526,
-    "seen": 1794543109.1253417,
-    "ast_hash": "652575aa250d0d31b7183bf7e78ade84",
+    "mtime": 1794545243.7784605,
+    "seen": 1794545640.8255672,
+    "ast_hash": "59eca41bfee835d370b54577faaf0c4b",
     "semantic_hash": ""
   },
   "src-tauri/src/topbar.rs": {
-    "mtime": 1794543188.892294,
-    "seen": 1794543265.9078748,
-    "ast_hash": "0da1f39b65319c5a33033ec4b39fc00c",
+    "mtime": 1794545243.7849712,
+    "seen": 1794545640.8255837,
+    "ast_hash": "406dbe90e513ed0c2474a8e5036c5efc",
     "semantic_hash": ""
   },
   "src/components/dock/Dock.jsx": {
@@ -1201,9 +1201,9 @@
     "semantic_hash": ""
   },
   "src-tauri/src/spotlight.rs": {
-    "mtime": 1794543014.6038702,
-    "seen": 1794543109.125353,
-    "ast_hash": "dd4f7be1baf9677ed8972138d3cbaf5b",
+    "mtime": 1794545243.7784605,
+    "seen": 1794545640.8255794,
+    "ast_hash": "bcae60b482783bd0dfa51d20e2708c29",
     "semantic_hash": ""
   },
   "src/components/spotlight/Spotlight.jsx": {
@@ -1291,9 +1291,9 @@
     "semantic_hash": ""
   },
   "src-tauri/src/window_utils.rs": {
-    "mtime": 1794538224.3662107,
-    "seen": 1794538250.5593193,
-    "ast_hash": "ef00dc4013d845a946686944730ae363",
+    "mtime": 1794545552.784349,
+    "seen": 1794545640.8255868,
+    "ast_hash": "418e53e69670bda398105ca6a664c42a",
     "semantic_hash": ""
   },
   "package-lock.json": {

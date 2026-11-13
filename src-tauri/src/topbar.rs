@@ -135,7 +135,7 @@ fn create_panel(app: &AppHandle) -> Option<WebviewWindow> {
     popups::register_window(app, &window, "bar_panel", || {
         panel_state().lock().unwrap().kind = None;
     });
-    window_utils::enforce_chrome_free(&window);
+    window_utils::mark_rounded(&window);
     window_utils::schedule_app_recovery(&window, "barpanel");
     Some(window)
 }

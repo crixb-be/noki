@@ -17,7 +17,7 @@ fn create(app: &AppHandle) -> Option<WebviewWindow> {
     let _ = clear_acrylic(&window);
     let _ = clear_blur(&window);
     popups::register_window(app, &window, "launchpad", || {});
-    window_utils::enforce_chrome_free(&window);
+    window_utils::mark_rounded(&window);
     window_utils::schedule_app_recovery(&window, "launchpad");
     Some(window)
 }

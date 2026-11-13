@@ -67,10 +67,10 @@ html, body, #root {
 .topbar-avatar { display: flex; align-items: center; justify-content: center; width: 20px; height: 20px; overflow: hidden; border-radius: 50%; background: #4f46e5; color: #fff; font-size: 11px; }
 .topbar-avatar img { width: 100%; height: 100%; object-fit: cover; }
 /* Superficie de los paneles: oscura, opaca y uniforme (nada de lo que hay detrás se transparenta). */
-.noki-popup-card { background: #1e1e20; border: 1px solid rgba(255,255,255,.10); box-shadow: none; backdrop-filter: none; -webkit-backdrop-filter: none; }
-.bar-panel { box-sizing: border-box; width: 100%; height: auto; max-height: 100vh; margin: 0; overflow: hidden auto; padding: 16px; color: #fff; border-radius: 12px; scrollbar-width: none; }
+.noki-popup-card { background: #1e1e20; border: 0; box-shadow: none; backdrop-filter: none; -webkit-backdrop-filter: none; }
+.bar-panel { box-sizing: border-box; width: 100%; height: auto; max-height: 100vh; margin: 0; overflow: hidden auto; padding: 16px; color: #fff; border-radius: 16px; scrollbar-width: none; }
 .bar-panel-body { display: flow-root; }
-.bar-panel-light, .bar-panel-dark { color: #fff; background: #1e1e20; border-color: rgba(255,255,255,.10); }
+.bar-panel-light, .bar-panel-dark { color: #fff; background: #1e1e20; }
 .bar-panel-light p, .bar-panel-light .panel-muted, .bar-panel-light .panel-link { color: rgba(255,255,255,.58); }
 .bar-panel-light .panel-row, .bar-panel-light .panel-link, .bar-panel-light .control-tile { color: #fff; }
 .bar-panel-light .panel-row:hover, .bar-panel-light .panel-link:hover, .bar-panel-light .control-tile:hover { background: rgba(255,255,255,.1); }
@@ -211,6 +211,6 @@ html, body, #root {
 
 [data-view="spotlight"] body, [data-view="spotlight"] html { background: transparent; overflow: hidden; user-select: none; }
 .spotlight-shell { width: 100%; height: 100%; box-sizing: border-box; color: #fff; }
-.spotlight-card { width: 100%; height: 100%; box-sizing: border-box; overflow: hidden; border-radius: 14px; }
+.spotlight-card { width: 100%; height: 100%; box-sizing: border-box; overflow: hidden; border-radius: 16px; }
 .spotlight-input { display: flex; align-items: center; gap: 12px; padding: 14px 20px; border-bottom: 1px solid rgba(255,255,255,.1); font-size: 26px; }.spotlight-input input { min-width: 0; flex: 1; border: 0; outline: 0; color: #fff; background: transparent; font-size: 23px; }.spotlight-input input::placeholder { color: rgba(255,255,255,.48); }
 .spotlight-results { max-height: 390px; overflow: auto; padding: 8px 12px 14px; }.spotlight-results section h2 { margin: 8px 8px 4px; color: rgba(255,255,255,.48); font-size: 11px; font-weight: 600; letter-spacing: .08em; text-transform: uppercase; }.spotlight-result { display: flex; align-items: center; width: 100%; gap: 12px; padding: 8px 10px; border: 0; border-radius: 12px; color: #fff; background: transparent; text-align: left; }.spotlight-result.active, .spotlight-result:hover { background: rgba(255,255,255,.12); }.spotlight-icon { display: grid; width: 34px; height: 34px; flex: 0 0 34px; place-items: center; overflow: hidden; border-radius: 9px; color: rgba(255,255,255,.75); background: rgba(255,255,255,.1); }.spotlight-icon img { width: 28px; height: 28px; object-fit: contain; }.spotlight-fallback { display: grid; width: 100%; height: 100%; place-items: center; color: #fff; font-size: 17px; font-weight: 700; }.spotlight-label { display: flex; min-width: 0; flex-direction: column; gap: 2px; }.spotlight-label strong { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 13px; }.spotlight-label small { overflow: hidden; color: rgba(255,255,255,.42); text-overflow: ellipsis; white-space: nowrap; font-size: 11px; }.spotlight-empty { padding: 34px 10px; color: rgba(255,255,255,.48); text-align: center; font-size: 13px; }
