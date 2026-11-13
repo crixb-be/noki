@@ -41,7 +41,7 @@ use tauri::{
     WebviewWindowBuilder,
 };
 use tauri_plugin_autostart::{MacosLauncher, ManagerExt as _};
-use tauri_plugin_global_shortcut::{GlobalShortcutExt, Shortcut, ShortcutState};
+use tauri_plugin_global_shortcut::{GlobalShortcutExt, Modifiers, Shortcut, ShortcutState};
 
 #[cfg(debug_assertions)]
 fn start_ui_watchdog(app: AppHandle) {
@@ -147,11 +147,43 @@ fn shortcut_list(sc: &settings::Shortcuts) -> Vec<(String, String)> {
     v
 }
 
+fn is_windows_text_shortcut(key: &str) -> bool {
+    let parts: Vec<_> = key.split('+').map(str::trim).collect();
+    parts.len() == 2
+        && (parts[0].eq_ignore_ascii_case("ctrl") || parts[0].eq_ignore_ascii_case("control"))
+        && (parts[1].eq_ignore_ascii_case("a") || parts[1].eq_ignore_ascii_case("v"))
+}
+
+#[cfg(windows)]
+fn physical_modifiers_match(shortcut: &Shortcut) -> bool {
+    use windows::Win32::UI::Input::KeyboardAndMouse::{
+        GetAsyncKeyState, VIRTUAL_KEY, VK_CONTROL, VK_LWIN, VK_MENU, VK_RWIN, VK_SHIFT,
+    };
+
+    let down = |key: VIRTUAL_KEY| unsafe { GetAsyncKeyState(key.0 as i32) < 0 };
+    let control_down = down(VK_CONTROL);
+    let alt_down = down(VK_MENU);
+    let shift_down = down(VK_SHIFT);
+    let super_down = down(VK_LWIN) || down(VK_RWIN);
+
+    (!shortcut.mods.contains(Modifiers::CONTROL) || control_down)
+        && (!shortcut.mods.contains(Modifiers::ALT) || alt_down)
+        && (!shortcut.mods.contains(Modifiers::SHIFT) || shift_down)
+        && (!shortcut.mods.contains(Modifiers::SUPER) || super_down)
+}
+
+#[cfg(not(windows))]
+fn physical_modifiers_match(_shortcut: &Shortcut) -> bool { true }
+
 fn apply_shortcut(app: &AppHandle, s: &Settings) -> Option<String> {
     let gs = app.global_shortcut();
     let _ = gs.unregister_all();
     let mut problems: Vec<String> = Vec::new();
     for (key, _) in shortcut_list(&s.shortcuts) {
+        if is_windows_text_shortcut(&key) {
+            problems.push(format!("«{key}» está reservado por Windows"));
+            continue;
+        }
         match key.parse::<Shortcut>() {
             Ok(sc) => {
                 if let Err(e) = gs.register(sc) {
@@ -702,8 +734,17 @@ pub fn run() {
                     if event.state() != ShortcutState::Pressed {
                         return;
                     }
+                    // RegisterHotKey identifica la combinación, pero el evento no expone los
+                    // modificadores físicos. Revalidarlos evita que Ctrl+A/V se conviertan en
+                    // acciones de Noki por un evento espurio o una condición de timing de Win32.
+                    if !physical_modifiers_match(shortcut) {
+                        return;
+                    }
                     let list = shortcut_list(&app.state::<notch::NotchState>().settings.lock().unwrap().shortcuts);
-                    let hit = list.into_iter().find(|(key, _)| key.parse::<Shortcut>().map(|k| &k == shortcut).unwrap_or(false));
+                    let hit = list.into_iter().find(|(key, _)| {
+                        !is_windows_text_shortcut(key)
+                            && key.parse::<Shortcut>().map(|k| &k == shortcut).unwrap_or(false)
+                    });
                     if let Some((_, action)) = hit {
                         run_shortcut(app, &action);
                     }

@@ -425,6 +425,27 @@ pub struct Shortcuts {
     pub tabs_modifier: String,
 }
 
+fn is_plain_control_shortcut(value: &str, key: &str) -> bool {
+    let parts: Vec<_> = value.split('+').map(str::trim).collect();
+    parts.len() == 2
+        && (parts[0].eq_ignore_ascii_case("ctrl") || parts[0].eq_ignore_ascii_case("control"))
+        && parts[1].eq_ignore_ascii_case(key)
+}
+
+impl Shortcuts {
+    /// Ctrl+A y Ctrl+V pertenecen a Windows y nunca deben quedar registrados por Noki.
+    /// Las versiones antiguas permitían guardarlos, así que se migran al atajo seguro por defecto.
+    fn migrate_windows_text_shortcuts(&mut self) {
+        let defaults = Self::default();
+        if is_plain_control_shortcut(&self.clip, "V") {
+            self.clip = defaults.clip;
+        }
+        if is_plain_control_shortcut(&self.ai, "A") {
+            self.ai = defaults.ai;
+        }
+    }
+}
+
 impl Default for Shortcuts {
     fn default() -> Self {
         Self {
@@ -882,6 +903,7 @@ impl Settings {
         if self.shortcuts.toggle.trim().is_empty() {
             self.shortcuts.toggle = Shortcuts::default().toggle;
         }
+        self.shortcuts.migrate_windows_text_shortcuts();
     }
 }
 
@@ -971,8 +993,10 @@ pub fn load(app: &AppHandle) -> Settings {
         s.topbar.enabled = true;
         s.general.reserve_space = false;
     }
+    let shortcuts_before_clamp = s.shortcuts.clone();
     s.clamp();
-    if migrated_topbar {
+    let migrated_shortcuts = shortcuts_before_clamp != s.shortcuts;
+    if migrated_topbar || migrated_shortcuts {
         let _ = save(app, &s);
     }
 
@@ -1016,4 +1040,33 @@ pub fn save(app: &AppHandle, s: &Settings) -> Result<(), String> {
 
 pub fn config_dir(app: &AppHandle) -> Option<PathBuf> {
     app.path().app_config_dir().ok()
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn migrates_windows_text_shortcuts_to_safe_defaults() {
+        let mut shortcuts = Shortcuts::default();
+        shortcuts.clip = "Ctrl+V".into();
+        shortcuts.ai = "Control+A".into();
+
+        shortcuts.migrate_windows_text_shortcuts();
+
+        assert_eq!(shortcuts.clip, "Ctrl+Alt+V");
+        assert_eq!(shortcuts.ai, "Ctrl+Alt+A");
+    }
+
+    #[test]
+    fn keeps_shortcuts_with_alt() {
+        let mut shortcuts = Shortcuts::default();
+        shortcuts.clip = "Ctrl+Alt+V".into();
+        shortcuts.ai = "Ctrl+Alt+I".into();
+
+        shortcuts.migrate_windows_text_shortcuts();
+
+        assert_eq!(shortcuts.clip, "Ctrl+Alt+V");
+        assert_eq!(shortcuts.ai, "Ctrl+Alt+I");
+    }
 }
