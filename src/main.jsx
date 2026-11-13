@@ -16,4 +16,10 @@ document.documentElement.dataset.view = view;
 
 const content = view === "settings" ? <SettingsWindow /> : view === "topbar" ? <TopBar /> : view === "barpanel" ? <BarPanel /> : view === "dock" ? <Dock /> : view === "launchpad" ? <Launchpad /> : view === "spotlight" ? <Spotlight /> : <App />;
 ReactDOM.createRoot(document.getElementById("root")).render(content);
-emit("frontend-ready", view).catch(() => {});
+// «Lista» cuando React ya ha pintado (dos fotogramas), no al evaluar el JS: el backend usa esta señal
+// para mostrar y colocar las ventanas. Las ventanas nacen ocultas y WebView2 puede no dar fotogramas
+// a una vista oculta: el temporizador garantiza que la señal llegue igualmente.
+let readySent = false;
+const sendReady = () => { if (readySent) return; readySent = true; emit("frontend-ready", view).catch(() => {}); };
+requestAnimationFrame(() => requestAnimationFrame(sendReady));
+setTimeout(sendReady, 250);

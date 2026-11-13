@@ -24,6 +24,8 @@ export default function Dock() {
   const maxSize = Math.round(size * scale);
   const sizes = useRef([]);
   const rest = useRef(null);
+  const geometry = useRef({ lift: 0 });
+  const reportHit = useRef(null);
 
   const refresh = async () => {
     try { if (!(await getCurrentWindow().isVisible())) return; } catch { /* El navegador de desarrollo no expone visibilidad nativa. */ }
@@ -33,14 +35,19 @@ export default function Dock() {
   useEffect(() => { refresh(); const timer = setInterval(refresh, 1000); return () => clearInterval(timer); }, []);
   useEffect(() => { let stops = []; Promise.all([listen("settings-updated", refresh), listen("settings-changed", refresh), listen("dock-windows", (event) => setItems(event.payload ?? []))]).then((fns) => { stops = fns; }); return () => stops.forEach((stop) => stop()); }, []);
   const all = useMemo(() => [ ...(dock.showApps ? [{ key: "apps", name: "Aplicaciones", kind: "apps" }] : []), ...items, ...(dock.showTrash ? [{ key: "trash", name: "Papelera", kind: "trash", running: trash.items > 0 }] : []) ], [dock.showApps, dock.showTrash, items, trash.items]);
-  // Área de clic: sigue a la píldora (también mientras se magnifica).
+  // Lo que necesita el área de clic sin depender del cierre del efecto.
+  geometry.current = { lift: dock.magnify ? maxSize - size : 0 };
+  // Área de clic: la píldora (fija) y, mientras se magnifica, también la franja de encima donde
+  // asoman los iconos ampliados (si no, al subir el cursor al icono grande el Dock lo soltaba).
   useEffect(() => {
     const node = pill.current;
     if (!node) return undefined;
     const report = () => {
       const r = node.getBoundingClientRect();
-      invoke("dock_set_hit", { x: Math.round(r.left), y: Math.round(r.top), w: Math.round(r.width), h: Math.round(r.height) }).catch(() => {});
+      const lift = pointerX.current != null ? geometry.current.lift : 0;
+      invoke("dock_set_hit", { x: Math.round(r.left - lift * 2), y: Math.round(r.top - lift), w: Math.round(r.width + lift * 4), h: Math.round(r.height + lift) }).catch(() => {});
     };
+    reportHit.current = report;
     report();
     const observer = new ResizeObserver(report);
     observer.observe(node);
@@ -50,7 +57,8 @@ export default function Dock() {
     const timer = setInterval(report, 2000);
     return () => { observer.disconnect(); window.removeEventListener("resize", report); clearInterval(timer); };
   }, []);
-  // Desenfoque real debajo de la píldora, con su forma exacta (también al magnificar).
+  // Desenfoque real debajo de la píldora. La píldora no cambia de tamaño al magnificar, así que el
+  // vidrio nativo no se recoloca en cada fotograma (era la franja clara que asomaba encima del Dock).
   const glass = useGlass(settings, "dock");
   useGlassShape(pill, glass);
   // Tamaño de la ventana: ancho natural de la píldora en reposo + holgura para la magnificación.
@@ -64,14 +72,14 @@ export default function Dock() {
   }, [all.length, size, maxSize, dock.magnify]);
 
   if (settings && !dock.enabled) return null;
-  function apply(index, value) {
+  // Magnificación solo con transform (ni width ni height cambian): el icono crece desde abajo con
+  // scale() y los vecinos se apartan con translateX, así la píldora y su vidrio quedan quietos.
+  function apply(index, scaleValue, shift) {
     const item = itemRefs.current[index];
     const icon = iconRefs.current[index];
     if (!item || !icon) return;
-    item.style.width = `${value}px`;
-    item.style.height = `${value + 8}px`;
-    icon.style.width = `${value}px`;
-    icon.style.height = `${value}px`;
+    item.style.transform = shift ? `translateX(${shift.toFixed(2)}px)` : "";
+    icon.style.transform = scaleValue !== 1 ? `scale(${scaleValue.toFixed(4)})` : "";
   }
 
   // Centros de cada icono en reposo, relativos al centro de la píldora (siempre centrada en
@@ -95,7 +103,8 @@ export default function Dock() {
     const x = pointerX.current;
     const reach = size * 3;
     let moving = false;
-    itemRefs.current.forEach((item, index) => {
+    const items = itemRefs.current;
+    items.forEach((item, index) => {
       if (!item) return;
       let target = size;
       if (x != null && dock.magnify && rest.current?.centers[index] != null) {
@@ -106,8 +115,17 @@ export default function Dock() {
       const next = Math.abs(target - current) < 0.4 ? target : current + (target - current) * 0.35;
       if (next !== target) moving = true;
       sizes.current[index] = next;
-      apply(index, next);
-      item.style.zIndex = String(Math.round(next));
+    });
+    // Cada icono ampliado ocupa `extra` px más; se reparte alrededor del centro de la píldora.
+    const extras = items.map((item, index) => (item ? (sizes.current[index] ?? size) - size : 0));
+    const total = extras.reduce((sum, value) => sum + value, 0);
+    let before = 0;
+    items.forEach((item, index) => {
+      if (!item) return;
+      const value = sizes.current[index] ?? size;
+      apply(index, value / size, before + extras[index] / 2 - total / 2);
+      before += extras[index];
+      item.style.zIndex = String(Math.round(value));
     });
     if (moving || x != null) frame.current = requestAnimationFrame(tick);
   }
@@ -115,13 +133,17 @@ export default function Dock() {
   function start() { if (!frame.current) frame.current = requestAnimationFrame(tick); }
 
   function resetMagnification() {
+    const was = pointerX.current != null;
     pointerX.current = null;
+    if (was) reportHit.current?.();
     start();
   }
 
   function onMouseMove(event) {
-    if (pointerX.current == null) rest.current = measureRest();
+    const first = pointerX.current == null;
+    if (first) rest.current = measureRest();
     pointerX.current = event.clientX;
+    if (first) reportHit.current?.();
     start();
   }  function activate(item) {
     if (item.kind === "apps") return invoke("toggle_launchpad");

@@ -4,7 +4,6 @@ use crate::{dock, launcher::{self, AppCache, AppEntry}, notch, popups, window_ut
 use serde::Serialize;
 use std::{path::{Path, PathBuf}, sync::{OnceLock, RwLock}, time::{Duration, SystemTime}};
 use tauri::{window::Color, AppHandle, Manager, WebviewWindow, WebviewWindowBuilder};
-use windows::Win32::{System::Threading::{AttachThreadInput, GetCurrentProcessId, GetCurrentThreadId}, UI::{Input::KeyboardAndMouse::{SendInput, INPUT, INPUT_KEYBOARD, KEYBDINPUT, KEYEVENTF_KEYUP, VIRTUAL_KEY}, WindowsAndMessaging::{AllowSetForegroundWindow, BringWindowToTop, GetForegroundWindow, GetWindowThreadProcessId, SetForegroundWindow, SetWindowLongPtrW, ShowWindow, ASFW_ANY, GWL_EXSTYLE, SW_SHOW, WS_EX_NOACTIVATE}}};
 use window_vibrancy::{clear_acrylic, clear_blur};
 
 const MAX_ENTRIES: usize = 60_000;
@@ -131,41 +130,6 @@ fn create(app: &AppHandle) -> Option<WebviewWindow> {
     Some(window)
 }
 
-fn focus(window: &WebviewWindow) {
-    let ui_window = window.clone();
-    let _ = window.run_on_main_thread(move || unsafe {
-        let Ok(hwnd) = ui_window.hwnd() else { return };
-        let ex = windows::Win32::UI::WindowsAndMessaging::GetWindowLongPtrW(hwnd, GWL_EXSTYLE);
-        SetWindowLongPtrW(hwnd, GWL_EXSTYLE, ex & !(WS_EX_NOACTIVATE.0 as isize));
-        let fg = GetForegroundWindow();
-        let source = if fg.0.is_null() { 0 } else { GetWindowThreadProcessId(fg, None) };
-        let me = GetCurrentThreadId();
-        let mut attached = false;
-        let mut source_pid = 0u32;
-        if !fg.0.is_null() { GetWindowThreadProcessId(fg, Some(&mut source_pid)); }
-        if source != 0 && source_pid != GetCurrentProcessId() && source != me {
-            attached = AttachThreadInput(source, me, true).as_bool();
-        }
-        let _ = AllowSetForegroundWindow(ASFW_ANY);
-        // tao debe saber que está visible, o su hide() posterior no la ocultaría.
-        let _ = ui_window.show();
-        // Después de show(): tao acaba de reescribir los estilos.
-        window_utils::enforce_chrome_free_hwnd(hwnd);
-        let _ = ShowWindow(hwnd, SW_SHOW);
-        let _ = BringWindowToTop(hwnd);
-        let focused = SetForegroundWindow(hwnd).as_bool();
-        if attached { let _ = AttachThreadInput(source, me, false); }
-        if !focused {
-            let alt = [
-                INPUT { r#type: INPUT_KEYBOARD, Anonymous: windows::Win32::UI::Input::KeyboardAndMouse::INPUT_0 { ki: KEYBDINPUT { wVk: VIRTUAL_KEY(0x12), wScan: 0, dwFlags: Default::default(), time: 0, dwExtraInfo: 0 } } },
-                INPUT { r#type: INPUT_KEYBOARD, Anonymous: windows::Win32::UI::Input::KeyboardAndMouse::INPUT_0 { ki: KEYBDINPUT { wVk: VIRTUAL_KEY(0x12), wScan: 0, dwFlags: KEYEVENTF_KEYUP, time: 0, dwExtraInfo: 0 } } },
-            ];
-            let _ = SendInput(&alt, std::mem::size_of::<INPUT>() as i32);
-            let _ = SetForegroundWindow(hwnd);
-        }
-    });
-}
-
 fn position(app: &AppHandle, window: &WebviewWindow) {
     let settings = app.state::<notch::NotchState>().settings.lock().unwrap().clone();
     let Some((_, mon)) = notch::assignments(&settings, &notch::monitors(app)).into_iter().find(|(label, _)| label == "main") else { return };
@@ -195,7 +159,7 @@ pub async fn toggle_spotlight(app: AppHandle) -> Result<(), String> {
     let window = create(&app).ok_or("No se pudo crear el buscador.")?;
     if !popups::toggle(&app, "spotlight")? { return Ok(()); }
     position(&app, &window);
-    focus(&window);
+    popups::present(&window, "spotlight");
     Ok(())
 }
 

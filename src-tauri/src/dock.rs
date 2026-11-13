@@ -7,7 +7,7 @@ use crate::{icons, notch, settings::{DockPinned, Settings}, window_utils};
 use serde::Serialize;
 use std::{path::Path, sync::{Mutex, OnceLock}, time::{Duration, Instant}};
 use tauri::{window::Color, AppHandle, Emitter, Manager, PhysicalPosition, PhysicalSize, WebviewUrl, WebviewWindow, WebviewWindowBuilder};
-use windows::{core::{w, PCWSTR}, Win32::{Foundation::{HWND, LPARAM, RECT}, Graphics::{Gdi::{GetMonitorInfoW, MonitorFromWindow, MONITORINFO, MONITOR_DEFAULTTONEAREST}}, UI::{Shell::{SHAppBarMessage, SHEmptyRecycleBinW, SHFileOperationW, SHQueryRecycleBinW, APPBARDATA, SHFILEOPSTRUCTW, FO_DELETE, FOF_ALLOWUNDO, FOF_NOCONFIRMATION, FOF_NOERRORUI, FOF_SILENT}, WindowsAndMessaging::{EnumChildWindows, EnumWindows, FindWindowExW, FindWindowW, GetWindowRect, GetAncestor, GetCursorPos, GetWindowLongPtrW, GetWindowTextLengthW, GetWindowTextW, GetWindowThreadProcessId, GetForegroundWindow, IsIconic, IsWindowVisible, SetForegroundWindow, SetWindowPos, ShowWindow, GA_ROOT, GWL_EXSTYLE, HWND_TOPMOST, SW_MINIMIZE, SW_RESTORE, SW_HIDE, SW_SHOW, SW_SHOWNA, SWP_ASYNCWINDOWPOS, SWP_NOACTIVATE, SWP_NOMOVE, SWP_NOSIZE, WS_EX_TOOLWINDOW}}}};
+use windows::{core::{w, PCWSTR}, Win32::{Foundation::{HWND, LPARAM, RECT}, Graphics::{Gdi::{GetMonitorInfoW, MonitorFromWindow, MONITORINFO, MONITOR_DEFAULTTONEAREST}}, UI::{Shell::{SHAppBarMessage, SHEmptyRecycleBinW, SHFileOperationW, SHQueryRecycleBinW, APPBARDATA, SHFILEOPSTRUCTW, FO_DELETE, FOF_ALLOWUNDO, FOF_NOCONFIRMATION, FOF_NOERRORUI, FOF_SILENT}, WindowsAndMessaging::{EnumChildWindows, EnumWindows, FindWindowExW, FindWindowW, GetClassNameW, GetWindowRect, GetAncestor, GetCursorPos, GetWindowLongPtrW, GetWindowTextLengthW, GetWindowTextW, GetWindowThreadProcessId, GetForegroundWindow, IsIconic, IsWindowVisible, SetForegroundWindow, SetWindowPos, ShowWindow, GA_ROOT, GWL_EXSTYLE, HWND_TOPMOST, SW_MINIMIZE, SW_RESTORE, SW_HIDE, SW_SHOW, SW_SHOWNA, SWP_ASYNCWINDOWPOS, SWP_NOACTIVATE, SWP_NOMOVE, SWP_NOSIZE, WS_EX_TOOLWINDOW}}}};
 
 const ABM_NEW: u32 = 0;
 const ABM_REMOVE: u32 = 1;
@@ -94,6 +94,9 @@ fn taskbars() -> Vec<HWND> {
 /// autoocultar, Windows la volvía a mostrar al acercar el ratón al borde inferior
 /// (justo donde está el Dock). Se llama cada 2 s: si Explorer la vuelve a mostrar, se oculta otra vez.
 pub fn sync_taskbar(settings: &Settings) {
+    // Nunca durante un recorte de pantalla: cambiar el AppBar de la barra de tareas mueve el área
+    // de trabajo y la superposición del recorte salta o se cierra.
+    if capture_overlay_active() { return; }
     let Some(taskbar) = (unsafe { FindWindowW(w!("Shell_TrayWnd"), PCWSTR::null()) }).ok() else { return };
     let mut data = APPBARDATA { cbSize: std::mem::size_of::<APPBARDATA>() as u32, hWnd: taskbar, ..Default::default() };
     unsafe {
@@ -113,6 +116,32 @@ pub fn sync_taskbar(settings: &Settings) {
             data.lParam = LPARAM(state as isize);
             let _ = SHAppBarMessage(ABM_SETSTATE, &mut data);
         }
+    }
+}
+
+/// ¿Hay una herramienta de captura de Windows en marcha (Win+Shift+S, Recortes)? Su superposición
+/// es una ventana TOPMOST a pantalla completa: no hay que confundirla con un juego o un vídeo ni
+/// subir ninguna ventana de Noki por encima de ella.
+pub(crate) fn capture_overlay_active() -> bool {
+    const CAPTURE_CLASSES: [&str; 2] = ["Microsoft-Windows-SnipperToolbar", "Microsoft-Windows-SnipperCaptureForm"];
+    unsafe {
+        for class in CAPTURE_CLASSES {
+            let wide: Vec<u16> = class.encode_utf16().chain(std::iter::once(0)).collect();
+            if let Ok(h) = FindWindowW(PCWSTR(wide.as_ptr()), PCWSTR::null()) {
+                if !h.0.is_null() && IsWindowVisible(h).as_bool() { return true; }
+            }
+        }
+        let fg = GetForegroundWindow();
+        if fg.0.is_null() { return false; }
+        let mut buf = [0u16; 128];
+        let n = GetClassNameW(fg, &mut buf);
+        let class = String::from_utf16_lossy(&buf[..n.max(0) as usize]);
+        if CAPTURE_CLASSES.contains(&class.as_str()) { return true; }
+        let mut pid = 0u32;
+        GetWindowThreadProcessId(fg, Some(&mut pid));
+        let process = file_name(&icons::process_image_path(pid).unwrap_or_default());
+        // Incluye las ventanas emergentes XAML (Xaml_WindowedPopupClass) de esos mismos procesos.
+        matches!(process.as_str(), "screenclippinghost.exe" | "snippingtool.exe")
     }
 }
 
@@ -491,7 +520,7 @@ pub fn start(app: AppHandle) {
             if periodic {
                 last_check = Instant::now();
                 sync_taskbar(&settings);
-                if visible {
+                if visible && !capture_overlay_active() {
                     unsafe { let _ = SetWindowPos(h, Some(HWND_TOPMOST), 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE | SWP_ASYNCWINDOWPOS); }
                 }
             }

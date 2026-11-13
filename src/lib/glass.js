@@ -1,5 +1,10 @@
 import { useEffect, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
+import { listen } from "@tauri-apps/api/event";
+import { getCurrentWindow } from "@tauri-apps/api/window";
+
+/** Dos fotogramas: el primero se programa antes de pintar y el segundo, cuando ya se ha pintado. */
+const afterPaint = (fn) => requestAnimationFrame(() => requestAnimationFrame(fn));
 
 /** Valores de MacDock (punto de partida y «Restablecer valores de MacDock»). */
 const surface = (radius) => ({ tintOpacity: 14, blur: "medium", radius, rim: true, shadow: false });
@@ -33,7 +38,7 @@ export function glassVars(cfg, dark) {
     "--glass-rim": rim ? "rgba(255,255,255,.18)" : "transparent",
     "--glass-rim-top": rim ? "rgba(255,255,255,.34)" : "transparent",
     "--glass-radius": `${Number(cfg?.radius ?? 18)}px`,
-    "--glass-shadow": cfg?.shadow ? "0 10px 28px rgba(0,0,0,.28)" : "none",
+    "--glass-shadow": cfg?.shadow ? "0 10px 28px rgba(0,0,0,.28)" : "0 0 #0000",
   };
 }
 
@@ -65,12 +70,17 @@ export function useGlass(settings, name) {
 export function useGlassShape(ref, glass, deps = []) {
   const { radius, dark = false, blur = "medium" } = typeof glass === "number" ? { radius: glass } : glass;
   useEffect(() => {
-    const node = ref.current;
-    if (!node) return undefined;
+    let node = null;
     let last = "";
     let frame = 0;
+    let attachFrame = 0;
+    let observer = null;
+    let timer = 0;
+    let stopReveal = null;
+    let disposed = false;
     const report = () => {
       frame = 0;
+      if (!node?.isConnected) { node = null; attach(); return; }
       const r = node.getBoundingClientRect();
       const shape = { x: r.left, y: r.top, w: r.width, h: r.height, radius, dark, blur };
       const key = `${shape.x}|${shape.y}|${shape.w}|${shape.h}|${radius}|${dark}|${blur}`;
@@ -79,14 +89,42 @@ export function useGlassShape(ref, glass, deps = []) {
       invoke("glass_shape", shape).catch(() => {});
     };
     const schedule = () => { if (!frame) frame = requestAnimationFrame(report); };
-    report();
-    const observer = new ResizeObserver(schedule);
-    observer.observe(node);
+    // El vidrio nativo solo se muestra cuando la vista ya ha pintado un fotograma estando visible
+    // (backdrop.rs `glass_ready`): así no aparece un recuadro gris vacío antes que el contenido.
+    const confirmPainted = () => afterPaint(() => { if (!disposed) invoke("glass_ready").catch(() => {}); });
+    // El nodo puede no existir al montar (p. ej. la barra devuelve null hasta tener los ajustes):
+    // antes el efecto salía y no volvía a ejecutarse nunca, y la barra se quedaba sin vidrio.
+    const attach = () => {
+      attachFrame = 0;
+      if (disposed || node) return;
+      node = ref.current;
+      if (!node) { attachFrame = requestAnimationFrame(attach); return; }
+      last = "";
+      report();
+      confirmPainted();
+      observer?.disconnect();
+      observer = new ResizeObserver(schedule);
+      observer.observe(node);
+    };
+    attach();
     window.addEventListener("resize", schedule);
     // La forma puede moverse dentro de la ventana sin cambiar de tamaño (p. ej. la píldora del
     // Dock al recentrarse): una comprobación ligera por segundo lo cubre.
-    const timer = setInterval(report, 1000);
-    return () => { observer.disconnect(); window.removeEventListener("resize", schedule); clearInterval(timer); if (frame) cancelAnimationFrame(frame); };
+    timer = setInterval(() => { if (node) report(); }, 1000);
+    // Al volver a mostrarse la ventana, el backend pide confirmar un fotograma pintado.
+    const label = getCurrentWindow().label;
+    listen("glass-reveal", (event) => { if (event.payload === label && node) confirmPainted(); })
+      .then((stop) => { if (disposed) stop(); else stopReveal = stop; })
+      .catch(() => {});
+    return () => {
+      disposed = true;
+      observer?.disconnect();
+      window.removeEventListener("resize", schedule);
+      clearInterval(timer);
+      if (frame) cancelAnimationFrame(frame);
+      if (attachFrame) cancelAnimationFrame(attachFrame);
+      stopReveal?.();
+    };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [ref, radius, dark, blur, ...deps]);
 }

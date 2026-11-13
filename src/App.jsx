@@ -287,7 +287,10 @@ function Notch({ settings, update }) {
     if (expanded) setHold(false);
   }, [expanded, setHold]);
 
-  const { appearance: ap, modules } = settings;
+  const { modules } = settings;
+  // Con la barra superior activa, la píldora mide lo mismo que la barra (así la coloca notch.rs):
+  // antes usaba «Alto cerrado» (34 px) sobre una barra de 28-32 px y el panel quedaba desfasado.
+  const ap = settings.topbar?.enabled ? { ...settings.appearance, collapsedH: settings.topbar.height } : settings.appearance;
   const rank = (id) => {
     const i = modules.order?.indexOf(id) ?? -1;
     return i < 0 ? TABS.length : i;

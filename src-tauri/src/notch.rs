@@ -22,6 +22,7 @@ use tauri::{
 };
 use windows::Win32::{
     Foundation::{CloseHandle, HWND, LPARAM, POINT, RECT},
+    Graphics::Dwm::{DwmGetWindowAttribute, DWMWA_EXTENDED_FRAME_BOUNDS},
     Graphics::Gdi::{GetDC, GetPixel, ReleaseDC},
     UI::{
         Input::KeyboardAndMouse::{GetAsyncKeyState, VK_ESCAPE, VK_LBUTTON, VK_RBUTTON},
@@ -30,13 +31,13 @@ use windows::Win32::{
             QUNS_RUNNING_D3D_FULL_SCREEN,
         },
         WindowsAndMessaging::{
-            GetCursorPos, GetForegroundWindow, GetWindowLongPtrW, GetWindowThreadProcessId, IsWindowVisible, SetWindowLongPtrW, SetWindowPos,
+            GetClassNameW, GetCursorPos, GetForegroundWindow, GetWindowLongPtrW, GetWindowRect, GetWindowThreadProcessId, IsIconic, IsWindowVisible, SetWindowLongPtrW, SetWindowPos,
             GWL_EXSTYLE, HWND_TOPMOST, SWP_ASYNCWINDOWPOS, SWP_NOACTIVATE, SWP_NOMOVE, SWP_NOSENDCHANGING, SWP_NOSIZE,
             WS_EX_TOOLWINDOW, WS_EX_TOPMOST, WS_EX_TRANSPARENT,
         },
     },
 };
-use windows::{core::PWSTR, Win32::System::Threading::{OpenProcess, QueryFullProcessImageNameW, PROCESS_NAME_FORMAT, PROCESS_QUERY_LIMITED_INFORMATION}};
+use windows::{core::PWSTR, Win32::System::Threading::{GetCurrentProcessId, OpenProcess, QueryFullProcessImageNameW, PROCESS_NAME_FORMAT, PROCESS_QUERY_LIMITED_INFORMATION}};
 
 /// Margen transparente a cada lado del notch para las "orejas" cóncavas (px lógicos).
 pub const EAR: i32 = 16;
@@ -387,6 +388,48 @@ fn sample_tint(frame: Rect, dy: i32) -> Option<(u8, u8, u8)> {
     }
 }
 
+/// Color predominante del borde superior de la ventana activa (su barra de título o cabecera), justo
+/// por debajo de la barra superior. `None` si no hay ventana útil (escritorio, Noki, minimizada…).
+/// Se muestrean 9 puntos a lo ancho y se toma el grupo de color más repetido, no la media: así un
+/// botón o un icono en la cabecera no tiñe la barra.
+fn sample_foreground_top(monitor: Rect, bar_px: i32, inset: i32) -> Option<(u8, u8, u8)> {
+    unsafe {
+        let fg = GetForegroundWindow();
+        if fg.0.is_null() || IsIconic(fg).as_bool() || !IsWindowVisible(fg).as_bool() { return None; }
+        let mut pid = 0u32;
+        GetWindowThreadProcessId(fg, Some(&mut pid));
+        if pid == GetCurrentProcessId() { return None; }
+        let mut buf = [0u16; 64];
+        let n = GetClassNameW(fg, &mut buf);
+        let class = String::from_utf16_lossy(&buf[..n.max(0) as usize]);
+        if matches!(class.as_str(), "Progman" | "WorkerW" | "Shell_TrayWnd" | "Shell_SecondaryTrayWnd") { return None; }
+        // Borde visible (sin los bordes invisibles de redimensionado de Windows 10/11).
+        let mut r = RECT::default();
+        if DwmGetWindowAttribute(fg, DWMWA_EXTENDED_FRAME_BOUNDS, &mut r as *mut _ as *mut _, std::mem::size_of::<RECT>() as u32).is_err() {
+            GetWindowRect(fg, &mut r).ok()?;
+        }
+        let left = r.left.max(monitor.left);
+        let right = r.right.min(monitor.right);
+        let y = r.top.max(monitor.top + bar_px) + inset;
+        if right - left < 40 || y >= r.bottom.min(monitor.bottom) { return None; }
+        let hdc = GetDC(None);
+        if hdc.is_invalid() { return None; }
+        let mut samples = Vec::with_capacity(9);
+        for i in 1..=9 {
+            let x = left + (right - left) * i / 10;
+            let c = GetPixel(hdc, x, y).0;
+            if c != 0xFFFF_FFFF { samples.push(((c & 0xFF) as u8, ((c >> 8) & 0xFF) as u8, ((c >> 16) & 0xFF) as u8)); }
+        }
+        ReleaseDC(None, hdc);
+        let key = |c: &(u8, u8, u8)| (c.0 >> 5, c.1 >> 5, c.2 >> 5);
+        let best = samples.iter().map(key).max_by_key(|k| samples.iter().filter(|c| key(c) == *k).count())?;
+        let group: Vec<_> = samples.iter().filter(|c| key(c) == best).collect();
+        let n = group.len() as u32;
+        let sum = group.iter().fold((0u32, 0u32, 0u32), |s, c| (s.0 + c.0 as u32, s.1 + c.1 as u32, s.2 + c.2 as u32));
+        Some(((sum.0 / n) as u8, (sum.1 / n) as u8, (sum.2 / n) as u8))
+    }
+}
+
 fn color_distance(a: (u8, u8, u8), b: (u8, u8, u8)) -> i32 {
     (a.0 as i32 - b.0 as i32).abs() + (a.1 as i32 - b.1 as i32).abs() + (a.2 as i32 - b.2 as i32).abs()
 }
@@ -412,10 +455,12 @@ fn transient_foreground_process() -> bool {
     }
 }
 
-fn raise_topmost(hwnd: HWND, _force: bool) {
-    if transient_foreground_process() { return; }
+fn raise_topmost(hwnd: HWND, force: bool) {
+    if transient_foreground_process() || crate::dock::capture_overlay_active() { return; }
     unsafe {
-        if GetWindowLongPtrW(hwnd, GWL_EXSTYLE) & WS_EX_TOPMOST.0 as isize != 0 {
+        // Con `force` se reafirma el orden aunque ya sea TOPMOST (antes `_force` se ignoraba y nada
+        // devolvía el notch por encima de otra ventana TOPMOST, p. ej. la barra creada después).
+        if !force && GetWindowLongPtrW(hwnd, GWL_EXSTYLE) & WS_EX_TOPMOST.0 as isize != 0 {
             return;
         }
         let _ = SetWindowPos(
@@ -693,11 +738,16 @@ fn run_loop(app: AppHandle) {
         }
 
         let previous_fullscreen = fullscreen;
-        if now - last_fs >= Duration::from_millis(400) {
+        // Durante un recorte de pantalla (Win+Shift+S, Recortes) Windows informa de «pantalla completa»
+        // y su superposición pasa a primer plano: si se reaccionaba, se ocultaban la barra y el Dock y se
+        // renegociaban las AppBars, el área de trabajo cambiaba y la pantalla saltaba bajo el recorte
+        // (o se cerraba). Mientras dura, todo se queda exactamente como estaba.
+        let capturing = crate::dock::capture_overlay_active();
+        if !capturing && now - last_fs >= Duration::from_millis(400) {
             last_fs = now;
             fullscreen = s.general.hide_on_fullscreen && fullscreen_app_active();
         }
-        if slow || previous_fullscreen != fullscreen {
+        if !capturing && (slow || previous_fullscreen != fullscreen) {
             crate::topbar::sync(&app, &s, fullscreen);
             crate::dock::sync(&app, &s, fullscreen);
             crate::launchpad::sync(&app, &s, fullscreen);
@@ -810,7 +860,12 @@ fn run_loop(app: AppHandle) {
                     lp.last_tint = now;
                     let sample_frame = if s.topbar.enabled { mon.rect } else { layout.frame };
                     let sample_y = if s.topbar.enabled { s.topbar.height } else { s.appearance.collapsed_h };
-                    if let Some(c) = sample_tint(sample_frame, px(sample_y, layout.scale) + px(4, layout.scale)) {
+                    // Con la barra superior: el color de la cabecera de la ventana activa; si no hay
+                    // ninguna útil (escritorio), lo que hay justo debajo de la barra, como antes.
+                    let foreground = if s.topbar.enabled && s.appearance.bar_mode == "auto" {
+                        sample_foreground_top(mon.rect, px(s.topbar.height, layout.scale), px(6, layout.scale))
+                    } else { None };
+                    if let Some(c) = foreground.or_else(|| sample_tint(sample_frame, px(sample_y, layout.scale) + px(4, layout.scale))) {
                         let changed = lp.tint.map_or(true, |p| color_distance(p, c) > 6);
                         // Se repite cada 3 s aunque no cambie, por si la ventana aún no escuchaba.
                         if changed || now - lp.last_tint_emit >= Duration::from_secs(3) {

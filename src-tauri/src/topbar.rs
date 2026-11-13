@@ -649,13 +649,7 @@ fn open_bar_panel_impl(app: &AppHandle, kind: String, anchor_x: i32) -> Result<(
     }
     position_panel(app, &panel);
     let _ = panel.emit("bar-panel", &kind);
-    let ui_panel = panel.clone();
-    let _ = panel.run_on_main_thread(move || {
-        let _ = ui_panel.show();
-        // Después de show(): tao acaba de reescribir los estilos.
-        if let Ok(hwnd) = ui_panel.hwnd() { window_utils::enforce_chrome_free_hwnd(hwnd); }
-        let _ = ui_panel.set_focus();
-    });
+    popups::present(&panel, "bar_panel");
     Ok(())
 }
 

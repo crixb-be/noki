@@ -54,13 +54,15 @@ pub fn repair_page_load(window: WebviewWindow, event: PageLoadEvent, url: &Url, 
     });
 }
 
-/// Reintenta la ruta de la aplicación mientras Vite/WebView2 termina de estar disponible.
-/// El evento `frontend-ready` detiene la secuencia tan pronto como React ha pintado la vista.
+/// Reintenta la ruta de la aplicación si la vista no llega a pintar. Antes recargaba a los 120, 370
+/// y 870 ms: una WebView2 nueva (barra, lanzador, buscador y panel se crean casi a la vez) tarda más,
+/// y cada recarga abortaba la carga anterior (la barra se quedaba vacía al arrancar). Ahora solo
+/// recarga tras 2,5 s sin pintar. El evento `frontend-ready` detiene la secuencia.
 pub fn schedule_app_recovery(window: &WebviewWindow, view: &'static str) {
     let Some(target) = window.url().ok() else { return };
     let window = window.clone();
     std::thread::spawn(move || {
-        for delay in [120u64, 250, 500, 1_000, 2_000] {
+        for delay in [2_500u64, 4_000, 8_000] {
             std::thread::sleep(Duration::from_millis(delay));
             if frontend_ready(view) { break; }
             let ui_window = window.clone();

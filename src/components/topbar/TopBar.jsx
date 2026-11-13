@@ -4,7 +4,7 @@ import { listen } from "@tauri-apps/api/event";
 import { useSettings } from "../../hooks/useSettings.js";
 import { isEn, presetLanguage, useLanguage } from "../../lib/i18n.js";
 import { BatteryIcon, BellIcon, BluetoothIcon, CameraIcon, ControlCenterIcon, RecordIcon, SearchIcon, SpeakerIcon, WifiIcon } from "./SymbolIcons.jsx";
-import { BarPaint, useBarPaint } from "./barPaint.jsx";
+import { BarPaint, barInk, useBarPaint } from "./barPaint.jsx";
 import { useGlass, useGlassShape } from "../../lib/glass.js";
 
 function Item({ title, onClick, children, className = "" }) {
@@ -59,8 +59,10 @@ export default function TopBar() {
     return () => { clearTimeout(timer); stop?.(); };
   }, [settings?.topbar?.avatarPath]);
 
-  // Sobre el vidrio gris el texto va siempre en blanco (como en macOS).
-  const dark = true;
+  // Sobre el vidrio gris el texto va en blanco (como en macOS); en «Automático» se elige negro o
+  // blanco según lo claro que sea el color tomado de la ventana activa.
+  const ink = barInk(settings, paint.tint);
+  const dark = ink !== "#111111";
   const open = (kind, event) => invoke("command_open_bar_panel", { kind, anchorX: Math.round(event.currentTarget.getBoundingClientRect().left + event.currentTarget.offsetWidth / 2) }).catch(() => {});
   const initials = (user.displayName || "U").trim().slice(0, 1).toUpperCase();
   const batteryPct = battery?.level ?? 100;
@@ -68,7 +70,7 @@ export default function TopBar() {
 
   if (!settings) return null;
   return (
-    <div ref={shell} className={`topbar-shell ${dark ? "topbar-dark" : "topbar-light"}`} style={{ "--notch-reserve": `${reserve}px` }}>
+    <div ref={shell} className={`topbar-shell ${dark ? "topbar-dark" : "topbar-light"}${ink ? " topbar-ink" : ""}`} style={{ "--notch-reserve": `${reserve}px`, ...(ink ? { color: ink } : {}) }}>
       <BarPaint settings={settings} tint={paint.tint} />
       <div className="topbar-left" />
       <div className="topbar-center-reserve" aria-hidden="true" />

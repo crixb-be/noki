@@ -52,7 +52,10 @@ html, body, #root {
 }
 
 .topbar-shell { position: relative; display: flex; align-items: center; width: 100%; height: 100%; min-width: 0; min-height: 0; overflow: hidden; padding: 0 8px; box-sizing: border-box; border: 0; outline: 0; border-radius: 0; box-shadow: none; font-size: 13px; font-weight: 500; }
-.topbar-paint { position: absolute; inset: 0; z-index: 0; pointer-events: none; transition: background .25s ease; }
+.topbar-paint { position: absolute; inset: 0; z-index: 0; pointer-events: none; transition: background-color .6s ease; }
+/* Barra «Automático»: la tinta (negra o blanca) cambia suave con el color de la ventana activa. */
+.topbar-shell.topbar-ink { transition: color .4s ease; }
+.topbar-shell.topbar-ink.topbar-light .topbar-item:hover, .topbar-shell.topbar-ink.topbar-light .topbar-item:active { background: rgba(0,0,0,.08); }
 .topbar-left, .topbar-actions, .topbar-center-reserve { position: relative; z-index: 1; }
 .topbar-dark { color: rgba(255,255,255,.92); }
 .topbar-light { color: rgba(20,20,22,.88); }
@@ -119,7 +122,7 @@ html, body, #root {
 .dock-item { position: relative; display: flex; align-items: flex-end; justify-content: center; width: var(--dock-icon-size, 44px); height: var(--dock-item-height, 62px); padding: 0 0 4px; border: 0; color: #fff; background: transparent; cursor: pointer; }
 .dock-item:hover { filter: brightness(1.16); }
 .dock-divider::before { position: absolute; left: -5px; top: 12%; width: 1px; height: 76%; content: ""; background: rgba(255,255,255,.28); }
-.dock-icon { display: grid; place-items: center; transform-origin: center bottom; will-change: width, height; }
+.dock-icon { display: grid; place-items: center; transform-origin: center bottom; }
 .dock-icon img { width: 100%; height: 100%; object-fit: contain; image-rendering: high-quality; image-rendering: auto; }
 .dock-fallback, .trash-icon { display: grid; width: 100%; height: 100%; place-items: center; color: rgba(255,255,255,.95); font-size: 22px; font-weight: 700; }
 .trash-icon { font-size: 29px; }
@@ -267,7 +270,9 @@ html, body, #root {
   background: linear-gradient(to bottom, var(--glass-sheen), rgba(255,255,255,0) 33%), var(--glass-tint);
   border: 1px solid var(--glass-rim);
   border-top-color: var(--glass-rim-top);
-  box-shadow: var(--glass-shadow, none);
+  /* Aro interior de 1 px: tapa el escalón (≤ 1 px físico) entre el acrílico nativo, que no admite
+     antialiasing, y el borde redondeado suavizado del CSS. */
+  box-shadow: inset 0 0 0 1px rgba(255,255,255,.07), var(--glass-shadow, 0 0 #0000);
   color: #fff;
 }
 /* Barra superior: el mismo vidrio en todos los modos (borde solo abajo). */

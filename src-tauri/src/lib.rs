@@ -810,6 +810,7 @@ pub fn run() {
             dock::trash_empty,
             dock::trash_drop,
             backdrop::glass_shape,
+            backdrop::glass_ready,
             launchpad::open_launchpad,
             launchpad::toggle_launchpad,
             launchpad::close_launchpad,
@@ -887,6 +888,7 @@ pub fn run() {
             notch::start(handle.clone());
             dock::start(handle.clone());
             backdrop::start(handle.clone());
+            popups::start(handle.clone());
             Ok(())
         })
         .build(tauri::generate_context!())

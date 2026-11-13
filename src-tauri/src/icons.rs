@@ -3,15 +3,22 @@
 //! Windows tiene varias rutas para resolver iconos. Los accesos del menú Inicio suelen ser `.lnk`,
 //! las apps empaquetadas viven bajo `shell:AppsFolder` y algunas ventanas solo exponen un icono a
 //! través de la extensión de Shell. Se prueban todas antes de generar un icono legible de respaldo.
+//!
+//! Nitidez: cada mapa de bits se lee con su tamaño real (antes se suponía siempre 256×256 y los de
+//! 32/48 px salían recortados o mal leídos), se distingue el alfa premultiplicado del directo (antes
+//! se «despremultiplicaba» también el alfa directo de los iconos y los bordes salían con halos y
+//! dientes), se usa la lista de imágenes JUMBO (256 px) del sistema y, si la app solo trae un icono
+//! pequeño, se amplía con Lanczos. El resultado se entrega a 128 px: a 125 % el Dock y el lanzador lo
+//! muestran a 60-100 px físicos, así Chromium ya no reduce 4:1 de golpe (aliasing).
 
 use base64::{engine::general_purpose::STANDARD, Engine};
-use image::ImageEncoder;
+use image::{imageops::FilterType, ImageEncoder, RgbaImage};
 use std::{collections::HashMap, sync::{OnceLock, RwLock}};
 use windows::{
     core::{HSTRING, Interface, PCWSTR},
     Win32::{
         Foundation::{CloseHandle, HWND, SIZE},
-        Graphics::Gdi::{DeleteObject, GetDC, GetDIBits, ReleaseDC, BITMAPINFO, BITMAPINFOHEADER, BI_RGB, DIB_RGB_COLORS, HGDIOBJ},
+        Graphics::Gdi::{DeleteObject, GetDC, GetDIBits, GetObjectW, ReleaseDC, BITMAP, BITMAPINFO, BITMAPINFOHEADER, BI_RGB, DIB_RGB_COLORS, HBITMAP, HGDIOBJ},
         Storage::EnhancedStorage::PKEY_AppUserModel_ID,
         System::{
             Com::{CoCreateInstance, CoInitializeEx, COINIT_APARTMENTTHREADED, IPersistFile, CLSCTX_INPROC_SERVER, STGM_READ},
@@ -20,9 +27,10 @@ use windows::{
             Variant::VT_LPWSTR,
         },
         UI::{
+            Controls::{IImageList, ILD_TRANSPARENT},
             Shell::{
                 IExtractIconW, IShellItem, IShellItemImageFactory, IShellLinkW, SHCreateItemFromParsingName, SHGetFileInfoW,
-                SHFILEINFOW, SHGFI_ICON, SHGFI_LARGEICON, SIIGBF_BIGGERSIZEOK, SIIGBF_ICONONLY, ShellLink,
+                SHGetImageList, SHFILEINFOW, SHGFI_SYSICONINDEX, SHIL_EXTRALARGE, SHIL_JUMBO, SIIGBF_BIGGERSIZEOK, SIIGBF_ICONONLY, ShellLink,
                 PropertiesSystem::{IPropertyStore, SHGetPropertyStoreForWindow},
             },
             WindowsAndMessaging::{DestroyIcon, GetIconInfo, HICON, ICONINFO},
@@ -30,51 +38,84 @@ use windows::{
     },
 };
 
-const SIZE_PX: i32 = 256;
+/// Tamaño pedido a Windows (el mayor que existe) y tamaño entregado a la interfaz.
+const SOURCE_PX: i32 = 256;
+const OUT_PX: u32 = 128;
+/// Un icono cuyo contenido visible mide menos que esto en la lista JUMBO es uno pequeño (32/48 px)
+/// que Windows ha colocado en un lienzo de 256: se toma el de 48 px y se amplía con suavizado.
+const SMALL_CONTENT_PX: u32 = 96;
+/// Límite de la caché de iconos (PNG en base64): antes crecía sin fin.
+const CACHE_MAX: usize = 400;
 static CACHE: OnceLock<RwLock<HashMap<String, String>>> = OnceLock::new();
 
 fn cache() -> &'static RwLock<HashMap<String, String>> { CACHE.get_or_init(|| RwLock::new(HashMap::new())) }
 
 fn png_data(bytes: Vec<u8>) -> String { format!("data:image/png;base64,{}", STANDARD.encode(bytes)) }
 
-fn bitmap_png(hbm: windows::Win32::Graphics::Gdi::HBITMAP) -> Result<String, String> {
-    if hbm.0.is_null() { return Err("bitmap vacío".into()); }
+/// Lee un mapa de bits con su tamaño real como BGRA de 32 bits, de arriba abajo.
+fn read_bitmap(hbm: HBITMAP) -> Option<(u32, u32, Vec<u8>)> {
+    if hbm.0.is_null() { return None; }
     unsafe {
+        let mut bm = BITMAP::default();
+        if GetObjectW(HGDIOBJ(hbm.0), std::mem::size_of::<BITMAP>() as i32, Some(&mut bm as *mut _ as *mut _)) == 0 { return None; }
+        let (w, h) = (bm.bmWidth, bm.bmHeight.abs());
+        if w <= 0 || h <= 0 || w > 1024 || h > 1024 { return None; }
         let mut bmi = BITMAPINFO::default();
         bmi.bmiHeader = BITMAPINFOHEADER {
             biSize: std::mem::size_of::<BITMAPINFOHEADER>() as u32,
-            biWidth: SIZE_PX,
-            biHeight: -SIZE_PX,
+            biWidth: w,
+            biHeight: -h,
             biPlanes: 1,
             biBitCount: 32,
             biCompression: BI_RGB.0,
             ..Default::default()
         };
-        let mut px = vec![0u8; (SIZE_PX * SIZE_PX * 4) as usize];
+        let mut px = vec![0u8; (w * h * 4) as usize];
         let hdc = GetDC(None);
-        let lines = GetDIBits(hdc, hbm, 0, SIZE_PX as u32, Some(px.as_mut_ptr() as *mut _), &mut bmi, DIB_RGB_COLORS);
+        let lines = GetDIBits(hdc, hbm, 0, h as u32, Some(px.as_mut_ptr() as *mut _), &mut bmi, DIB_RGB_COLORS);
         ReleaseDC(None, hdc);
-        if lines == 0 { return Err("no se pudo leer el bitmap".into()); }
-        for p in px.chunks_exact_mut(4) {
-            let (b, g, r, a) = (p[0], p[1], p[2], p[3]);
-            let un = |c: u8| if a == 0 || a == 255 { c } else { ((c as u32 * 255 + a as u32 / 2) / a as u32).min(255) as u8 };
-            p[0] = un(r); p[1] = un(g); p[2] = un(b); p[3] = a;
-        }
-        let mut bytes = Vec::new();
-        image::codecs::png::PngEncoder::new(&mut bytes)
-            .write_image(&px, SIZE_PX as u32, SIZE_PX as u32, image::ExtendedColorType::Rgba8)
-            .map_err(|e| e.to_string())?;
-        Ok(png_data(bytes))
+        (lines > 0).then_some((w as u32, h as u32, px))
     }
 }
 
-fn hicon_png(icon: HICON) -> Option<String> {
+/// BGRA con canal alfa → RGBA con alfa directo. Solo se «despremultiplica» si los datos lo están
+/// (en un píxel premultiplicado ningún canal supera al alfa). `None` si no hay canal alfa.
+fn straight_rgba(w: u32, h: u32, bgra: &[u8]) -> Option<RgbaImage> {
+    if !bgra.chunks_exact(4).any(|p| p[3] != 0) { return None; }
+    let premultiplied = bgra.chunks_exact(4).all(|p| p[0] <= p[3] && p[1] <= p[3] && p[2] <= p[3]);
+    let mut out = Vec::with_capacity(bgra.len());
+    for p in bgra.chunks_exact(4) {
+        let (b, g, r, a) = (p[0], p[1], p[2], p[3]);
+        let un = |c: u8| if !premultiplied || a == 0 || a == 255 { c } else { ((c as u32 * 255 + a as u32 / 2) / a as u32).min(255) as u8 };
+        out.extend_from_slice(&[un(r), un(g), un(b), a]);
+    }
+    RgbaImage::from_raw(w, h, out)
+}
+
+/// Mapa de bits de la Shell (IShellItemImageFactory) → RGBA.
+fn bitmap_rgba(hbm: HBITMAP) -> Option<RgbaImage> {
+    let (w, h, bgra) = read_bitmap(hbm)?;
+    straight_rgba(w, h, &bgra)
+}
+
+/// Icono → RGBA. Los iconos sin canal alfa (24 bits) toman la transparencia de su máscara.
+fn hicon_rgba(icon: HICON) -> Option<RgbaImage> {
     if icon.0.is_null() { return None; }
     unsafe {
         let mut info = ICONINFO::default();
-        let result = if GetIconInfo(icon, &mut info).is_ok() {
-            let bitmap = if !info.hbmColor.0.is_null() { info.hbmColor } else { info.hbmMask };
-            bitmap_png(bitmap).ok()
+        let result = if GetIconInfo(icon, &mut info).is_ok() && !info.hbmColor.0.is_null() {
+            read_bitmap(info.hbmColor).and_then(|(w, h, bgra)| {
+                straight_rgba(w, h, &bgra).or_else(|| {
+                    // Sin alfa: la máscara AND dice qué es transparente (blanco = transparente).
+                    let (mw, mh, mask) = read_bitmap(info.hbmMask)?;
+                    if mw != w || mh < h { return None; }
+                    let mut out = Vec::with_capacity(bgra.len());
+                    for (p, m) in bgra.chunks_exact(4).zip(mask.chunks_exact(4)) {
+                        out.extend_from_slice(&[p[2], p[1], p[0], if m[0] > 127 { 0 } else { 255 }]);
+                    }
+                    RgbaImage::from_raw(w, h, out)
+                })
+            })
         } else { None };
         if !info.hbmColor.0.is_null() { let _ = DeleteObject(HGDIOBJ(info.hbmColor.0)); }
         if !info.hbmMask.0.is_null() { let _ = DeleteObject(HGDIOBJ(info.hbmMask.0)); }
@@ -83,24 +124,86 @@ fn hicon_png(icon: HICON) -> Option<String> {
     }
 }
 
+/// Caja del contenido visible (alfa > 16): (x, y, ancho, alto).
+fn content_box(img: &RgbaImage) -> Option<(u32, u32, u32, u32)> {
+    let (mut x0, mut y0, mut x1, mut y1) = (u32::MAX, u32::MAX, 0u32, 0u32);
+    for (x, y, p) in img.enumerate_pixels() {
+        if p[3] > 16 { x0 = x0.min(x); y0 = y0.min(y); x1 = x1.max(x); y1 = y1.max(y); }
+    }
+    (x0 <= x1 && y0 <= y1).then(|| (x0, y0, x1 - x0 + 1, y1 - y0 + 1))
+}
+
+/// Redimensiona con alfa premultiplicado (si no, el color de los píxeles transparentes, casi siempre
+/// negro, se filtra al borde y deja un halo oscuro).
+fn resize_clean(img: &RgbaImage, w: u32, h: u32) -> RgbaImage {
+    let mut pre = img.clone();
+    for p in pre.pixels_mut() {
+        let a = p[3] as u32;
+        for c in 0..3 { p[c] = ((p[c] as u32 * a + 127) / 255) as u8; }
+    }
+    let mut out = image::imageops::resize(&pre, w, h, FilterType::Lanczos3);
+    for p in out.pixels_mut() {
+        let a = p[3] as u32;
+        for c in 0..3 { p[c] = if a == 0 { 0 } else { ((p[c] as u32 * 255 + a / 2) / a).min(255) as u8 }; }
+    }
+    out
+}
+
+/// Ajusta el icono a un lienzo cuadrado de OUT_PX. Si ocupa poco de su lienzo (un icono de 32/48 px
+/// dentro de uno de 256), se recorta a su contenido antes de ampliarlo.
+fn finish(img: RgbaImage) -> Option<String> {
+    let (bx, by, bw, bh) = content_box(&img)?;
+    let (w, h) = img.dimensions();
+    let img = if bw.max(bh) * 2 <= w.max(h) {
+        let side = bw.max(bh);
+        let cx = (bx + bw / 2).saturating_sub(side / 2).min(w.saturating_sub(side));
+        let cy = (by + bh / 2).saturating_sub(side / 2).min(h.saturating_sub(side));
+        image::imageops::crop_imm(&img, cx, cy, side.min(w), side.min(h)).to_image()
+    } else { img };
+    let (w, h) = img.dimensions();
+    let scale = OUT_PX as f64 / w.max(h) as f64;
+    let (nw, nh) = (((w as f64 * scale).round() as u32).max(1), ((h as f64 * scale).round() as u32).max(1));
+    let resized = if (nw, nh) == (w, h) { img } else { resize_clean(&img, nw, nh) };
+    let mut canvas = RgbaImage::new(OUT_PX, OUT_PX);
+    image::imageops::overlay(&mut canvas, &resized, ((OUT_PX - nw) / 2) as i64, ((OUT_PX - nh) / 2) as i64);
+    let mut bytes = Vec::new();
+    image::codecs::png::PngEncoder::new(&mut bytes)
+        .write_image(canvas.as_raw(), OUT_PX, OUT_PX, image::ExtendedColorType::Rgba8)
+        .ok()?;
+    Some(png_data(bytes))
+}
+
+/// Icono de la lista de imágenes del sistema (la que usa el Explorador) en el tamaño indicado.
+fn image_list_icon(path: &str, list: u32) -> Option<RgbaImage> {
+    let wide: Vec<u16> = path.encode_utf16().chain(std::iter::once(0)).collect();
+    unsafe {
+        let mut info = SHFILEINFOW::default();
+        if SHGetFileInfoW(PCWSTR(wide.as_ptr()), Default::default(), Some(&mut info), std::mem::size_of::<SHFILEINFOW>() as u32, SHGFI_SYSICONINDEX) == 0 { return None; }
+        let images: IImageList = SHGetImageList(list as i32).ok()?;
+        let icon = images.GetIcon(info.iIcon, ILD_TRANSPARENT.0).ok()?;
+        hicon_rgba(icon)
+    }
+}
+
+/// Mejor icono de un archivo: JUMBO (256) si es grande de verdad; si solo existe uno pequeño, el
+/// de 48 px ampliado con suavizado (mejor que el de 256 que Windows rellena o estira).
+fn file_icon_png(path: &str) -> Option<String> {
+    if let Some(jumbo) = image_list_icon(path, SHIL_JUMBO) {
+        if content_box(&jumbo).is_some_and(|(_, _, w, h)| w.max(h) >= SMALL_CONTENT_PX) { return finish(jumbo); }
+        if let Some(large) = image_list_icon(path, SHIL_EXTRALARGE) { return finish(large); }
+        return finish(jumbo);
+    }
+    image_list_icon(path, SHIL_EXTRALARGE).and_then(finish)
+}
+
 fn shell_item_png(path: &str) -> Option<String> {
     unsafe {
         let item: IShellItem = SHCreateItemFromParsingName(&HSTRING::from(path), None).ok()?;
         let factory: IShellItemImageFactory = item.cast().ok()?;
-        let hbm = factory.GetImage(SIZE { cx: SIZE_PX, cy: SIZE_PX }, SIIGBF_ICONONLY | SIIGBF_BIGGERSIZEOK).ok()?;
-        let result = bitmap_png(hbm).ok();
+        let hbm = factory.GetImage(SIZE { cx: SOURCE_PX, cy: SOURCE_PX }, SIIGBF_ICONONLY | SIIGBF_BIGGERSIZEOK).ok()?;
+        let result = bitmap_rgba(hbm).and_then(finish);
         let _ = DeleteObject(HGDIOBJ(hbm.0));
         result
-    }
-}
-
-fn shgetfileinfo_png(path: &str) -> Option<String> {
-    let wide: Vec<u16> = path.encode_utf16().chain(std::iter::once(0)).collect();
-    unsafe {
-        let mut info = SHFILEINFOW::default();
-        let flags = SHGFI_ICON | SHGFI_LARGEICON;
-        if SHGetFileInfoW(PCWSTR(wide.as_ptr()), Default::default(), Some(&mut info), std::mem::size_of::<SHFILEINFOW>() as u32, flags) == 0 { return None; }
-        hicon_png(info.hIcon)
     }
 }
 
@@ -113,8 +216,8 @@ fn shell_extension_png(path: &str) -> Option<String> {
         let mut flags = 0u32;
         extractor.GetIconLocation(0, &mut file, &mut index, &mut flags).ok()?;
         let mut large = HICON::default();
-        extractor.Extract(PCWSTR(file.as_ptr()), index.max(0) as u32, Some(&mut large), None, SIZE_PX as u32).ok()?;
-        hicon_png(large)
+        extractor.Extract(PCWSTR(file.as_ptr()), index.max(0) as u32, Some(&mut large), None, SOURCE_PX as u32).ok()?;
+        hicon_rgba(large).and_then(finish)
     }
 }
 
@@ -214,9 +317,11 @@ fn fallback_png(name: &str) -> String {
     let mut hash = 2166136261u32;
     for byte in name.bytes() { hash = (hash ^ byte as u32).wrapping_mul(16777619); }
     let color = [70 + ((hash >> 16) & 0x7f) as u8, 70 + ((hash >> 8) & 0x7f) as u8, 70 + (hash & 0x7f) as u8, 255];
-    let mut image = image::RgbaImage::new(SIZE_PX as u32, SIZE_PX as u32);
-    for y in 0..SIZE_PX {
-        for x in 0..SIZE_PX {
+    // El dibujo mide 64 px (antes iba en una esquina de un lienzo de 256 y salía diminuto).
+    const FALLBACK_PX: i32 = 64;
+    let mut image = image::RgbaImage::new(FALLBACK_PX as u32, FALLBACK_PX as u32);
+    for y in 0..FALLBACK_PX {
+        for x in 0..FALLBACK_PX {
             let dx = if x < 13 { x - 13 } else if x >= 51 { x - 50 } else { 0 };
             let dy = if y < 13 { y - 13 } else if y >= 51 { y - 50 } else { 0 };
             let inside = (x >= 9 && x < 55 && y >= 9 && y < 55) || dx * dx + dy * dy <= 13 * 13;
@@ -232,7 +337,7 @@ fn fallback_png(name: &str) -> String {
         }
     }
     let mut bytes = Vec::new();
-    let _ = image::codecs::png::PngEncoder::new(&mut bytes).write_image(image.as_raw(), SIZE_PX as u32, SIZE_PX as u32, image::ExtendedColorType::Rgba8);
+    let _ = image::codecs::png::PngEncoder::new(&mut bytes).write_image(image.as_raw(), FALLBACK_PX as u32, FALLBACK_PX as u32, image::ExtendedColorType::Rgba8);
     png_data(bytes)
 }
 
@@ -254,10 +359,21 @@ fn render(path: &str) -> String {
     let normalized = resolve_program(path).replace('/', "\\");
     let mut candidates = vec![normalized.clone()];
     candidates.extend(link_targets(&normalized));
+    // Apps de la Tienda (`shell:AppsFolder\…`): solo la Shell sabe resolverlas. Archivos: primero la
+    // lista de imágenes del sistema (tamaño real y nitidez), luego la Shell y su extensión.
+    let shell_only = normalized.to_ascii_lowercase().starts_with("shell:");
     for candidate in candidates {
-        if let Some(url) = shell_item_png(&candidate).or_else(|| shgetfileinfo_png(&candidate)).or_else(|| shell_extension_png(&candidate)) { return url; }
+        let found = if shell_only { shell_item_png(&candidate) } else { file_icon_png(&candidate).or_else(|| shell_item_png(&candidate)) };
+        if let Some(url) = found.or_else(|| shell_extension_png(&candidate)) { return url; }
     }
     fallback_png(normalized.rsplit(['\\', '/']).next().unwrap_or(&normalized))
+}
+
+/// Guarda un icono en la caché sin dejarla crecer sin límite.
+fn remember(path: String, url: String) {
+    let mut map = cache().write().unwrap();
+    if map.len() >= CACHE_MAX && !map.contains_key(&path) { map.clear(); }
+    map.insert(path, url);
 }
 
 /// Precalienta iconos sin bloquear el hilo de ventanas. La caché se comparte
@@ -266,7 +382,7 @@ pub fn warm_paths(paths: Vec<String>) {
     for path in paths {
         if cache().read().unwrap().contains_key(&path) { continue; }
         let url = render(&path);
-        cache().write().unwrap().insert(path, url);
+        remember(path, url);
     }
 }
 
@@ -276,6 +392,6 @@ pub async fn app_icon(path: String) -> Result<String, String> {
     if let Some(hit) = cache().read().unwrap().get(&path) { return Ok(hit.clone()); }
     let key = path.clone();
     let url = tauri::async_runtime::spawn_blocking(move || render(&path)).await.map_err(|e| e.to_string())?;
-    cache().write().unwrap().insert(key, url.clone());
+    remember(key, url.clone());
     Ok(url)
 }

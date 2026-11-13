@@ -2,7 +2,6 @@
 
 use crate::{dock, notch, popups, settings::Settings, window_utils};
 use tauri::{window::Color, AppHandle, Emitter, Manager, WebviewWindow, WebviewWindowBuilder};
-use windows::Win32::{Foundation::HWND, System::Threading::{AttachThreadInput, GetCurrentProcessId, GetCurrentThreadId}, UI::{Input::KeyboardAndMouse::{SendInput, SetFocus, INPUT, INPUT_KEYBOARD, KEYBDINPUT, KEYEVENTF_KEYUP, VIRTUAL_KEY}, WindowsAndMessaging::{AllowSetForegroundWindow, BringWindowToTop, GetForegroundWindow, GetWindowThreadProcessId, SetForegroundWindow, SetWindowLongPtrW, ShowWindow, ASFW_ANY, GWL_EXSTYLE, SW_SHOW, WS_EX_NOACTIVATE}}};
 use window_vibrancy::{clear_acrylic, clear_blur};
 
 fn create(app: &AppHandle) -> Option<WebviewWindow> {
@@ -26,50 +25,12 @@ fn create(app: &AppHandle) -> Option<WebviewWindow> {
 
 pub fn ensure(app: &AppHandle) { let _ = create(app); }
 
-fn remove_noactivate(h: HWND) { unsafe { let ex = SetWindowLongPtrW(h, GWL_EXSTYLE, windows::Win32::UI::WindowsAndMessaging::GetWindowLongPtrW(h, GWL_EXSTYLE) & !(WS_EX_NOACTIVATE.0 as isize)); let _ = ex; } }
-
-fn focus_window(window: &WebviewWindow) {
-    let ui_window = window.clone();
-    let _ = window.run_on_main_thread(move || unsafe {
-        let Ok(hwnd) = ui_window.hwnd() else { return };
-        // Mostrar con tao primero: si solo se usa ShowWindow, tao cree que sigue oculta
-        // y su hide() posterior no hace nada (el Launchpad no se cerraba).
-        let _ = ui_window.show();
-        window_utils::enforce_chrome_free_hwnd(hwnd);
-        remove_noactivate(hwnd);
-        let fg = GetForegroundWindow();
-        let fg_thread = if fg.0.is_null() { 0 } else { GetWindowThreadProcessId(fg, None) };
-        let me = GetCurrentThreadId();
-        let mut attached = false;
-        let mut fg_pid = 0u32;
-        if !fg.0.is_null() { GetWindowThreadProcessId(fg, Some(&mut fg_pid)); }
-        if fg_thread != 0 && fg_pid != GetCurrentProcessId() && fg_thread != me {
-            attached = AttachThreadInput(fg_thread, me, true).as_bool();
-        }
-        let _ = AllowSetForegroundWindow(ASFW_ANY);
-        let _ = ShowWindow(hwnd, SW_SHOW);
-        let _ = BringWindowToTop(hwnd);
-        let mut focused = SetForegroundWindow(hwnd).as_bool();
-        let _ = SetFocus(Some(hwnd));
-        if attached { let _ = AttachThreadInput(fg_thread, me, false); }
-        if !focused {
-            let inputs = [
-                INPUT { r#type: INPUT_KEYBOARD, Anonymous: windows::Win32::UI::Input::KeyboardAndMouse::INPUT_0 { ki: KEYBDINPUT { wVk: VIRTUAL_KEY(0x12), wScan: 0, dwFlags: Default::default(), time: 0, dwExtraInfo: 0 } } },
-                INPUT { r#type: INPUT_KEYBOARD, Anonymous: windows::Win32::UI::Input::KeyboardAndMouse::INPUT_0 { ki: KEYBDINPUT { wVk: VIRTUAL_KEY(0x12), wScan: 0, dwFlags: KEYEVENTF_KEYUP, time: 0, dwExtraInfo: 0 } } },
-            ];
-            let _ = SendInput(&inputs, std::mem::size_of::<INPUT>() as i32);
-            focused = SetForegroundWindow(hwnd).as_bool();
-        }
-        let _ = focused;
-    });
-}
-
 pub fn open(app: &AppHandle) -> Result<(), String> {
     let window = create(app).ok_or("No se pudo crear Launchpad.")?;
     popups::open(app, "launchpad")?;
     let settings = app.state::<notch::NotchState>().settings.lock().unwrap().clone();
     position(app, &window, &settings);
-    focus_window(&window);
+    popups::present(&window, "launchpad");
     let _ = app.emit("launchpad-open", true);
     Ok(())
 }
