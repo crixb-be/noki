@@ -583,15 +583,15 @@
     "semantic_hash": ""
   },
   "src-tauri/src/launchpad.rs": {
-    "mtime": 1794542541.7318592,
-    "seen": 1794542599.7715368,
-    "ast_hash": "3887b703747f6baa9b566805ad196bd2",
+    "mtime": 1794543005.4397526,
+    "seen": 1794543109.1253417,
+    "ast_hash": "652575aa250d0d31b7183bf7e78ade84",
     "semantic_hash": ""
   },
   "src-tauri/src/topbar.rs": {
-    "mtime": 1794538003.8434196,
-    "seen": 1794538250.5593164,
-    "ast_hash": "639c8f228c6574cecbf91cb3986df5dc",
+    "mtime": 1794542692.2248342,
+    "seen": 1794543109.1253579,
+    "ast_hash": "f8d212bb888e56de5154ac842058201c",
     "semantic_hash": ""
   },
   "src/components/dock/Dock.jsx": {
@@ -601,15 +601,15 @@
     "semantic_hash": ""
   },
   "src/components/launchpad/Launchpad.jsx": {
-    "mtime": 1794542531.931792,
-    "seen": 1794542599.7715795,
-    "ast_hash": "68d641ce563d6d8d69ca01a0b64cf41f",
+    "mtime": 1794542684.7937984,
+    "seen": 1794543109.1253815,
+    "ast_hash": "9f98d8eb9911fb0bac92245d5350e10e",
     "semantic_hash": ""
   },
   "src/components/topbar/BarPanel.jsx": {
-    "mtime": 1794538019.8689916,
-    "seen": 1794538250.559349,
-    "ast_hash": "7627381794f24b7fb99d71fdf96aae05",
+    "mtime": 1794542753.93142,
+    "seen": 1794543109.1253889,
+    "ast_hash": "2bf774f8940d322897b4dc5acb5aef68",
     "semantic_hash": ""
   },
   "src/components/topbar/SymbolIcons.jsx": {
@@ -1201,9 +1201,9 @@
     "semantic_hash": ""
   },
   "src-tauri/src/spotlight.rs": {
-    "mtime": 1794537979.431702,
-    "seen": 1794538250.5593119,
-    "ast_hash": "27a057a2e1335c742498649ea410bb95",
+    "mtime": 1794543014.6038702,
+    "seen": 1794543109.125353,
+    "ast_hash": "dd4f7be1baf9677ed8972138d3cbaf5b",
     "semantic_hash": ""
   },
   "src/components/spotlight/Spotlight.jsx": {
@@ -1285,9 +1285,9 @@
     "semantic_hash": ""
   },
   "src-tauri/src/popups.rs": {
-    "mtime": 1794538035.593443,
-    "seen": 1794538250.5593069,
-    "ast_hash": "0edb62d95b60500ef0a662bf0fefbb29",
+    "mtime": 1794543005.437753,
+    "seen": 1794543109.125348,
+    "ast_hash": "99402263bd482a2e967f004ef268e623",
     "semantic_hash": ""
   },
   "src-tauri/src/window_utils.rs": {

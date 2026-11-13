@@ -87,15 +87,15 @@ export default function Launchpad() {
   }, [query, filtered]);
 
   return <div className="launchpad-backdrop" onMouseDown={(event) => { if (event.target === event.currentTarget) invoke("close_launchpad").catch(() => {}); }}>
-    <div className="launchpad-layout">
-      <div className="launchpad-head noki-popup-card">
+    <div className="launchpad-layout launchpad-card noki-popup-card">
+      <div className="launchpad-head">
         <label className="launchpad-search"><span className="launchpad-app-mark">A</span><input autoFocus value={query} onChange={(event) => setQuery(event.target.value)} placeholder={isEn() ? "Applications" : "Aplicaciones"} /></label>
         <button className="launchpad-sort" onClick={() => setSort(sort === "az" ? "za" : "az")} aria-label="Ordenar aplicaciones">☷ {sort === "az" ? "A-Z" : "Z-A"}</button>
       </div>
-      <div className="launchpad-card noki-popup-card">
+      <>
         <div className="launchpad-chips">{CATEGORIES.map((item) => <button key={item} className={category === item ? "selected" : ""} onClick={() => setCategory(item)}>{item}</button>)}</div>
         <div className="launchpad-grid">{filtered.length ? filtered.map((app) => <LaunchItem key={`${app.name}-${app.path}`} app={app} onLaunch={launch} />) : <div className="launchpad-empty">No hay aplicaciones en esta categoría</div>}</div>
-      </div>
+      </>
     </div>
   </div>;
 }

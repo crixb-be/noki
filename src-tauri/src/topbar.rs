@@ -684,7 +684,7 @@ fn close_bar_panel_impl(app: &AppHandle) {
 }
 
 fn resize_bar_panel_impl(app: &AppHandle, height: i32) {
-    panel_state().lock().unwrap().height = height.clamp(180, 700);
+    panel_state().lock().unwrap().height = height.clamp(60, 700);
     if let Some(panel) = app.get_webview_window("barpanel") { position_panel(app, &panel); }
 }
 
