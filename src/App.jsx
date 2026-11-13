@@ -28,7 +28,6 @@ import { EMPTY_HABITS, countOn, useHabits } from "./hooks/useHabits.js";
 import { fillFor, rgba, useBgImage } from "./lib/background.js";
 import { weatherInfo } from "./lib/wmo.js";
 import { THEMES, resolveTheme } from "./lib/themes.js";
-import { useBarPaint } from "./components/topbar/barPaint.jsx";
 import { presetLanguage, useLanguage } from "./lib/i18n.js";
 
 // Misma curva y duración para ancho y alto: el notch se abre y cierra como una sola pieza.
@@ -319,7 +318,6 @@ function Notch({ settings, update }) {
   const themeFor = (setting) => resolveTheme(setting, ap.birthday, ap.themeEvents);
   const notchTheme = THEMES[themeFor(ap.notchTheme)] ?? null;
   const notchImg = useBgImage(ap.notchAuto || notchTheme ? "" : ap.notchImage);
-  const barPaint = useBarPaint(settings);
   const notchColor = notchTheme ? notchTheme.notch : ap.notchAuto ? tint ?? ap.notchColor : ap.notchColor;
   const notchOpacity = notchTheme ? ap.notchThemeOpacity : ap.opacity;
   const bg = rgba(notchColor, notchOpacity); // color plano: también lo usan las «orejas»
@@ -354,8 +352,10 @@ function Notch({ settings, update }) {
           transition: `width ${NOTCH_MS}ms ${NOTCH_EASE}, height ${NOTCH_MS}ms ${NOTCH_EASE}`,
         }}
       >
-        {!notchImg && <Ear side="left" bg={settings.topbar.enabled ? (barPaint.fill ?? bg) : bg} />}
-        {!notchImg && <Ear side="right" bg={settings.topbar.enabled ? (barPaint.fill ?? bg) : bg} />}
+        {/* Con la barra superior activa la pastilla ya está dentro de la barra: las orejas
+            solo añadían esquinas de otro tono (bordes oscuros) junto a la pastilla. */}
+        {!notchImg && !settings.topbar.enabled && <Ear side="left" bg={bg} />}
+        {!notchImg && !settings.topbar.enabled && <Ear side="right" bg={bg} />}
         <div
           className={`absolute inset-0 overflow-hidden text-white transition-[border-radius,box-shadow,background-color] duration-300 ${
             pomo.alert || peek?.tone === "alert" ? "animate-[ringPulse_1.1s_ease-out_infinite] ring-2 ring-amber-400" : ""
@@ -363,7 +363,8 @@ function Notch({ settings, update }) {
           style={{
             background: notchFill,
             borderRadius: expanded || greeting ? "0 0 28px 28px" : peek || (hoverShown && pillHover) ? "0 0 20px 20px" : "0 0 16px 16px",
-            boxShadow: expanded ? "0 14px 36px rgba(0,0,0,0.55)" : "none",
+            // Sin sombra: alrededor de la pastilla se veía un halo oscuro sobre la barra y las apps.
+            boxShadow: "none",
           }}
         >
           {notchTheme && !peek && !greeting && <NotchDecor theme={notchTheme} compact={!expanded} />}

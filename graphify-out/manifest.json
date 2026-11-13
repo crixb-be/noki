@@ -211,9 +211,9 @@
     "semantic_hash": ""
   },
   "src/App.jsx": {
-    "mtime": 1794522369.912455,
-    "seen": 1794522552.2033687,
-    "ast_hash": "53fb6765f80bf5bdf6592913829a9904",
+    "mtime": 1794543471.3153052,
+    "seen": 1794543508.443407,
+    "ast_hash": "77d9d498be9734b1cb0107779c20c1fa",
     "semantic_hash": ""
   },
   "src/components/AIChat.jsx": {
@@ -1285,8 +1285,8 @@
     "semantic_hash": ""
   },
   "src-tauri/src/popups.rs": {
-    "mtime": 1794543005.437753,
-    "seen": 1794543109.125348,
+    "mtime": 1794543330.5709984,
+    "seen": 1794543508.4433906,
     "ast_hash": "99402263bd482a2e967f004ef268e623",
     "semantic_hash": ""
   },

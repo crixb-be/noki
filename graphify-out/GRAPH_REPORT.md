@@ -1,17 +1,17 @@
 # Graph Report - noki-dock  (2026-11-12)
 
 ## Corpus Check
-- 109 files · ~102,916 words
+- 109 files · ~102,938 words
 - Verdict: corpus is large enough that graph structure adds value.
 - Unclassified: 6 file(s) not represented in the graph (top: (none) 3, .icns 1, .ico 1)
 
 ## Summary
-- 1715 nodes · 3914 edges · 94 communities (62 shown, 32 thin omitted)
-- Extraction: 99% EXTRACTED · 1% INFERRED · 0% AMBIGUOUS · INFERRED: 36 edges (avg confidence: 0.71)
+- 1715 nodes · 3911 edges · 94 communities (62 shown, 32 thin omitted)
+- Extraction: 99% EXTRACTED · 1% INFERRED · 0% AMBIGUOUS · INFERRED: 36 edges (avg confidence: 0.72)
 - Token cost: 0 input · 0 output
 
 ## Graph Freshness
-- Built from commit: `614eecc3`
+- Built from commit: `0c752101`
 - Run `git rev-parse HEAD` and compare to check if the graph is stale.
 - Run `graphify update .` after code changes (no API cost).
 
@@ -77,7 +77,7 @@
 - Win
 - Mutex
 - bitmap_png
-- MediaPill.jsx
+- ScreenTime.jsx
 - noki
 - backup_export_blocking
 - Mutex
@@ -88,7 +88,7 @@
 1. `react` - 55 edges
 2. `Settings` - 51 edges
 3. `useStore()` - 46 edges
-4. `Notch()` - 41 edges
+4. `Notch()` - 40 edges
 5. `@tauri-apps/api` - 40 edges
 6. `NotchState` - 31 edges
 7. `dayKey()` - 23 edges
@@ -97,16 +97,16 @@
 10. `Row()` - 19 edges
 
 ## Surprising Connections (you probably didn't know these)
-- `register_appbar()` --references--> `Rect`  [INFERRED]
-  src-tauri/src/topbar.rs → src-tauri/src/notch.rs
-- `check_z_order()` --references--> `Rect`  [INFERRED]
-  src-tauri/src/topbar.rs → src-tauri/src/notch.rs
-- `command_user_avatar()` --references--> `NotchState`  [INFERRED]
-  src-tauri/src/topbar.rs → src-tauri/src/notch.rs
-- `set_avatar_image()` --references--> `NotchState`  [INFERRED]
-  src-tauri/src/topbar.rs → src-tauri/src/notch.rs
 - `shortcut_list()` --references--> `Shortcuts`  [INFERRED]
   src-tauri/src/lib.rs → src-tauri/src/settings.rs
+- `backup_export()` --references--> `Store`  [INFERRED]
+  src-tauri/src/lib.rs → src-tauri/src/store.rs
+- `store_all()` --references--> `Store`  [INFERRED]
+  src-tauri/src/lib.rs → src-tauri/src/store.rs
+- `store_set()` --references--> `Store`  [INFERRED]
+  src-tauri/src/lib.rs → src-tauri/src/store.rs
+- `check_z_order()` --references--> `Rect`  [INFERRED]
+  src-tauri/src/topbar.rs → src-tauri/src/notch.rs
 
 ## Import Cycles
 - None detected.
@@ -158,8 +158,8 @@ Cohesion: 0.09
 Nodes (15): PERSONALIZE, alert(), bluetooth_loop(), connected_bluetooth(), MIC_KEY, mic_loop(), mic_users(), open_key() (+7 more)
 
 ### Community 11 - "App.jsx"
-Cohesion: 0.10
-Nodes (37): isTextField(), Notch(), TABS, isNight(), STROKE, useLook(), useMascotMood(), EAR (+29 more)
+Cohesion: 0.09
+Nodes (40): react, isTextField(), Notch(), TABS, useBattery(), isNight(), STROKE, useLook() (+32 more)
 
 ### Community 12 - "clipboard.rs"
 Cohesion: 0.10
@@ -194,16 +194,16 @@ Cohesion: 0.15
 Nodes (16): child_callback(), dock_activate(), dock_close_windows(), dock_items(), dock_launch(), dock_launch_blocking(), DockItem, enum_callback() (+8 more)
 
 ### Community 21 - "ExpandedView.jsx"
-Cohesion: 0.13
-Nodes (25): AIChat(), Battery(), useBattery(), Clock(), Costume(), Eyes(), Mascot(), Mouth() (+17 more)
+Cohesion: 0.16
+Nodes (19): AIChat(), Battery(), Clock(), Costume(), Eyes(), Mascot(), Mouth(), CompactBar() (+11 more)
 
 ### Community 22 - "topbar.rs"
 Cohesion: 0.05
 Nodes (13): ABE_TOP, ABM_NEW, ABM_QUERYPOS, ABM_REMOVE, ABM_SETPOS, command_send_keys(), command_user_info(), PANEL_MARGIN (+5 more)
 
 ### Community 23 - "PanelView.jsx"
-Cohesion: 0.14
-Nodes (25): react, @tauri-apps/api, App(), ago(), Clipboard(), Launcher(), SUBTABS, ToolsView() (+17 more)
+Cohesion: 0.13
+Nodes (24): @tauri-apps/api, App(), ago(), Clipboard(), Launcher(), SUBTABS, ToolsView(), LANGS (+16 more)
 
 ### Community 24 - "media.rs"
 Cohesion: 0.14
@@ -341,9 +341,9 @@ Nodes (8): APPBAR, dock_set_hit(), Hit, HIT, hit(), SIZE, TASKBAR_STATE, WINDOWS
 Cohesion: 0.33
 Nodes (5): bitmap_png(), fallback_png(), glyph(), png_data(), shell_item_png()
 
-### Community 70 - "MediaPill.jsx"
-Cohesion: 0.53
-Nodes (5): Ctl(), Eq(), Icon(), MediaPill(), PILL_EXTRA_H
+### Community 70 - "ScreenTime.jsx"
+Cohesion: 0.38
+Nodes (9): AppList(), Bars(), colorOf(), COLORS, fmt(), lastDays(), mergeApps(), ScreenTime() (+1 more)
 
 ### Community 76 - "backup_export_blocking"
 Cohesion: 0.50
@@ -370,16 +370,16 @@ Nodes (4): set_brightness(), set_mute(), set_volume(), SysHandle
 _Questions this graph is uniquely positioned to answer:_
 
 - **Why does `Settings` connect `Settings` to `AppHandle`, `run`, `State`, `notch.rs`, `set_avatar_image`, `backup_export_blocking`, `lib.rs`, `sync`, `LPARAM`, `topbar.rs`, `window_utils.rs`, `sync`, `spotlight.rs`, `Store`, `ensure_layout`?**
-  _High betweenness centrality (0.025) - this node is a cross-community bridge._
+  _High betweenness centrality (0.031) - this node is a cross-community bridge._
 - **What connects `Next`, `Pause`, `Play` to the rest of the system?**
   _12 weakly-connected nodes found - possible missing edges._
 - **Should `SettingsWindow.jsx` be split into smaller, more focused modules?**
   _Cohesion score 0.09643483343074226 - nodes in this community are weakly interconnected._
-- **Why does `react` connect `PanelView.jsx` to `SettingsWindow.jsx`, `SystemView.jsx`, `package.json`, `Recorder.jsx`, `PanelView.jsx`, `ambient.js`, `App.jsx`, `FileShelf.jsx`, `MediaPlayer.jsx`, `ExpandedView.jsx`, `dayKey`, `TopBar.jsx`?**
-  _High betweenness centrality (0.022) - this node is a cross-community bridge._
+- **Why does `react` connect `App.jsx` to `SettingsWindow.jsx`, `SystemView.jsx`, `package.json`, `Recorder.jsx`, `ScreenTime.jsx`, `PanelView.jsx`, `ambient.js`, `FileShelf.jsx`, `MediaPlayer.jsx`, `ExpandedView.jsx`, `PanelView.jsx`, `dayKey`, `TopBar.jsx`?**
+  _High betweenness centrality (0.028) - this node is a cross-community bridge._
 - **Should `translate.rs` be split into smaller, more focused modules?**
   _Cohesion score 0.07535460992907801 - nodes in this community are weakly interconnected._
-- **Why does `NotchState` connect `State` to `run_loop`, `translate.rs`, `ai.rs`, `calendar.rs`, `notch.rs`, `set_avatar_image`, `clipboard.rs`, `lib.rs`, `screentime.rs`, `Settings`, `LPARAM`, `Store`, `Win`?**
-  _High betweenness centrality (0.018) - this node is a cross-community bridge._
+- **Why does `@tauri-apps/api` connect `PanelView.jsx` to `SettingsWindow.jsx`, `SystemView.jsx`, `package.json`, `Recorder.jsx`, `ScreenTime.jsx`, `PanelView.jsx`, `ambient.js`, `App.jsx`, `FileShelf.jsx`, `ExpandedView.jsx`, `dayKey`, `TopBar.jsx`?**
+  _High betweenness centrality (0.017) - this node is a cross-community bridge._
 - **Should `dropzone.rs` be split into smaller, more focused modules?**
   _Cohesion score 0.07084785133565621 - nodes in this community are weakly interconnected._
