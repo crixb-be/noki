@@ -133,7 +133,7 @@ export default function BarPanel() {
   useGlassShape(ref, glass, [kind, openCount], kind === "control" ? "[data-glass]" : null);
   if (!kind) return null;
   const panelDark = settings?.topbar?.tint === "dark" || (settings?.topbar?.tint !== "light" && window.matchMedia?.("(prefers-color-scheme: dark)").matches !== false);
-  const card = kind === "control" ? "cc-root" : `noki-popup-card ${panelDark ? "bar-panel-dark" : "bar-panel-light"}`;
+  const card = kind === "control" ? "cc-root" : `noki-popup-card noki-panel-surface ${panelDark ? "bar-panel-dark" : "bar-panel-light"}`;
   return <div ref={ref} className={`bar-panel ${card}`} onMouseDown={(e) => e.stopPropagation()}><div ref={body} className="bar-panel-body">
     {kind === "wifi" && <>
       <header className="panel-head-mac"><h2>Wi-Fi</h2><Switch checked onChange={(v) => invoke("quick_set", { kind: "wifi", on: v })} /></header>

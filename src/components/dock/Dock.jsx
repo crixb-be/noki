@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import { getCurrentWindow } from "@tauri-apps/api/window";
+import TrashIcon from "./TrashIcon.jsx";
 import { useSettings } from "../../hooks/useSettings.js";
 import { useGlass, useGlassShape } from "../../lib/glass.js";
 
@@ -11,9 +12,7 @@ export default function Dock() {
   const { settings } = useSettings();
   const [items, setItems] = useState([]);
   const [trash, setTrash] = useState({ items: 0 });
-  const [menu, setMenu] = useState(null);
-  const menuRef = useRef(null);
-  const lastMenuSpace = useRef(0);
+  const [menuOpen, setMenuOpen] = useState(false);
   const pill = useRef(null);
   const itemRefs = useRef([]);
   const iconRefs = useRef([]);
@@ -34,7 +33,6 @@ export default function Dock() {
   // Tras un recorte de pantalla (Impr Pant, Recortes) el backend pide reiniciar el estado de la vista.
   const recover = useRef(null);
   const leave = useRef(null);
-  const menuOpenedAt = useRef(0);
 
   const refresh = async () => {
     try { if (!(await getCurrentWindow().isVisible())) return; } catch { /* El navegador de desarrollo no expone visibilidad nativa. */ }
@@ -42,7 +40,7 @@ export default function Dock() {
     invoke("trash_state").then(setTrash).catch(() => {});
   };
   useEffect(() => { refresh(); const timer = setInterval(refresh, 1000); return () => clearInterval(timer); }, []);
-  useEffect(() => { let stops = []; Promise.all([listen("settings-updated", refresh), listen("settings-changed", refresh), listen("dock-windows", (event) => setItems(event.payload ?? [])), listen("dock-recover", () => recover.current?.()), listen("dock-leave", () => leave.current?.())]).then((fns) => { stops = fns; }); return () => stops.forEach((stop) => stop()); }, []);
+  useEffect(() => { let stops = []; Promise.all([listen("context-menu-visibility", (event) => setMenuOpen(!!event.payload)), listen("settings-updated", refresh), listen("settings-changed", refresh), listen("dock-windows", (event) => setItems(event.payload ?? [])), listen("dock-recover", () => recover.current?.()), listen("dock-leave", () => leave.current?.())]).then((fns) => { stops = fns; }); return () => stops.forEach((stop) => stop()); }, []);
   const all = useMemo(() => [ ...(dock.showApps ? [{ key: "apps", name: "Aplicaciones", kind: "apps" }] : []), ...items, ...(dock.showTrash ? [{ key: "trash", name: "Papelera", kind: "trash", running: trash.items > 0 }] : []) ], [dock.showApps, dock.showTrash, items, trash.items]);
   // Lo que necesita el área de clic sin depender del cierre del efecto.
   geometry.current = { lift: dock.magnify ? maxSize - size : 0 };
@@ -55,9 +53,6 @@ export default function Dock() {
       const r = node.getBoundingClientRect();
       const lift = pointerX.current != null ? geometry.current.lift : 0;
       let box = { left: r.left - lift * 2, top: r.top - lift, right: r.right + lift * 2, bottom: r.bottom };
-      // Con el menú contextual abierto, el área de clic también lo cubre (si no, era click-through).
-      const m = menuRef.current?.getBoundingClientRect();
-      if (m) box = { left: Math.min(box.left, m.left), top: Math.min(box.top, m.top), right: Math.max(box.right, m.right), bottom: box.bottom };
       invoke("dock_set_hit", { x: Math.round(box.left), y: Math.round(box.top), w: Math.round(box.right - box.left), h: Math.round(box.bottom - box.top) }).catch(() => {});
     };
     reportHit.current = report;
@@ -75,29 +70,13 @@ export default function Dock() {
   const glass = useGlass(settings, "dock");
   // Anclada abajo: si la ventana crece hacia arriba (menú contextual), el vidrio no se mueve.
   useGlassShape(pill, glass, [], null, true);
-  // Tamaño de la ventana: ancho natural de la píldora en reposo + holgura para la magnificación.
-  // Antes la píldora se limitaba al ancho de la ventana y la ventana a la píldora: los iconos se recortaban.
-  // Con el menú contextual abierto la ventana crece hacia arriba lo que mide el menú (la píldora no
-  // se mueve: el borde inferior de la ventana queda fijo). Antes el menú se abría hacia abajo dentro
-  // de una ventana de ~86 px y se cortaba en el borde de la pantalla.
-  const menuSpace = menu ? menuHeight(menuActions(menu.item)) + MENU_GAP + 6 : 0;
+  // Context menus have their own topmost window, so the Dock never grows or clips them.
   useEffect(() => {
     const node = pill.current;
-    if (!node) return;
-    const menuChanged = lastMenuSpace.current !== menuSpace;
-    if (pointerX.current != null && !menuChanged) return;
-    lastMenuSpace.current = menuSpace;
-    const width = Math.ceil(Math.max(node.scrollWidth + (dock.magnify ? (maxSize - size) * 4 : 0) + 24, menu ? MENU_WIDTH + 16 : 0));
-    const height = Math.ceil(maxSize + 8 + 24 + menuSpace);
-    invoke("dock_resize", { width, height }).catch(() => {});
-  }, [all.length, size, maxSize, dock.magnify, menuSpace]);
-  useEffect(() => {
-    if (!menu) { reportHit.current?.(); return undefined; }
-    const frame = requestAnimationFrame(() => reportHit.current?.());
-    const onResize = () => reportHit.current?.();
-    window.addEventListener("resize", onResize);
-    return () => { cancelAnimationFrame(frame); window.removeEventListener("resize", onResize); };
-  }, [menu]);
+    if (!node || pointerX.current != null) return;
+    const width = Math.ceil(node.scrollWidth + (dock.magnify ? (maxSize - size) * 4 : 0) + 24);
+    invoke("dock_resize", { width, height: Math.ceil(maxSize + 32) }).catch(() => {});
+  }, [all.length, size, maxSize, dock.magnify]);
 
   if (settings && !dock.enabled) return null;
   // Magnificación solo con transform (ni width ni height cambian): el icono crece desde abajo con
@@ -169,16 +148,14 @@ export default function Dock() {
 
   function onMouseMove(event) {
     // Con el menú abierto no se magnifica (los iconos ampliados lo tapaban).
-    if (menu) return;
+    if (menuOpen) return;
     const first = pointerX.current == null;
     if (first) rest.current = measureRest();
     pointerX.current = event.clientX;
     if (first) reportHit.current?.();
     start();
   }  recover.current = () => { resetMagnification(); reportHit.current?.(); refresh(); };
-  // El cursor ha salido del Dock (aviso del backend): cierra el menú y suelta la magnificación.
-  // Se ignora justo al abrir el menú: la ventana crece y el área de clic va un instante desfasada.
-  leave.current = () => { if (performance.now() - menuOpenedAt.current < 400) return; setMenu(null); resetMagnification(); };
+  leave.current = () => resetMagnification();
   function activate(item) {
     if (item.kind === "apps") return invoke("toggle_launchpad");
     if (item.kind === "trash") return invoke("trash_open");
@@ -187,51 +164,22 @@ export default function Dock() {
   }
 
   function openMenu(event, item) {
+    event.stopPropagation();
     resetMagnification();
-    // Encima de la píldora, centrado en el icono; medido desde abajo porque la ventana va a crecer.
-    const box = pill.current?.getBoundingClientRect();
-    const bottom = box ? window.innerHeight - box.top + MENU_GAP : 80;
-    menuOpenedAt.current = performance.now();
-    setMenu({ x: event.clientX, bottom, item });
+    invoke("dock_context_menu", { key: item.key }).catch(console.error);
   }
-  const actions = menu ? menuActions(menu.item) : [];
-  const menuLeft = menu ? Math.round(Math.min(Math.max(4, menu.x - MENU_WIDTH / 2), Math.max(4, window.innerWidth - MENU_WIDTH - 4))) : 0;
 
-  return <div className="dock-stage" onMouseMove={onMouseMove} onMouseLeave={() => { resetMagnification(); setMenu(null); }} onMouseDown={(e) => { if (menu && !menuRef.current?.contains(e.target)) setMenu(null); }}>
+  return <div className="dock-stage" onContextMenu={(e) => { e.preventDefault(); resetMagnification(); invoke("desktop_context_menu", { section: "dock" }).catch(console.error); }} onMouseMove={onMouseMove} onMouseLeave={resetMagnification}>
     <div ref={pill} className="dock-pill" style={pillVars}>
       {all.map((item, index) => {
-        const icon = item.kind === "apps" ? <AppsIcon /> : item.kind === "trash" ? <span className="trash-icon">{item.running ? "🗑️" : "♲"}</span> : item.icon ? <img src={item.icon} alt="" /> : <ItemIcon path={item.path || (item.aumid ? `shell:AppsFolder\\${item.aumid}` : "")} name={item.name} />;
+        const icon = item.kind === "apps" ? <AppsIcon /> : item.kind === "trash" ? <TrashIcon full={trash.items > 0} /> : item.icon ? <img src={item.icon} alt="" /> : <ItemIcon path={item.path || (item.aumid ? `shell:AppsFolder\\${item.aumid}` : "")} name={item.name} />;
         const firstShelfIndex = all.findIndex((entry) => entry.kind === "folder" || entry.kind === "trash");
-        return <button key={`${item.key}-${index}`} title={item.name} className={`dock-item ${item.kind === "folder" ? "dock-folder" : ""} ${index === firstShelfIndex ? "dock-divider" : ""}`} style={{ width: size, height: size + 8 }} ref={(node) => { itemRefs.current[index] = node; iconRefs.current[index] = node?.querySelector(".dock-icon") ?? null; }} onClick={() => activate(item)} onContextMenu={(e) => { e.preventDefault(); openMenu(e, item); }} onMouseDown={(e) => { if (e.button === 1) { e.preventDefault(); invoke("dock_close_windows", { key: item.key }); } }}>
-          <span className="dock-icon" style={{ width: size, height: size }}>{icon}</span>{item.running && <span className="dock-dot" />}
+        return <button key={item.key} title={item.name} className={`dock-item ${item.kind === "folder" ? "dock-folder" : ""} ${index === firstShelfIndex ? "dock-divider" : ""}`} style={{ width: size, height: size + 8 }} ref={(node) => { itemRefs.current[index] = node; iconRefs.current[index] = node?.querySelector(".dock-icon") ?? null; }} onClick={() => activate(item)} onContextMenu={(e) => { e.preventDefault(); openMenu(e, item); }} onMouseDown={(e) => { if (e.button === 1) { e.preventDefault(); invoke("dock_close_windows", { key: item.key }); } }}>
+          <span className="dock-icon" style={{ width: size, height: size }}>{icon}</span>{item.running && item.kind !== "trash" && <span className="dock-dot" />}
         </button>;
       })}
     </div>
-    {menu && <div ref={menuRef} className="dock-menu" role="menu" style={{ left: menuLeft, bottom: menu.bottom, width: MENU_WIDTH }}>
-      {actions.map((a) => <button key={a.label} role="menuitem" className={a.danger ? "danger" : ""} onClick={() => { setMenu(null); a.run(); }}>{a.label}</button>)}
-    </div>}
   </div>;
-}
-
-const MENU_WIDTH = 200;
-const MENU_ROW = 30;
-const MENU_PAD = 12;
-/** Separación entre la píldora y el menú. */
-const MENU_GAP = 8;
-const menuHeight = (actions) => actions.length * MENU_ROW + MENU_PAD;
-
-/** Opciones del menú contextual de cada elemento del Dock. */
-function menuActions(item) {
-  const run = (cmd, args) => () => invoke(cmd, args).catch(() => {});
-  if (item.kind === "trash") return [{ label: "Abrir papelera", run: run("trash_open") }, { label: "Vaciar papelera", run: run("trash_empty"), danger: true }];
-  if (item.kind === "apps") return [{ label: "Abrir Launchpad", run: run("toggle_launchpad") }];
-  if (item.kind === "folder") return [{ label: "Abrir", run: run("open_path", { path: item.path }) }];
-  const list = [{ label: "Abrir", run: run("dock_activate", { key: item.key }) }];
-  if (item.path || item.aumid) list.push({ label: "Nueva ventana", run: run("dock_launch", { path: item.path ?? "", args: item.args ?? "", aumid: item.aumid ?? "" }) });
-  if (item.kind === "pinned") list.push({ label: "Quitar del Dock", run: run("dock_unpin", { key: item.key }) });
-  else list.push({ label: "Anclar al Dock", run: run("dock_pin", { path: item.path ?? "", name: item.name ?? "", args: "", aumid: item.aumid ?? "" }) });
-  if (item.running) list.push({ label: (item.windowCount ?? 1) > 1 ? `Cerrar ${item.windowCount} ventanas` : "Cerrar programa", run: run("dock_close_windows", { key: item.key }), danger: true });
-  return list;
 }
 
 function fallbackColor(name = "") {

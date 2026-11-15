@@ -124,15 +124,10 @@ html, body, #root {
 .dock-divider::before { position: absolute; left: -5px; top: 12%; width: 1px; height: 76%; content: ""; background: rgba(255,255,255,.28); }
 .dock-icon { display: grid; place-items: center; transform-origin: center bottom; }
 .dock-icon img { width: 100%; height: 100%; object-fit: contain; image-rendering: high-quality; image-rendering: auto; }
-.dock-fallback, .trash-icon { display: grid; width: 100%; height: 100%; place-items: center; color: rgba(255,255,255,.95); font-size: 22px; font-weight: 700; }
-.trash-icon { font-size: 29px; }
+.dock-fallback { display: grid; width: 100%; height: 100%; place-items: center; color: rgba(255,255,255,.95); font-size: 22px; font-weight: 700; }
 .apps-icon { display: grid; grid-template-columns: repeat(3, 1fr); gap: 3px; width: 72%; height: 72%; padding: 5px; border-radius: 15px; background: linear-gradient(135deg,#222,#555); box-sizing: border-box; }
 .apps-icon i { border-radius: 4px; background: #ff375f; }.apps-icon i:nth-child(2) { background:#ff9f0a }.apps-icon i:nth-child(3) { background:#ffd60a }.apps-icon i:nth-child(4) { background:#30d158 }.apps-icon i:nth-child(5) { background:#64d2ff }.apps-icon i:nth-child(6) { background:#0a84ff }.apps-icon i:nth-child(7) { background:#5e5ce6 }.apps-icon i:nth-child(8) { background:#bf5af2 }.apps-icon i:nth-child(9) { background:#ff6482 }
 .dock-dot { position: absolute; bottom: 0; width: 5px; height: 5px; border-radius: 50%; background: #fff; }
-/* Menú contextual del Dock: se abre hacia arriba, encima de la píldora y de los iconos ampliados. */
-.dock-menu { position: fixed; z-index: 1000; box-sizing: border-box; padding: 5px; border: 1px solid rgba(255,255,255,.18); border-radius: 12px; color: #fff; background: rgba(34,34,38,.96); box-shadow: 0 6px 18px rgba(0,0,0,.35); transform-origin: bottom center; animation: dockMenuIn .12s ease-out both; font-family: "Segoe UI Variable Text", "Segoe UI", system-ui, sans-serif; }
-@keyframes dockMenuIn { from { opacity: 0; transform: translateY(4px) scale(.97); } to { opacity: 1; transform: none; } }
-.dock-menu button { display: flex; align-items: center; width: 100%; height: 30px; padding: 0 10px; border: 0; border-radius: 7px; color: inherit; background: transparent; text-align: left; font-size: 13px; white-space: nowrap; }.dock-menu button:hover { background: rgba(255,255,255,.14); }.dock-menu button.danger { color: #ff6b6b; }
 .launchpad-backdrop { display: flex; align-items: stretch; justify-content: stretch; width: 100%; height: 100%; box-sizing: border-box; overflow: hidden; background: transparent; animation: launchpadIn .15s ease-out both; }
 @keyframes launchpadIn { from { opacity: 0; transform: scale(.98); } to { opacity: 1; transform: scale(1); } }
 .launchpad-layout { display: flex; flex-direction: column; width: 100%; height: 100%; min-height: 0; color: #fff; }
@@ -357,3 +352,45 @@ button.cc-module:active { filter: brightness(.95); }
 .cc-range { flex: 1; height: 6px; margin: 0; border-radius: 99px; outline: none; -webkit-appearance: none; appearance: none;
   background: linear-gradient(to right, rgba(255,255,255,.95) var(--v, 50%), rgba(255,255,255,.22) var(--v, 50%)); }
 .cc-range::-webkit-slider-thumb { width: 20px; height: 20px; border-radius: 50%; background: #fff; box-shadow: 0 1px 5px rgba(0,0,0,.35); -webkit-appearance: none; appearance: none; }
+
+/* Reordering pinned apps: native drag preview, source placeholder and insertion boundary. */
+.dock-pinned-row { position: relative; transition: background-color .15s ease, opacity .15s ease; }
+.dock-pinned-row.is-dragging { opacity: .35; background: rgba(129,140,248,.08); }
+.dock-pin-handle { display: grid; place-items: center; flex: none; width: 28px; height: 30px; padding: 0; border: 0; border-radius: 6px; color: rgba(255,255,255,.45); background: transparent; cursor: grab; user-select: none; }
+.dock-pin-handle:hover { color: #c7d2fe; background: rgba(129,140,248,.14); }
+.dock-pin-handle:active { cursor: grabbing; }
+.dock-pin-handle:focus-visible { outline: 2px solid #a5b4fc; outline-offset: 2px; }
+.dock-pinned-row.drop-before::before, .dock-pinned-row.drop-after::after { content: ""; position: absolute; z-index: 1; left: 12px; right: 12px; height: 3px; border-radius: 3px; background: #a5b4fc; box-shadow: 0 0 8px rgba(129,140,248,.45); pointer-events: none; }
+.dock-pinned-row.drop-before::before { top: 0; }
+.dock-pinned-row.drop-after::after { bottom: 0; }
+.dock-pinned-preview { position: fixed; left: -10000px; top: 0; box-sizing: border-box; color: #fff; background: #2b2b35; border: 1px solid rgba(165,180,252,.6); border-radius: 10px; box-shadow: 0 12px 30px rgba(0,0,0,.4); opacity: 1; }
+
+.dock-trash-can { display: block; width: 100%; height: 100%; filter: drop-shadow(0 2px 2px rgba(0,0,0,.2)); }
+.dock-pin-remove { display: grid; place-items: center; flex: none; width: 28px; height: 30px; padding: 0; border: 0; border-radius: 6px; color: rgba(255,255,255,.45); background: transparent; cursor: pointer; transition: color .15s, background-color .15s; }
+.dock-pin-remove:hover { color: #fca5a5; background: rgba(248,113,113,.12); }
+.dock-pin-remove:focus-visible { outline: 2px solid #fca5a5; outline-offset: 2px; }
+
+/* One surface for Wi-Fi/Bluetooth and every context-menu level. */
+:root { --panel-rim: rgba(255,255,255,.14); --panel-blur: 16px; }
+.noki-panel-surface, [data-panels="light"] .noki-panel-surface {
+  background: linear-gradient(to bottom, var(--glass-sheen), rgba(255,255,255,0) 33%), var(--glass-tint);
+  border: 1px solid var(--panel-rim);
+  border-radius: var(--glass-radius, 16px);
+  backdrop-filter: blur(var(--panel-blur)) saturate(140%);
+  -webkit-backdrop-filter: blur(var(--panel-blur)) saturate(140%);
+  box-shadow: inset 0 0 0 var(--glass-band, 0px) var(--glass-band-color, transparent), var(--glass-shadow, 0 0 #0000);
+  color: #fff;
+}
+.context-menu-stage { position: fixed; inset: 0; overflow: hidden; background: transparent; }
+.context-menu-panel { position: absolute; box-sizing: border-box; width: min(280px, calc(100vw - 16px)); max-height: calc(100vh - 16px); overflow: auto; overscroll-behavior: contain; padding: 6px; scrollbar-width: thin; font-family: "Segoe UI Variable Text", "Segoe UI", system-ui, sans-serif; }
+.context-menu-panel .panel-row { min-height: 30px; padding: 6px 10px; font-size: 13px; cursor: default; }
+.context-menu-panel .panel-row::before { display: none; }
+.context-menu-panel .panel-row:disabled { opacity: .4; }
+.noki-panel-surface .panel-row:not(:disabled):hover,
+.noki-panel-surface .panel-row:not(:disabled):focus-visible,
+.noki-panel-surface .panel-row.active { background: var(--glass-hover); outline: none; }
+.context-menu-panel .panel-row:disabled:hover { background: transparent; }
+.context-menu-panel .panel-divider { margin: 5px 6px; background: rgba(255,255,255,.16); }
+.context-menu-label { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.context-menu-chevron { flex: none; width: 12px; height: 12px; opacity: .8; }
+html[data-view="contextmenu"], html[data-view="contextmenu"] body, html[data-view="contextmenu"] #root { width: 100%; height: 100%; margin: 0; background: transparent; overflow: hidden; }

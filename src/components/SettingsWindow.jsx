@@ -1,4 +1,4 @@
-import { Children, Fragment, cloneElement, isValidElement, useEffect, useState } from "react";
+import { Children, Fragment, cloneElement, isValidElement, useEffect, useRef, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import { getVersion } from "@tauri-apps/api/app";
@@ -1599,6 +1599,104 @@ function TopBarSettings({ s, set }) {
   </Page>;
 }
 
+/** Native drag image follows the pointer; only a completed drop persists the order. */
+function PinnedDockApps({ pinned, onChange }) {
+  const [dragged, setDragged] = useState(null);
+  const [slot, setSlot] = useState(null);
+  const drag = useRef(null);
+  const image = useRef(null);
+  const signature = JSON.stringify(pinned);
+
+  function reset() {
+    drag.current = null;
+    image.current?.remove();
+    image.current = null;
+    setDragged(null);
+    setSlot(null);
+  }
+
+  // A pin/unpin in another window cancels an outdated drag rather than overwriting that change.
+  useEffect(() => { reset(); }, [signature]);
+  useEffect(() => () => image.current?.remove(), []);
+
+  function start(event, index) {
+    const row = event.currentTarget.closest("[data-pinned-index]");
+    drag.current = { index, signature, slot: index };
+    event.dataTransfer.effectAllowed = "move";
+    event.dataTransfer.setData("text/plain", pinned[index].name);
+    const preview = row.cloneNode(true);
+    preview.classList.add("dock-pinned-preview");
+    const box = row.getBoundingClientRect();
+    preview.style.width = `${box.width}px`;
+    document.body.appendChild(preview);
+    image.current = preview;
+    event.dataTransfer.setDragImage(preview, Math.max(0, event.clientX - box.left), Math.max(0, event.clientY - box.top));
+    requestAnimationFrame(() => { preview.remove(); if (image.current === preview) image.current = null; });
+    setDragged(index);
+    setSlot(index);
+  }
+
+  function over(event) {
+    if (!drag.current || drag.current.signature !== signature) return;
+    event.preventDefault();
+    event.dataTransfer.dropEffect = "move";
+    const rows = [...event.currentTarget.querySelectorAll("[data-pinned-index]")];
+    const next = rows.findIndex((row) => {
+      const box = row.getBoundingClientRect();
+      return event.clientY < box.top + box.height / 2;
+    });
+    const insertion = next === -1 ? pinned.length : next;
+    drag.current.slot = insertion;
+    setSlot(insertion);
+  }
+
+  function drop(event) {
+    if (!drag.current) return;
+    event.preventDefault();
+    event.stopPropagation();
+    const { index, signature: original, slot: destination } = drag.current;
+    reset();
+    if (original !== signature) return;
+    // Slots describe boundaries before removal, so downward drops need an index adjustment.
+    const target = destination > index ? destination - 1 : destination;
+    move(index, target);
+  }
+
+  function move(from, to) {
+    if (to < 0 || to >= pinned.length || from === to) return;
+    const next = [...pinned];
+    next.splice(to, 0, next.splice(from, 1)[0]);
+    onChange(next); // useSettings -> save_settings -> settings-updated refreshes the Dock.
+  }
+
+  const showSlot = dragged !== null && slot !== dragged && slot !== dragged + 1;
+  const occurrences = new Map();
+  return <div className="dock-pinned-list" onDragOver={over} onDrop={drop}>
+    <p className="sr-only" id="dock-reorder-help">Arrastra el agarre para mover la aplicación. Con el teclado, usa las flechas arriba y abajo, Inicio o Fin.</p>
+    {pinned.map((app, index) => {
+      const identity = JSON.stringify([app.name, app.path, app.args ?? "", app.aumid ?? ""]);
+      const occurrence = occurrences.get(identity) ?? 0;
+      occurrences.set(identity, occurrence + 1);
+      return <div key={`${identity}:${occurrence}`} data-pinned-index={index}
+      className={`dock-pinned-row flex items-center gap-3 border-b border-white/5 px-4 py-2.5 last:border-0${dragged === index ? " is-dragging" : ""}${showSlot && slot === index ? " drop-before" : ""}${showSlot && slot === pinned.length && index === pinned.length - 1 ? " drop-after" : ""}`}>
+      <span className="min-w-0 flex-1 truncate text-sm">{app.name}</span>
+      <button type="button" draggable className="dock-pin-handle" title="Arrastra para reordenar" aria-label={`Reordenar ${app.name}`} aria-describedby="dock-reorder-help"
+        onDragStart={(event) => start(event, index)} onDragEnd={reset}
+        onKeyDown={(event) => {
+          const target = { ArrowUp: index - 1, ArrowDown: index + 1, Home: 0, End: pinned.length - 1 }[event.key];
+          if (target === undefined) return;
+          event.preventDefault();
+          move(index, target);
+        }}>
+        <svg width="18" height="18" viewBox="0 0 18 18" fill="none" aria-hidden="true"><path d="M3 5h12M3 9h12M3 13h12" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" /></svg>
+      </button>
+      <button type="button" className="dock-pin-remove" title={`Quitar ${app.name} del Dock`} aria-label={`Quitar ${app.name} del Dock`} onClick={() => onChange(pinned.filter((_, i) => i !== index))}>
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M3 6h18M9 6V4h6v2M5 6l1 14h12l1-14M10 10v6M14 10v6" /></svg>
+      </button>
+    </div>; })}
+  </div>;
+}
+
 function DockSettings({ s, set }) {
   const d = s.dock ?? {};
   const updatePinned = (pinned) => set({ dock: { pinned } });
@@ -1614,7 +1712,7 @@ function DockSettings({ s, set }) {
     <Row title="Reservar espacio" hint="Las ventanas maximizadas dejan libre el borde inferior."><Toggle checked={d.reserveSpace} onChange={(v) => set({ dock: { reserveSpace: v } })} /></Row>
     <Row title="Ocultar la barra de tareas de Windows" hint="Guarda el estado actual y lo restaura al desactivar o salir de Noki."><Toggle checked={d.hideTaskbar} onChange={(v) => set({ dock: { hideTaskbar: v } })} /></Row>
     <SectionTitle>Aplicaciones ancladas</SectionTitle>
-    <div className={`${CARD} overflow-hidden`}>{(d.pinned ?? []).map((p, i) => <div key={`${p.name}-${p.path}`} className="flex items-center justify-between gap-3 border-b border-white/5 px-4 py-2.5 last:border-0"><span className="min-w-0 flex-1 truncate text-sm">{p.name}</span><button className={button} disabled={i === 0} onClick={() => { const a = [...d.pinned]; [a[i - 1], a[i]] = [a[i], a[i - 1]]; updatePinned(a); }}>↑</button><button className={button} disabled={i === d.pinned.length - 1} onClick={() => { const a = [...d.pinned]; [a[i], a[i + 1]] = [a[i + 1], a[i]]; updatePinned(a); }}>↓</button><button className={button} onClick={() => updatePinned(d.pinned.filter((_, j) => j !== i))}>Quitar</button></div>)}<button className={`${button} m-3`} onClick={async () => { const path = await open({ multiple: false, directory: false, filters: [{ name: "Programas", extensions: ["exe", "lnk", "url"] }] }); if (typeof path === "string") updatePinned([...(d.pinned ?? []), { name: path.split(/[\\/]/).pop().replace(/\.[^.]+$/, ""), path, args: "", aumid: "" }]); }}>Añadir programa…</button></div>
+    <div className={`${CARD} overflow-hidden`}><PinnedDockApps pinned={d.pinned ?? []} onChange={updatePinned} /><button className={`${button} m-3`} onClick={async () => { const path = await open({ multiple: false, directory: false, filters: [{ name: "Programas", extensions: ["exe", "lnk", "url"] }] }); if (typeof path === "string") updatePinned([...(d.pinned ?? []), { name: path.split(/[\\/]/).pop().replace(/\.[^.]+$/, ""), path, args: "", aumid: "" }]); }}>Añadir programa…</button></div>
   </Page>;
 }
 

@@ -395,3 +395,112 @@ pub async fn app_icon(path: String) -> Result<String, String> {
     remember(key, url.clone());
     Ok(url)
 }
+
+/// Stable application labels, never window/tab titles. Cache expensive metadata/Shell lookups.
+pub(crate) fn program_name(path: &str, aumid: &str) -> String {
+    static NAMES: OnceLock<RwLock<HashMap<(String, String), String>>> = OnceLock::new();
+    let names = NAMES.get_or_init(|| RwLock::new(HashMap::new()));
+    let path = resolve_program(path);
+    let key = (path.to_lowercase(), aumid.to_lowercase());
+    if let Some(name) = names.read().unwrap().get(&key) { return name.clone(); }
+    let shell_path = if !aumid.is_empty() { format!("shell:AppsFolder\\{aumid}") } else { path.clone() };
+    let name = if path.to_ascii_lowercase().ends_with(".lnk") || path.to_ascii_lowercase().ends_with(".url") {
+        filename_label(&path)
+    } else if !path.is_empty() && !path.to_ascii_lowercase().starts_with("shell:") && !path.to_ascii_lowercase().ends_with("applicationframehost.exe") {
+        executable_name(&path).unwrap_or_else(|| filename_label(&path))
+    } else {
+        shell_display_name(&shell_path).unwrap_or_else(|| {
+            let package = aumid.split('!').next().unwrap_or(aumid).split('_').next().unwrap_or(aumid);
+            filename_label(package.rsplit('.').next().unwrap_or(package))
+        })
+    };
+    let mut cache = names.write().unwrap();
+    if cache.len() >= CACHE_MAX { cache.clear(); }
+    cache.insert(key, name.clone());
+    name
+}
+
+fn filename_label(path: &str) -> String {
+    let name = path.rsplit(['\\', '/']).next().unwrap_or(path);
+    let stem = name.rsplit_once('.').filter(|(_, ext)| matches!(ext.to_ascii_lowercase().as_str(), "exe" | "lnk" | "url")).map(|(stem, _)| stem).unwrap_or(name);
+    let mut chars = stem.chars();
+    match chars.next() {
+        Some(first) => first.to_uppercase().chain(chars).collect(),
+        None => "Aplicación".into(),
+    }
+}
+
+fn shell_display_name(path: &str) -> Option<String> {
+    use windows::Win32::{System::Com::{CoUninitialize, IBindCtx}, UI::Shell::SIGDN_NORMALDISPLAY};
+    struct ComGuard(bool);
+    impl Drop for ComGuard { fn drop(&mut self) { if self.0 { unsafe { CoUninitialize(); } } } }
+    unsafe {
+        let _com = ComGuard(CoInitializeEx(None, COINIT_APARTMENTTHREADED).is_ok());
+        let item: IShellItem = SHCreateItemFromParsingName(&HSTRING::from(path), None::<&IBindCtx>).ok()?;
+        let raw = item.GetDisplayName(SIGDN_NORMALDISPLAY).ok()?;
+        let result = raw.to_string().ok();
+        windows::Win32::System::Com::CoTaskMemFree(Some(raw.0.cast()));
+        result.filter(|s| !s.trim().is_empty())
+    }
+}
+
+fn executable_name(path: &str) -> Option<String> {
+    use windows::Win32::Storage::FileSystem::{GetFileVersionInfoSizeW, GetFileVersionInfoW, VerQueryValueW};
+    unsafe {
+        let path = HSTRING::from(path);
+        let size = GetFileVersionInfoSizeW(&path, None);
+        if size == 0 || size > 16 * 1024 * 1024 { return None; }
+        // DWORD alignment required by the VERSIONINFO APIs.
+        let mut data = vec![0u32; (size as usize + 3) / 4];
+        GetFileVersionInfoW(&path, None, size, data.as_mut_ptr().cast()).ok()?;
+        let query = |key: &str| -> Option<(*const u8, usize)> {
+            let mut raw = std::ptr::null_mut();
+            let mut len = 0;
+            if !VerQueryValueW(data.as_ptr().cast(), &HSTRING::from(key), &mut raw, &mut len).as_bool() || raw.is_null() { return None; }
+            let offset = (raw as usize).checked_sub(data.as_ptr() as usize)?;
+            let available = (size as usize).checked_sub(offset)?;
+            Some((raw.cast(), (len as usize).min(available)))
+        };
+        let mut translations = Vec::new();
+        if let Some((raw, bytes)) = query(r"\VarFileInfo\Translation") {
+            for chunk in std::slice::from_raw_parts(raw, bytes).chunks_exact(4) {
+                translations.push((u16::from_le_bytes([chunk[0], chunk[1]]), u16::from_le_bytes([chunk[2], chunk[3]])));
+            }
+        }
+        translations.extend([(0x0409, 0x04b0), (0x0409, 0x04e4), (0x0000, 0x04b0)]);
+        for field in ["FileDescription", "ProductName"] {
+            for (language, codepage) in &translations {
+                let key = format!("\\StringFileInfo\\{language:04x}{codepage:04x}\\{field}");
+                if let Some((raw, chars)) = query(&key) {
+                    let available = size as usize - (raw as usize - data.as_ptr() as usize);
+                    let count = chars.min(available / 2);
+                    // Read UTF-16 bytes without assuming the returned pointer is aligned.
+                    let units: Vec<u16> = std::slice::from_raw_parts(raw, count * 2).chunks_exact(2)
+                        .map(|b| u16::from_le_bytes([b[0], b[1]])).take_while(|unit| *unit != 0).collect();
+                    let name = String::from_utf16_lossy(&units).trim().to_string();
+                    if !name.is_empty() { return Some(name); }
+                }
+            }
+        }
+        None
+    }
+}
+
+#[cfg(test)]
+mod name_tests {
+    use super::*;
+    #[test]
+    fn fallback_names_use_program_files_not_window_titles() {
+        assert_eq!(program_name(r"C:\NokiMissing\brave.exe", ""), "Brave");
+        assert_eq!(program_name(r"C:\NokiMissing\My Program.lnk", ""), "My Program");
+        assert_eq!(filename_label("chat.exe"), "Chat");
+    }
+    #[test]
+    fn reads_windows_executable_version_metadata() {
+        let path = resolve_program("explorer.exe");
+        let name = executable_name(&path).expect("Explorer has version resources");
+        assert!(!name.is_empty());
+        assert!(!name.to_ascii_lowercase().ends_with(".exe"));
+        assert_eq!(program_name(&path, ""), name);
+    }
+}

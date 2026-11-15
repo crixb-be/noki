@@ -24,6 +24,8 @@ mod viz;
 mod topbar;
 mod backdrop;
 mod dock;
+mod context_menu;
+mod jump_lists;
 mod launchpad;
 mod spotlight;
 mod popups;
@@ -71,6 +73,8 @@ pub(crate) async fn commit_settings(app: &AppHandle, mut new: Settings) -> Resul
     let prev = state.settings.lock().unwrap().clone();
     new.restore_masked_keys(&prev);
     new.clamp();
+    let new = tauri::async_runtime::spawn_blocking(move || { dock::normalize_pinned_names(&mut new); new })
+        .await.map_err(|e| e.to_string())?;
     if prev == new {
         return Ok(None);
     }
@@ -385,6 +389,8 @@ fn show_settings(app: &AppHandle, section: Option<String>) -> Result<(), String>
     }
     let url = format!("index.html?view=settings&section={}", section.unwrap_or_else(|| "general".into()));
     WebviewWindowBuilder::new(app, "settings", WebviewUrl::App(url.into()))
+        // WebView2 must retain its HTML5 drop handler for reordering pinned apps.
+        .disable_drag_drop_handler()
         .title("Noki — Ajustes")
         .inner_size(880.0, 600.0)
         .min_inner_size(720.0, 480.0)
@@ -838,6 +844,12 @@ pub fn run() {
             topbar::command_toggle_airplane,
             topbar::command_open_task_manager,
             topbar::command_bar_panel_state,
+            context_menu::context_menu_state,
+            context_menu::context_menu_present,
+            context_menu::context_menu_execute,
+            context_menu::context_menu_close,
+            context_menu::dock_context_menu,
+            context_menu::desktop_context_menu,
             dock::dock_items,
             dock::dock_set_hit,
             dock::dock_resize,

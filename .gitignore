@@ -40,3 +40,7 @@ build_noki_*.py
 /assets/*.mp4
 /pc.png
 /pcnotch.png
+
+# Comprobaciones locales temporales
+/scripts/.verify-*
+/**/.noki-post.ps1

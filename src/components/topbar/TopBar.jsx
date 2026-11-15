@@ -70,7 +70,7 @@ export default function TopBar() {
 
   if (!settings) return null;
   return (
-    <div ref={shell} className={`topbar-shell ${dark ? "topbar-dark" : "topbar-light"}${ink ? " topbar-ink" : ""}`} style={{ "--notch-reserve": `${reserve}px`, ...(ink ? { color: ink } : {}) }}>
+    <div ref={shell} onContextMenu={(e) => { e.preventDefault(); invoke("desktop_context_menu", { section: "topbar" }).catch(console.error); }} className={`topbar-shell ${dark ? "topbar-dark" : "topbar-light"}${ink ? " topbar-ink" : ""}`} style={{ "--notch-reserve": `${reserve}px`, ...(ink ? { color: ink } : {}) }}>
       <BarPaint settings={settings} tint={paint.tint} />
       <div className="topbar-left" />
       <div className="topbar-center-reserve" aria-hidden="true" />

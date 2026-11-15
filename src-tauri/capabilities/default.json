@@ -2,6 +2,6 @@
   "$schema": "../gen/schemas/desktop-schema.json",
   "identifier": "default",
   "description": "Permisos de las ventanas del notch y de ajustes",
-  "windows": ["main", "main-*", "settings", "topbar", "barpanel", "dock", "launchpad", "spotlight"],
+  "windows": ["main", "main-*", "settings", "topbar", "barpanel", "dock", "launchpad", "spotlight", "contextmenu"],
   "permissions": ["core:default", "drag:default", "dialog:default"]
 }

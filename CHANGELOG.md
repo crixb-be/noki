@@ -3,6 +3,11 @@
 ## 1.3.0 — Barra superior unificada, Dock y Launchpad
 
 - Barra superior unificada con buscador rápido, paneles de la barra y avatar; nuevo Dock y Launchpad para acceder a aplicaciones y ventanas desde un solo lugar.
+- Menús contextuales del Dock y la barra superior con el mismo gris translúcido, desenfoque, borde y resaltado de los paneles de Wi-Fi y Bluetooth.
+- Menús del Dock por encima de sus iconos, con submenús que se adaptan a los bordes de pantalla, desplazamiento para listas largas y navegación por teclado.
+- Jump Lists de Windows con tareas y destinos publicados por cada aplicación; acciones para abrir, anclar, desanclar, cerrar ventanas y finalizar tareas.
+- Orden estable de las aplicaciones abiertas y gestión de los anclados desde Ajustes: reordenación por arrastre, nombres de aplicación e iconos de Windows.
+- Accesos contextuales a terminales, carpetas, ventanas abiertas, escritorio y ajustes; papelera con icono propio en el Dock.
 
 ## 1.2.0 — Themes, recorder and shortcuts / Temas, grabadora y atajos
 

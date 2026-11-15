@@ -996,9 +996,7 @@ pub fn load(app: &AppHandle) -> Settings {
     let shortcuts_before_clamp = s.shortcuts.clone();
     s.clamp();
     let migrated_shortcuts = shortcuts_before_clamp != s.shortcuts;
-    if migrated_topbar || migrated_shortcuts {
-        let _ = save(app, &s);
-    }
+    let migrated_pin_names = crate::dock::normalize_pinned_names(&mut s);
 
     // Migración: si el archivo trae claves en texto plano (versiones ≤0.5) se pasan a Windows y se reescribe
     // el archivo sin ellas. Si Windows no las acepta, se conservan en el archivo para no perderlas.
@@ -1019,7 +1017,9 @@ pub fn load(app: &AppHandle) -> Settings {
             *s.key_mut(p) = stored;
         }
     }
-    if had_plaintext && all_moved {
+    // Persist name migrations after secrets have been secured. If the credential vault rejects
+    // a plaintext key, retain the original file rather than stripping that key during a rename.
+    if all_moved && (had_plaintext || migrated_topbar || migrated_shortcuts || migrated_pin_names) {
         let _ = save(app, &s);
     }
     s

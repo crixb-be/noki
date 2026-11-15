@@ -604,6 +604,7 @@ pub fn battery_info() -> Option<BatteryInfo> {
 pub fn send_keys(combo: String) -> Result<(), String> {
     let combo = combo.to_lowercase();
     let keys: Vec<VIRTUAL_KEY> = match combo.as_str() {
+        "win+d" | "desktop" => vec![VIRTUAL_KEY(0x44)],
         "win+s" | "search" => vec![VIRTUAL_KEY(0x53)],
         "win+shift+s" | "capture" => vec![VIRTUAL_KEY(0x10), VIRTUAL_KEY(0x53)],
         "win+shift+r" | "record" => vec![VIRTUAL_KEY(0x10), VIRTUAL_KEY(0x52)],

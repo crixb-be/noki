@@ -5,7 +5,7 @@
 
 use crate::{icons, notch, settings::{DockPinned, Settings}, window_utils};
 use serde::Serialize;
-use std::{path::Path, sync::{Mutex, OnceLock}, time::{Duration, Instant}};
+use std::{sync::{Mutex, OnceLock}, time::{Duration, Instant}};
 use tauri::{window::Color, AppHandle, Emitter, Manager, PhysicalPosition, PhysicalSize, WebviewUrl, WebviewWindow, WebviewWindowBuilder};
 use windows::{core::{w, PCWSTR}, Win32::{Foundation::{HWND, LPARAM, RECT}, Graphics::{Gdi::{GetMonitorInfoW, MonitorFromWindow, MONITORINFO, MONITOR_DEFAULTTONEAREST}}, UI::{Shell::{SHAppBarMessage, SHEmptyRecycleBinW, SHFileOperationW, SHQueryRecycleBinW, APPBARDATA, SHFILEOPSTRUCTW, FO_DELETE, FOF_ALLOWUNDO, FOF_NOCONFIRMATION, FOF_NOERRORUI, FOF_SILENT}, WindowsAndMessaging::{EnumChildWindows, EnumWindows, FindWindowExW, FindWindowW, GetClassNameW, GetWindowRect, GetAncestor, GetCursorPos, GetWindowLongPtrW, GetWindowTextLengthW, GetWindowTextW, GetWindowThreadProcessId, GetForegroundWindow, IsIconic, IsWindowVisible, SetForegroundWindow, SetWindowPos, ShowWindow, ShowWindowAsync, GA_ROOT, GWL_EXSTYLE, HWND_TOPMOST, SW_MINIMIZE, SW_RESTORE, SW_HIDE, SW_SHOW, SW_SHOWNA, SWP_ASYNCWINDOWPOS, SWP_NOACTIVATE, SWP_NOMOVE, SWP_NOSIZE, SWP_NOZORDER, WS_EX_TOOLWINDOW}}}};
 
@@ -23,6 +23,11 @@ struct Hit { x: i32, y: i32, w: i32, h: i32, scale: f64 }
 
 #[derive(Clone, Copy)]
 struct AppBarState { hwnd: isize, rect: RECT, monitor: notch::Rect, height: i32, dpi_milli: i32 }
+
+static RUNNING_ORDER: OnceLock<Mutex<Vec<String>>> = OnceLock::new();
+static MENU_OPEN: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBool::new(false);
+
+pub(crate) fn set_menu_open(open: bool) { MENU_OPEN.store(open, std::sync::atomic::Ordering::SeqCst); }
 
 static HIT: OnceLock<Mutex<Hit>> = OnceLock::new();
 static APPBAR: OnceLock<Mutex<Option<AppBarState>>> = OnceLock::new();
@@ -327,6 +332,10 @@ fn running_windows() -> Vec<Running> {
     list.into_iter().map(|(title, hwnd, path, aumid)| Running { title, hwnd, path, aumid }).collect()
 }
 
+pub(crate) fn open_window_entries() -> Vec<(isize, String)> {
+    running_windows().into_iter().map(|w| (w.hwnd, w.title)).collect()
+}
+
 fn file_name(path: &str) -> String { path.rsplit(['\\', '/']).next().unwrap_or(path).to_ascii_lowercase() }
 
 /// Identidad estable de una app: AUMID si lo hay; si no, la ruta del ejecutable.
@@ -341,7 +350,17 @@ fn pin_matches(pin: &DockPinned, w: &Running) -> bool {
     !pinned.is_empty() && (w.path.eq_ignore_ascii_case(&pinned) || (!w.path.is_empty() && file_name(&w.path) == file_name(&pinned)))
 }
 
-fn pin_key(pin: &DockPinned) -> String { format!("pin:{}", pin.name) }
+fn pin_key(pin: &DockPinned) -> String { format!("pin:{}:{}", identity(&pin.path, &pin.aumid), pin.args) }
+
+/// Normalize both existing pins and incoming settings without changing paths, arguments or order.
+pub(crate) fn normalize_pinned_names(settings: &mut Settings) -> bool {
+    let mut changed = false;
+    for pin in &mut settings.dock.pinned {
+        let name = icons::program_name(&pin.path, &pin.aumid);
+        if pin.name != name { pin.name = name; changed = true; }
+    }
+    changed
+}
 
 pub fn items(settings: &Settings) -> Vec<DockItem> {
     let running = running_windows();
@@ -361,19 +380,39 @@ pub fn items(settings: &Settings) -> Vec<DockItem> {
             if let Some(group) = groups.iter_mut().find(|(g, _)| *g == id) { group.1 += 1; continue; }
             groups.push((id, 1));
             let icon_path = if w.aumid.is_empty() { w.path.clone() } else { format!("shell:AppsFolder\\{}", w.aumid) };
-            out.push(DockItem { key: String::new(), name: w.title.clone(), path: icon_path, args: String::new(), aumid: w.aumid.clone(), running: true, window_count: 1, kind: "running".into() });
+            out.push(DockItem { key: String::new(), name: icons::program_name(&w.path, &w.aumid), path: icon_path, args: String::new(), aumid: w.aumid.clone(), running: true, window_count: 1, kind: "running".into() });
         }
         let first_running = out.len() - groups.len();
         for (item, (id, count)) in out[first_running..].iter_mut().zip(groups) { item.key = format!("app:{id}"); item.window_count = count; }
     }
+    // EnumWindows follows Z-order. Keep surviving app identities in their first-seen order;
+    // only append newly opened apps, without ever sorting the configured pins.
+    let first = settings.dock.pinned.len();
+    let mut order = RUNNING_ORDER.get_or_init(|| Mutex::new(Vec::new())).lock().unwrap();
+    stable_running_order(&mut order, &mut out[first..]);
+    drop(order);
     for folder in &settings.dock.folders {
         out.push(DockItem { key: format!("folder:{}", folder.path), name: folder.name.clone(), path: folder.path.clone(), args: String::new(), aumid: String::new(), running: false, window_count: 0, kind: "folder".into() });
     }
     out
 }
 
+fn stable_running_order(order: &mut Vec<String>, items: &mut [DockItem]) {
+    order.retain(|key| items.iter().any(|item| &item.key == key));
+    let mut new_keys: Vec<_> = items.iter().filter(|item| !order.contains(&item.key)).map(|item| item.key.clone()).collect();
+    // Deterministic order when several apps first appear in the same snapshot.
+    new_keys.sort();
+    new_keys.dedup();
+    order.extend(new_keys);
+    items.sort_by_key(|item| order.iter().position(|key| key == &item.key).unwrap_or(usize::MAX));
+}
+
+pub(crate) fn menu_item(settings: &Settings, key: &str) -> Option<DockItem> {
+    items(settings).into_iter().find(|item| item.key == key)
+}
+
 /// Ventanas abiertas que corresponden a una clave del Dock (`pin:` o `app:`).
-fn windows_for(settings: &Settings, key: &str) -> Vec<isize> {
+pub(crate) fn windows_for(settings: &Settings, key: &str) -> Vec<isize> {
     let running = running_windows();
     if let Some(pin) = settings.dock.pinned.iter().find(|p| pin_key(p) == key) {
         return running.iter().filter(|w| pin_matches(pin, w)).map(|w| w.hwnd).collect();
@@ -409,13 +448,17 @@ pub async fn dock_launch(path: String, args: String, aumid: String) -> Result<()
     tauri::async_runtime::spawn_blocking(move || dock_launch_blocking(path, args, aumid)).await.map_err(|e| e.to_string())?
 }
 
-fn dock_launch_blocking(path: String, args: String, aumid: String) -> Result<(), String> {
-    if !aumid.trim().is_empty() { return std::process::Command::new("explorer.exe").arg(format!("shell:AppsFolder\\{aumid}")).spawn().map(|_| ()).map_err(|e| e.to_string()); }
-    let p = Path::new(&path);
-    if !p.exists() && !path.eq_ignore_ascii_case("explorer.exe") && !path.eq_ignore_ascii_case("notepad.exe") { return Err("El programa ya no existe.".into()); }
-    let mut cmd = std::process::Command::new(&path);
-    for arg in args.split_whitespace() { cmd.arg(arg); }
-    cmd.spawn().map(|_| ()).map_err(|e| e.to_string())
+pub(crate) fn dock_launch_blocking(path: String, args: String, aumid: String) -> Result<(), String> {
+    // ShellExecute preserves the original Windows command line (quoted profile/document paths)
+    // and handles shortcuts. Launch a desktop executable directly even if it has an AUMID.
+    let target = if !aumid.trim().is_empty() && (path.is_empty() || path.starts_with("shell:")) {
+        format!("shell:AppsFolder\\{aumid}")
+    } else { path };
+    let result = unsafe {
+        windows::Win32::UI::Shell::ShellExecuteW(None, w!("open"), &windows::core::HSTRING::from(&target),
+            &windows::core::HSTRING::from(args), None, windows::Win32::UI::WindowsAndMessaging::SW_SHOWNORMAL)
+    };
+    (result.0 as isize > 32).then_some(()).ok_or_else(|| format!("Windows no pudo abrir {target} ({}).", result.0 as isize))
 }
 
 #[tauri::command]
@@ -458,6 +501,10 @@ async fn commit_pin(app: &AppHandle, mut s: Settings) -> Result<(), String> { cr
 #[tauri::command]
 pub async fn dock_pin(app: AppHandle, path: String, name: String, args: String, aumid: String) -> Result<(), String> {
     let state = app.state::<notch::NotchState>(); let mut s = state.settings.lock().unwrap().clone();
+    // `name` is accepted for IPC compatibility only; callers may pass a dynamic window title.
+    let _ = name;
+    let name_path = path.clone(); let name_aumid = aumid.clone();
+    let name = tauri::async_runtime::spawn_blocking(move || icons::program_name(&name_path, &name_aumid)).await.map_err(|e| e.to_string())?;
     if !s.dock.pinned.iter().any(|p| p.path == path && p.aumid == aumid) { s.dock.pinned.push(DockPinned { name, path, args, aumid }); }
     commit_pin(&app, s).await
 }
@@ -465,7 +512,7 @@ pub async fn dock_pin(app: AppHandle, path: String, name: String, args: String, 
 #[tauri::command]
 pub async fn dock_unpin(app: AppHandle, key: String) -> Result<(), String> {
     let state = app.state::<notch::NotchState>(); let mut s = state.settings.lock().unwrap().clone();
-    s.dock.pinned.retain(|p| format!("pin:{}", p.name) != key && p.path != key);
+    s.dock.pinned.retain(|p| pin_key(p) != key && p.path != key);
     commit_pin(&app, s).await
 }
 
@@ -577,6 +624,7 @@ pub fn start(app: AppHandle) {
                 x >= hit_area.x && x < hit_area.x + hit_area.w && y >= hit_area.y && y < hit_area.y + hit_area.h
             };
             let near_bottom = work_area(&app).map(|(r, scale)| p.y >= r.bottom - physical(12, scale) && p.x >= r.left && p.x < r.right).unwrap_or(false);
+            if MENU_OPEN.load(std::sync::atomic::Ordering::SeqCst) { continue; }
             let should_show = !dock_settings.autohide || inside || near_bottom;
             // Cada 2 s se reaplica todo aunque nada haya cambiado: si Windows o tao
             // alteraron los estilos (clics ignorados) o el orden Z, se corrige solo.
@@ -603,4 +651,47 @@ pub fn start(app: AppHandle) {
             });
         }
     });
+}
+
+#[cfg(test)]
+mod order_tests {
+    use super::*;
+    fn item(key: &str) -> DockItem { DockItem { key: key.into(), name: key.into(), path: String::new(), args: String::new(), aumid: String::new(), running: true, window_count: 1, kind: "running".into() } }
+    #[test]
+    fn activation_does_not_reorder_running_apps() {
+        let mut order = vec!["a".into(), "b".into()];
+        let mut items = vec![item("b"), item("c"), item("a")];
+        stable_running_order(&mut order, &mut items);
+        assert_eq!(items.iter().map(|i| i.key.as_str()).collect::<Vec<_>>(), ["a", "b", "c"]);
+    }
+    #[test]
+    fn reopened_app_appends_after_survivors() {
+        let mut order = vec!["a".into(), "b".into()];
+        stable_running_order(&mut order, &mut [item("b")]);
+        let mut items = vec![item("a"), item("b")];
+        stable_running_order(&mut order, &mut items);
+        assert_eq!(items.iter().map(|i| i.key.as_str()).collect::<Vec<_>>(), ["b", "a"]);
+    }
+}
+
+#[cfg(test)]
+mod pin_name_tests {
+    use super::*;
+    #[test]
+    fn migration_discards_tab_titles_preserves_launch_data_and_order() {
+        let mut settings = Settings::default();
+        settings.dock.pinned = vec![
+            DockPinned { name: "Corrección y unificación - Google Gemini - Brave".into(), path: r"C:\NokiMissing\brave.exe".into(), args: "--profile-directory=Work".into(), aumid: String::new() },
+            DockPinned { name: "Draft.txt - Editor".into(), path: r"C:\NokiMissing\editor.exe".into(), args: String::new(), aumid: String::new() },
+        ];
+        let before = settings.dock.pinned.clone();
+        let key = pin_key(&before[0]);
+        assert!(normalize_pinned_names(&mut settings));
+        assert_eq!(settings.dock.pinned.iter().map(|pin| pin.name.as_str()).collect::<Vec<_>>(), ["Brave", "Editor"]);
+        for (old, new) in before.iter().zip(&settings.dock.pinned) {
+            assert_eq!((&old.path, &old.args, &old.aumid), (&new.path, &new.args, &new.aumid));
+        }
+        assert_eq!(key, pin_key(&settings.dock.pinned[0]));
+        assert!(!normalize_pinned_names(&mut settings));
+    }
 }

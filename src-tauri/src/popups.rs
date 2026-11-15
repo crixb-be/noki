@@ -45,14 +45,15 @@ fn state() -> &'static Mutex<PopupState> { STATE.get_or_init(|| Mutex::new(Popup
 fn callbacks() -> &'static Mutex<HashMap<&'static str, Callback>> { CALLBACKS.get_or_init(|| Mutex::new(HashMap::new())) }
 
 fn window_name(id: &str) -> &'static str {
-    if id == "launchpad" { "launchpad" }
+    if id == "contextmenu" { "contextmenu" }
+    else if id == "launchpad" { "launchpad" }
     else if id == "spotlight" { "spotlight" }
     else { "barpanel" }
 }
 
 /// Id con el que se registró la ventana (los paneles comparten «bar_panel»).
 fn base_id(id: &str) -> &'static str {
-    if id == "launchpad" { "launchpad" } else if id == "spotlight" { "spotlight" } else { "bar_panel" }
+    if id == "contextmenu" { "contextmenu" } else if id == "launchpad" { "launchpad" } else if id == "spotlight" { "spotlight" } else { "bar_panel" }
 }
 
 fn same_window(left: &str, right: &str) -> bool {
@@ -74,6 +75,7 @@ fn in_grace(current: &PopupState) -> bool {
 }
 
 fn hide_window(app: &AppHandle, name: &'static str) {
+    if name == "contextmenu" { crate::context_menu::clear_session(app); }
     if let Some(window) = app.get_webview_window(name) {
         let ui_window = window.clone();
         let _ = window.run_on_main_thread(move || { let _ = ui_window.hide(); });
@@ -81,8 +83,9 @@ fn hide_window(app: &AppHandle, name: &'static str) {
 }
 
 fn hide_other_windows(app: &AppHandle, id: &str) {
-    for name in ["launchpad", "spotlight", "barpanel"] {
-        let keep = (name == "launchpad" && id == "launchpad")
+    for name in ["launchpad", "spotlight", "barpanel", "contextmenu"] {
+        let keep = (name == "contextmenu" && id == "contextmenu")
+            || (name == "launchpad" && id == "launchpad")
             || (name == "spotlight" && id == "spotlight")
             || (name == "barpanel" && id.starts_with("bar_panel:"));
         if !keep { hide_window(app, name); }
@@ -91,7 +94,7 @@ fn hide_other_windows(app: &AppHandle, id: &str) {
 
 /// Abre un popup lógico y oculta los demás inmediatamente.
 pub fn open(app: &AppHandle, id: &str) -> Result<(), String> {
-    if !matches!(id, "launchpad" | "spotlight") && !id.starts_with("bar_panel:") {
+    if !matches!(id, "launchpad" | "spotlight" | "contextmenu") && !id.starts_with("bar_panel:") {
         return Err("Popup desconocido.".into());
     }
     let mut current = state().lock().unwrap();
@@ -126,7 +129,7 @@ pub fn close(app: &AppHandle, id: &str) -> bool {
 /// Alterna un popup. Un toggle del mismo id justo después de un cierre automático se suprime para
 /// evitar la carrera cierre -> clic en su botón -> reapertura.
 pub fn toggle(app: &AppHandle, id: &str) -> Result<bool, String> {
-    if !matches!(id, "launchpad" | "spotlight") && !id.starts_with("bar_panel:") {
+    if !matches!(id, "launchpad" | "spotlight" | "contextmenu") && !id.starts_with("bar_panel:") {
         return Err("Popup desconocido.".into());
     }
     // Visibilidad real de la ventana (fuera del candado): si quedó oculta por otra vía,
@@ -161,7 +164,7 @@ pub fn close_all(app: &AppHandle) {
         current.shown_at = None;
         current.generation = current.generation.wrapping_add(1);
     }
-    for name in ["launchpad", "spotlight", "barpanel"] { hide_window(app, name); }
+    for name in ["launchpad", "spotlight", "barpanel", "contextmenu"] { hide_window(app, name); }
 }
 
 #[tauri::command]
@@ -288,11 +291,11 @@ pub fn start(app: AppHandle) {
             if crate::dock::capture_in_progress() { continue; }
             let mut cursor = POINT::default();
             if unsafe { GetCursorPos(&mut cursor) }.is_err() { continue; }
-            let inside = ["launchpad", "spotlight", "barpanel", "dock", "topbar"]
+            let inside = if id == "contextmenu" { crate::context_menu::contains_point(cursor) } else { ["launchpad", "spotlight", "barpanel", "dock", "topbar"]
                 .iter()
                 .filter(|label| **label == window_name(&id) || matches!(**label, "dock" | "topbar"))
                 .filter_map(|label| visible_rect(&app, label))
-                .any(|rect| contains(&rect, cursor));
+                .any(|rect| contains(&rect, cursor)) };
             if !inside { auto_close(&app, &id, epoch); }
         }
     });
