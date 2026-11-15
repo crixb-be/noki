@@ -152,6 +152,7 @@ fn resize_clean(img: &RgbaImage, w: u32, h: u32) -> RgbaImage {
 /// Ajusta el icono a un lienzo cuadrado de OUT_PX. Si ocupa poco de su lienzo (un icono de 32/48 px
 /// dentro de uno de 256), se recorta a su contenido antes de ampliarlo.
 fn finish(img: RgbaImage) -> Option<String> {
+    if generic_application_icon(&img) { return None; }
     let (bx, by, bw, bh) = content_box(&img)?;
     let (w, h) = img.dimensions();
     let img = if bw.max(bh) * 2 <= w.max(h) {
@@ -354,6 +355,27 @@ pub(crate) fn resolve_program(path: &str) -> String {
     path.to_string()
 }
 
+/// Infrastructure processes never represent launchable applications in the Dock.
+pub(crate) fn is_shell_host(path: &str) -> bool {
+    matches!(path.rsplit(['\\', '/']).next().unwrap_or(path).to_ascii_lowercase().as_str(),
+        "applicationframehost.exe" | "searchhost.exe" | "searchapp.exe" |
+        "startmenuexperiencehost.exe" | "shellexperiencehost.exe" | "textinputhost.exe" | "lockapp.exe")
+}
+
+/// Compare pixels, never destroy the shared IDI_APPLICATION handle.
+fn generic_application_icon(img: &RgbaImage) -> bool {
+    use windows::Win32::{Foundation::HANDLE, UI::WindowsAndMessaging::{CopyImage, LoadIconW, IDI_APPLICATION, IMAGE_ICON, IMAGE_FLAGS}};
+    static DEFAULTS: OnceLock<RwLock<HashMap<(u32, u32), Option<RgbaImage>>>> = OnceLock::new();
+    let cache = DEFAULTS.get_or_init(|| RwLock::new(HashMap::new()));
+    let size = img.dimensions();
+    if let Some(default) = cache.read().unwrap().get(&size) { return default.as_ref() == Some(img); }
+    // LoadIcon returns a shared handle. Only CopyImage's owned copy is destroyed.
+    let default = unsafe { LoadIconW(None, IDI_APPLICATION).ok().and_then(|shared| CopyImage(HANDLE(shared.0), IMAGE_ICON, size.0 as i32, size.1 as i32, IMAGE_FLAGS(0)).ok()).and_then(|h| hicon_rgba(HICON(h.0))) };
+    let matches = default.as_ref() == Some(img);
+    cache.write().unwrap().insert(size, default);
+    matches
+}
+
 fn render(path: &str) -> String {
     unsafe { let _ = CoInitializeEx(None, COINIT_APARTMENTTHREADED); }
     let normalized = resolve_program(path).replace('/', "\\");
@@ -380,6 +402,7 @@ fn remember(path: String, url: String) {
 /// con las peticiones posteriores de Launchpad, Spotlight y Dock.
 pub fn warm_paths(paths: Vec<String>) {
     for path in paths {
+        if is_shell_host(&path) { continue; }
         if cache().read().unwrap().contains_key(&path) { continue; }
         let url = render(&path);
         remember(path, url);
@@ -389,6 +412,7 @@ pub fn warm_paths(paths: Vec<String>) {
 /// Icono del programa, acceso directo o `shell:AppsFolder\\…` de una app de la Tienda.
 #[tauri::command]
 pub async fn app_icon(path: String) -> Result<String, String> {
+    if is_shell_host(&path) { return Err("El proceso de infraestructura no representa una aplicación.".into()); }
     if let Some(hit) = cache().read().unwrap().get(&path) { return Ok(hit.clone()); }
     let key = path.clone();
     let url = tauri::async_runtime::spawn_blocking(move || render(&path)).await.map_err(|e| e.to_string())?;
@@ -502,5 +526,19 @@ mod name_tests {
         assert!(!name.is_empty());
         assert!(!name.to_ascii_lowercase().ends_with(".exe"));
         assert_eq!(program_name(&path, ""), name);
+    }
+}
+
+#[cfg(test)]
+mod generic_icon_tests {
+    use super::*;
+    #[test]
+    fn rejects_windows_default_application_icon() {
+        use windows::Win32::UI::WindowsAndMessaging::{CopyIcon, LoadIconW, IDI_APPLICATION};
+        let icon = unsafe { CopyIcon(LoadIconW(None, IDI_APPLICATION).unwrap()).unwrap() };
+        let image = hicon_rgba(icon).unwrap();
+        assert!(generic_application_icon(&image));
+        assert!(finish(image).is_none());
+        assert!(file_icon_png(&resolve_program("explorer.exe")).is_some());
     }
 }

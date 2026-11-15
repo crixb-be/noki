@@ -5,6 +5,7 @@
 
 use crate::{icons, notch, settings::{DockPinned, Settings}, window_utils};
 use serde::Serialize;
+use windows::Win32::Graphics::Dwm::{DwmGetWindowAttribute, DWMWA_CLOAKED};
 use std::{sync::{Mutex, OnceLock}, time::{Duration, Instant}};
 use tauri::{window::Color, AppHandle, Emitter, Manager, PhysicalPosition, PhysicalSize, WebviewUrl, WebviewWindow, WebviewWindowBuilder};
 use windows::{core::{w, PCWSTR}, Win32::{Foundation::{HWND, LPARAM, RECT}, Graphics::{Gdi::{GetMonitorInfoW, MonitorFromWindow, MONITORINFO, MONITOR_DEFAULTTONEAREST}}, UI::{Shell::{SHAppBarMessage, SHEmptyRecycleBinW, SHFileOperationW, SHQueryRecycleBinW, APPBARDATA, SHFILEOPSTRUCTW, FO_DELETE, FOF_ALLOWUNDO, FOF_NOCONFIRMATION, FOF_NOERRORUI, FOF_SILENT}, WindowsAndMessaging::{EnumChildWindows, EnumWindows, FindWindowExW, FindWindowW, GetClassNameW, GetWindowRect, GetAncestor, GetCursorPos, GetWindowLongPtrW, GetWindowTextLengthW, GetWindowTextW, GetWindowThreadProcessId, GetForegroundWindow, IsIconic, IsWindowVisible, SetForegroundWindow, SetWindowPos, ShowWindow, ShowWindowAsync, GA_ROOT, GWL_EXSTYLE, HWND_TOPMOST, SW_MINIMIZE, SW_RESTORE, SW_HIDE, SW_SHOW, SW_SHOWNA, SWP_ASYNCWINDOWPOS, SWP_NOACTIVATE, SWP_NOMOVE, SWP_NOSIZE, SWP_NOZORDER, WS_EX_TOOLWINDOW}}}};
@@ -287,49 +288,93 @@ fn title(hwnd: HWND) -> String {
     }
 }
 
+fn cloaked(hwnd: HWND) -> bool {
+    let mut value = 0u32;
+    unsafe { DwmGetWindowAttribute(hwnd, DWMWA_CLOAKED, &mut value as *mut _ as *mut _, std::mem::size_of::<u32>() as u32).is_ok() && value != 0 }
+}
+
+struct HostedApp { host_pid: u32, child: Option<(HWND, u32, String)> }
+
 unsafe extern "system" fn child_callback(hwnd: HWND, lparam: LPARAM) -> windows::core::BOOL {
-    if IsWindowVisible(hwnd).as_bool() {
-        let result = &mut *(lparam.0 as *mut Option<HWND>);
-        *result = Some(hwnd);
+    let state = &mut *(lparam.0 as *mut HostedApp);
+    let mut class = [0u16; 128];
+    let len = GetClassNameW(hwnd, &mut class);
+    if String::from_utf16_lossy(&class[..len.max(0) as usize]) != "Windows.UI.Core.CoreWindow"
+        || !IsWindowVisible(hwnd).as_bool() || cloaked(hwnd) { return true.into(); }
+    let mut pid = 0;
+    GetWindowThreadProcessId(hwnd, Some(&mut pid));
+    if pid == 0 || pid == state.host_pid { return true.into(); }
+    if let Some(path) = icons::process_image_path(pid).filter(|p| !p.is_empty() && !icons::is_shell_host(p)) {
+        state.child = Some((hwnd, pid, path));
         return false.into();
     }
     true.into()
 }
 
 unsafe extern "system" fn enum_callback(hwnd: HWND, lparam: LPARAM) -> windows::core::BOOL {
-    if !IsWindowVisible(hwnd).as_bool() || GetAncestor(hwnd, GA_ROOT) != hwnd { return true.into(); }
+    if !IsWindowVisible(hwnd).as_bool() || cloaked(hwnd) || GetAncestor(hwnd, GA_ROOT) != hwnd { return true.into(); }
     let ex = GetWindowLongPtrW(hwnd, GWL_EXSTYLE);
     if ex & WS_EX_TOOLWINDOW.0 as isize != 0 || title(hwnd).is_empty() { return true.into(); }
     let mut pid = 0u32;
     GetWindowThreadProcessId(hwnd, Some(&mut pid));
-    let own = windows::Win32::System::Threading::GetCurrentProcessId();
-    if pid == own { return true.into(); }
-    let process_path = icons::process_image_path(pid).unwrap_or_default();
-    let process_name = process_path.rsplit(['\\', '/']).next().unwrap_or_default().to_ascii_lowercase();
-    // Procesos del sistema que tienen ventanas «visibles» pero no son apps: la Experiencia de entrada
-    // de Windows (teclado táctil, panel de emojis, dictado) y sus ventanas vacías.
-    if HIDDEN_PROCESSES.contains(&process_name.as_str()) { return true.into(); }
-    let icon_hwnd = if process_name == "applicationframehost.exe" {
-        let mut child = None;
-        let _ = EnumChildWindows(Some(hwnd), Some(child_callback), LPARAM(&mut child as *mut _ as isize));
-        child.unwrap_or(hwnd)
+    if pid == windows::Win32::System::Threading::GetCurrentProcessId() { return true.into(); }
+    let Some(mut process_path) = icons::process_image_path(pid).filter(|p| !p.is_empty()) else { return true.into(); };
+    let icon_hwnd = if file_name(&process_path) == "applicationframehost.exe" {
+        let mut state = HostedApp { host_pid: pid, child: None };
+        let _ = EnumChildWindows(Some(hwnd), Some(child_callback), LPARAM(&mut state as *mut _ as isize));
+        let Some((child, child_pid, path)) = state.child else { return true.into(); };
+        pid = child_pid;
+        process_path = path;
+        child
     } else { hwnd };
+    if icons::is_shell_host(&process_path) { return true.into(); }
     let aumid = icons::window_app_user_model_id(icon_hwnd, pid).unwrap_or_default();
-    let list = &mut *(lparam.0 as *mut Vec<(String, isize, String, String)>);
-    list.push((title(hwnd), hwnd.0 as isize, process_path, aumid));
+    let list = &mut *(lparam.0 as *mut Vec<Running>);
+    list.push(Running { title: title(hwnd), hwnd: hwnd.0 as isize, path: process_path, aumid, recycle_bin: false });
     true.into()
 }
 
-/// Procesos cuyas ventanas nunca aparecen en el Dock como app abierta.
-const HIDDEN_PROCESSES: [&str; 1] = ["textinputhost.exe"];
+/// Keep the frame HWND for activation/WM_CLOSE, but always use the real app for identity/icons.
+struct Running { title: String, hwnd: isize, path: String, aumid: String, recycle_bin: bool }
 
-/// Ventana abierta de otra app: título, HWND, ruta del ejecutable y AUMID.
-struct Running { title: String, hwnd: isize, path: String, aumid: String }
+/// Identify Explorer's current namespace using PIDLs, independent of title, language or URL.
+fn recycle_bin_windows() -> Vec<isize> {
+    use windows::{core::Interface, Win32::{System::{Com::{CoCreateInstance, CoInitializeEx, CoTaskMemFree, CoUninitialize, IServiceProvider, CLSCTX_ALL, COINIT_APARTMENTTHREADED}, Variant::VARIANT}, UI::Shell::{IFolderView, IPersistFolder2, IShellBrowser, IShellWindows, IWebBrowserApp, ShellWindows, SID_STopLevelBrowser, SHGetKnownFolderIDList, FOLDERID_RecycleBinFolder, KF_FLAG_DEFAULT, ILIsEqual}}};
+    struct ComGuard(bool);
+    impl Drop for ComGuard { fn drop(&mut self) { if self.0 { unsafe { CoUninitialize(); } } } }
+    unsafe {
+        let _com = ComGuard(CoInitializeEx(None, COINIT_APARTMENTTHREADED).is_ok());
+        let Ok(windows): Result<IShellWindows, _> = CoCreateInstance(&ShellWindows, None, CLSCTX_ALL) else { return Vec::new(); };
+        let Ok(bin) = SHGetKnownFolderIDList(&FOLDERID_RecycleBinFolder, KF_FLAG_DEFAULT.0 as u32, None) else { return Vec::new(); };
+        let mut result = Vec::new();
+        for i in 0..windows.Count().unwrap_or(0) {
+            let resolved = (|| -> windows::core::Result<Option<isize>> {
+                let dispatch = windows.Item(&VARIANT::from(i))?;
+                let browser: IWebBrowserApp = dispatch.cast()?;
+                let provider: IServiceProvider = dispatch.cast()?;
+                let shell: IShellBrowser = provider.QueryService(&SID_STopLevelBrowser)?;
+                let view: IFolderView = shell.QueryActiveShellView()?.cast()?;
+                let folder: IPersistFolder2 = view.GetFolder()?;
+                let pidl = folder.GetCurFolder()?;
+                let matches = ILIsEqual(pidl, bin).as_bool();
+                CoTaskMemFree(Some(pidl.cast()));
+                Ok(if matches { Some(browser.HWND()?.0) } else { None })
+            })();
+            if let Ok(Some(hwnd)) = resolved { result.push(hwnd); }
+        }
+        CoTaskMemFree(Some(bin.cast()));
+        result
+    }
+}
 
 fn running_windows() -> Vec<Running> {
-    let mut list: Vec<(String, isize, String, String)> = Vec::new();
+    let mut list: Vec<Running> = Vec::new();
     unsafe { let _ = EnumWindows(Some(enum_callback), LPARAM(&mut list as *mut _ as isize)); }
-    list.into_iter().map(|(title, hwnd, path, aumid)| Running { title, hwnd, path, aumid }).collect()
+    if list.iter().any(|w| file_name(&w.path) == "explorer.exe") {
+        let bins = recycle_bin_windows();
+        for w in &mut list { w.recycle_bin = bins.contains(&w.hwnd); }
+    }
+    list
 }
 
 pub(crate) fn open_window_entries() -> Vec<(isize, String)> {
@@ -363,14 +408,16 @@ pub(crate) fn normalize_pinned_names(settings: &mut Settings) -> bool {
 }
 
 pub fn items(settings: &Settings) -> Vec<DockItem> {
-    let running = running_windows();
+    let running: Vec<_> = running_windows().into_iter().filter(|w| !settings.dock.show_trash || !w.recycle_bin).collect();
     let mut used = vec![false; running.len()];
     let mut out = Vec::new();
     for p in &settings.dock.pinned {
+        if icons::is_shell_host(&p.path) { continue; }
         let mut count = 0;
         for (i, w) in running.iter().enumerate() { if pin_matches(p, w) { used[i] = true; count += 1; } }
         out.push(DockItem { key: pin_key(p), name: p.name.clone(), path: icons::resolve_program(&p.path), args: p.args.clone(), aumid: p.aumid.clone(), running: count > 0, window_count: count, kind: "pinned".into() });
     }
+    let first = out.len();
     if settings.dock.show_running {
         // Una entrada por app (no por ventana), en el orden en que aparecen.
         let mut groups: Vec<(String, usize)> = Vec::new();
@@ -387,7 +434,6 @@ pub fn items(settings: &Settings) -> Vec<DockItem> {
     }
     // EnumWindows follows Z-order. Keep surviving app identities in their first-seen order;
     // only append newly opened apps, without ever sorting the configured pins.
-    let first = settings.dock.pinned.len();
     let mut order = RUNNING_ORDER.get_or_init(|| Mutex::new(Vec::new())).lock().unwrap();
     stable_running_order(&mut order, &mut out[first..]);
     drop(order);
@@ -693,5 +739,47 @@ mod pin_name_tests {
         }
         assert_eq!(key, pin_key(&settings.dock.pinned[0]));
         assert!(!normalize_pinned_names(&mut settings));
+    }
+}
+
+#[cfg(test)]
+mod window_filter_tests {
+    use super::*;
+
+    #[test]
+    fn shell_infrastructure_is_never_an_independent_app() {
+        for executable in ["ApplicationFrameHost.exe", "SearchHost.exe", "StartMenuExperienceHost.exe", "ShellExperienceHost.exe", "TextInputHost.exe", "LockApp.exe"] {
+            assert!(icons::is_shell_host(&format!(r"C:\Windows\System32\{executable}")));
+        }
+        assert!(!icons::is_shell_host(r"C:\Windows\ImmersiveControlPanel\SystemSettings.exe"));
+        assert!(!icons::is_shell_host(r"C:\Windows\explorer.exe"));
+    }
+
+    #[test]
+    #[ignore = "Requires Settings and the Recycle Bin open on the interactive Windows desktop"]
+    fn live_settings_and_recycle_bin_have_no_duplicate_entries() {
+        let windows = running_windows();
+        assert!(windows.iter().all(|w| !icons::is_shell_host(&w.path)));
+        let settings_window = windows.iter().find(|w| file_name(&w.path) == "systemsettings.exe").expect("Open Windows Settings first");
+        assert!(windows.iter().any(|w| w.recycle_bin), "Open the Recycle Bin first; its namespace must be recognized");
+        let mut settings = Settings::default();
+        settings.dock.pinned.clear();
+        settings.dock.show_running = true;
+        settings.dock.show_trash = true;
+        let key = format!("app:{}", identity(&settings_window.path, &settings_window.aumid));
+        let unpinned = items(&settings);
+        assert_eq!(unpinned.iter().filter(|i| i.key == key).count(), 1);
+        let bin_only: Vec<_> = windows.iter().filter(|w| w.recycle_bin).collect();
+        for bin in bin_only {
+            if !windows.iter().any(|w| !w.recycle_bin && identity(&w.path, &w.aumid) == identity(&bin.path, &bin.aumid)) {
+                assert!(!unpinned.iter().any(|i| i.key == format!("app:{}", identity(&bin.path, &bin.aumid))));
+            }
+        }
+        settings.dock.pinned.push(DockPinned { name: "Settings".into(), path: settings_window.path.clone(), args: String::new(), aumid: settings_window.aumid.clone() });
+        let pinned = items(&settings);
+        assert!(pinned[0].running);
+        assert_eq!(pinned.iter().filter(|i| i.aumid == settings_window.aumid && i.path.to_lowercase().contains("systemsettings.exe")).count(), 1);
+        assert!(!pinned.iter().any(|i| i.key == key));
+        println!("PASS: real Settings app merges with its pin; Recycle Bin namespace belongs to the fixed metallic icon; no infrastructure processes.");
     }
 }
