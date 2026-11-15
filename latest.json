@@ -1,11 +1,11 @@
 {
-  "version": "1.3.0",
-  "notes": "- Barra superior unificada con buscador rápido, paneles de la barra y avatar; nuevo Dock y Launchpad para acceder a aplicaciones y ventanas desde un solo lugar.\n- Menús contextuales del Dock y la barra superior con el mismo gris translúcido, desenfoque, borde y resaltado de los paneles de Wi-Fi y Bluetooth.\n- Menús del Dock por encima de sus iconos, con submenús que se adaptan a los bordes de pantalla, desplazamiento para listas largas y navegación por teclado.\n- Jump Lists de Windows con tareas y destinos publicados por cada aplicación; acciones para abrir, anclar, desanclar, cerrar ventanas y finalizar tareas.\n- Orden estable de las aplicaciones abiertas y gestión de los anclados desde Ajustes: reordenación por arrastre, nombres de aplicación e iconos de Windows.\n- Accesos contextuales a terminales, carpetas, ventanas abiertas, escritorio y ajustes; papelera con icono propio en el Dock.",
-  "pub_date": "2026-11-15T00:17:20Z",
+  "version": "1.3.1",
+  "notes": "- Corregida la identidad de las apps UWP: ApplicationFrameHost resuelve el proceso real y se descartan ventanas vacías, ocultas y procesos de infraestructura del sistema.\n- Papelera protegida: conserva su arte metálico y las ventanas del Explorador abiertas en la Papelera no añaden un icono duplicado.\n- Aplicaciones ancladas reordenables por drag-and-drop en Ajustes, con agarre y papelera a la derecha; se mantiene la navegación por teclado.",
+  "pub_date": "2026-11-15T01:31:29Z",
   "platforms": {
     "windows-x86_64": {
-      "signature": "dW50cnVzdGVkIGNvbW1lbnQ6IHNpZ25hdHVyZSBmcm9tIHRhdXJpIHNlY3JldCBrZXkKUlVTTnBFd3FJNE9ZOTBVWG04L3VIRUg1cFNXVWhTdW1vNVVuU1FwRE1kR3FZYkdrV1NpbjluUGo1ZFBpWXJFV3E2QXRsMmduY2pZWU03QU52UTBpSzFMdzNPVC9WQ29sK2drPQp0cnVzdGVkIGNvbW1lbnQ6IHRpbWVzdGFtcDoxNzk0NzAxNTEyCWZpbGU6Tm9raV8xLjMuMF94NjQtc2V0dXAuZXhlCXZlcnNpb246MS4zLjAKdlZjN1kveFVuZlR4cXIrTFlYSjVLQ3VZTHBraEdOOG9CY0wyQ3pGemN2a0VKV2cxL1BTTlFENkFpekxFL2lkZjRXazJVTnpSODdtSVB4bTRidUNMQnc9PQo=",
-      "url": "https://github.com/crixb-be/noki/releases/download/v1.3.0/Noki_1.3.0_x64-setup.exe"
+      "signature": "",
+      "url": "https://github.com/crixb-be/noki/releases/download/v1.3.1/Noki_1.3.1_x64-setup.exe"
     }
   }
 }

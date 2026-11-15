@@ -1,5 +1,11 @@
 # Changelog
 
+## [1.3.1]
+
+- Corregida la identidad de las apps UWP: ApplicationFrameHost resuelve el proceso real y se descartan ventanas vacías, ocultas y procesos de infraestructura del sistema.
+- Papelera protegida: conserva su arte metálico y las ventanas del Explorador abiertas en la Papelera no añaden un icono duplicado.
+- Aplicaciones ancladas reordenables por drag-and-drop en Ajustes, con agarre y papelera a la derecha; se mantiene la navegación por teclado.
+
 ## 1.3.0 — Barra superior unificada, Dock y Launchpad
 
 - Barra superior unificada con buscador rápido, paneles de la barra y avatar; nuevo Dock y Launchpad para acceder a aplicaciones y ventanas desde un solo lugar.
