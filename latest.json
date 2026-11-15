@@ -1,11 +1,11 @@
 {
-  "version": "1.3.1",
-  "notes": "- Corregida la identidad de las apps UWP: ApplicationFrameHost resuelve el proceso real y se descartan ventanas vacías, ocultas y procesos de infraestructura del sistema.\n- Papelera protegida: conserva su arte metálico y las ventanas del Explorador abiertas en la Papelera no añaden un icono duplicado.\n- Aplicaciones ancladas reordenables por drag-and-drop en Ajustes, con agarre y papelera a la derecha; se mantiene la navegación por teclado.",
-  "pub_date": "2026-11-15T01:31:29Z",
-  "platforms": {
-    "windows-x86_64": {
-      "signature": "",
-      "url": "https://github.com/crixb-be/noki/releases/download/v1.3.1/Noki_1.3.1_x64-setup.exe"
-    }
-  }
+    "version":  "1.3.1",
+    "notes":  "- Corregida la identidad de las apps UWP: ApplicationFrameHost resuelve el proceso real y se descartan ventanas vacÃ­as, ocultas y procesos de infraestructura del sistema.\n- Papelera protegida: conserva su arte metÃ¡lico y las ventanas del Explorador abiertas en la Papelera no aÃ±aden un icono duplicado.\n- Aplicaciones ancladas reordenables por drag-and-drop en Ajustes, con agarre y papelera a la derecha; se mantiene la navegaciÃ³n por teclado.",
+    "pub_date":  "2026-11-15T01:31:29Z",
+    "platforms":  {
+                      "windows-x86_64":  {
+                                             "signature":  "dW50cnVzdGVkIGNvbW1lbnQ6IHNpZ25hdHVyZSBmcm9tIHRhdXJpIHNlY3JldCBrZXkKUlVTTnBFd3FJNE9ZOTNMalZsWTArYUgxL3VkRmtaQmZPNHNOUTFmMjNGRC80SDM3V2FHakJEK3NoWDFldmpCcGZ1V0llMzlpNHBWWHN6L0tDdjVZQXMzL0JmY09nVUtydkFjPQp0cnVzdGVkIGNvbW1lbnQ6IHRpbWVzdGFtcDoxNzk0NzA2NTU5CWZpbGU6Tm9raV8xLjMuMV94NjQtc2V0dXAuZXhlCXZlcnNpb246MS4zLjEKcExxclFRN0l1aGNxK3JnQTJCUGdJK1lNWSsvTHdROWhmQ1dOQTdheTlXZEN1RUhPb0NDSUVlRCtDRFhxcTY1amg3MDhZUWFFenZpSVJHSW0xT0xJQlE9PQo=",
+                                             "url":  "https://github.com/crixb-be/noki/releases/download/v1.3.1/Noki_1.3.1_x64-setup.exe"
+                                         }
+                  }
 }
