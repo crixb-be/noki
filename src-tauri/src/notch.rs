@@ -92,12 +92,13 @@ pub struct NotchState {
     pub settings: Mutex<Settings>,
     /// Los ajustes cambiaron: recalcular ventanas y layout ya.
     pub dirty: AtomicBool,
+    pub fullscreen: AtomicBool,
     wins: Mutex<HashMap<String, Arc<Win>>>,
 }
 
 impl NotchState {
     pub fn new(settings: Settings) -> Self {
-        Self { settings: Mutex::new(settings), dirty: AtomicBool::new(true), wins: Mutex::new(HashMap::new()) }
+        Self { settings: Mutex::new(settings), dirty: AtomicBool::new(true), fullscreen: AtomicBool::new(false), wins: Mutex::new(HashMap::new()) }
     }
 
     pub fn win(&self, label: &str) -> Option<Arc<Win>> {
@@ -708,9 +709,11 @@ fn run_loop(app: AppHandle) {
     let mut loops: HashMap<String, WinLoop> = HashMap::new();
     let mut assign: Vec<(String, Mon)> = vec![];
     let mut fullscreen = false;
+    let mut was_capturing = false;
     let long_ago = Instant::now() - Duration::from_secs(10);
     let mut last_slow = long_ago;
     let mut last_fs = long_ago;
+    let mut fullscreen_since = None;
     let mut last_drop = long_ago;
     // Ajustes en caché: antes se clonaba toda la estructura (con sus Strings) 40 veces por segundo.
     let mut s = app.state::<NotchState>().settings.lock().unwrap().clone();
@@ -742,12 +745,32 @@ fn run_loop(app: AppHandle) {
         // y su superposición pasa a primer plano: si se reaccionaba, se ocultaban la barra y el Dock y se
         // renegociaban las AppBars, el área de trabajo cambiaba y la pantalla saltaba bajo el recorte
         // (o se cerraba). Mientras dura, todo se queda exactamente como estaba.
-        let capturing = crate::dock::capture_overlay_active();
-        if !capturing && now - last_fs >= Duration::from_millis(400) {
+        let capturing = crate::dock::capture_in_progress();
+        let capture_ended = was_capturing && !capturing;
+        was_capturing = capturing;
+        if capturing {
+            fullscreen_since = None;
+        } else if capture_ended || now - last_fs >= Duration::from_millis(60) {
             last_fs = now;
-            fullscreen = s.general.hide_on_fullscreen && fullscreen_app_active();
+            if !s.general.hide_on_fullscreen {
+                fullscreen = false;
+                fullscreen_since = None;
+            } else if transient_foreground_process() {
+                fullscreen_since = None;
+            } else {
+                let detected = fullscreen_app_active();
+                if detected == fullscreen {
+                    fullscreen_since = None;
+                } else if now - *fullscreen_since.get_or_insert(now) >= Duration::from_millis(275) {
+                    fullscreen = detected;
+                    fullscreen_since = None;
+                }
+            }
+            if fullscreen != previous_fullscreen {
+                st.fullscreen.store(fullscreen, SeqCst);
+            }
         }
-        if !capturing && (slow || previous_fullscreen != fullscreen) {
+        if !capturing && (slow || capture_ended || previous_fullscreen != fullscreen) {
             crate::topbar::sync(&app, &s, fullscreen);
             crate::dock::sync(&app, &s, fullscreen);
             crate::launchpad::sync(&app, &s, fullscreen);

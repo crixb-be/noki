@@ -61,13 +61,13 @@ struct PanelState {
     height: i32,
 }
 
-static APPBAR_HWND: OnceLock<Mutex<Option<isize>>> = OnceLock::new();
+static APPBAR: OnceLock<Mutex<Option<(isize, notch::Rect, i32)>>> = OnceLock::new();
 static PANEL: OnceLock<Mutex<PanelState>> = OnceLock::new();
 static GLASS: OnceLock<Mutex<Option<(String, String)>>> = OnceLock::new();
 static AVATAR_CACHE: OnceLock<Mutex<Option<(String, Option<String>)>>> = OnceLock::new();
 
-fn appbar_hwnd() -> &'static Mutex<Option<isize>> {
-    APPBAR_HWND.get_or_init(|| Mutex::new(None))
+fn appbar() -> &'static Mutex<Option<(isize, notch::Rect, i32)>> {
+    APPBAR.get_or_init(|| Mutex::new(None))
 }
 
 fn panel_state() -> &'static Mutex<PanelState> {
@@ -174,6 +174,9 @@ fn set_owner(app: &AppHandle, enabled: bool) {
 
 fn register_appbar(window: &WebviewWindow, monitor: notch::Rect, height: i32) {
     let Some(h) = hwnd(window) else { return };
+    let key = (h.0 as isize, monitor, height);
+    let mut current = appbar().lock().unwrap();
+    if *current == Some(key) { return; }
     let mut data = APPBARDATA {
         cbSize: std::mem::size_of::<APPBARDATA>() as u32,
         hWnd: h,
@@ -183,14 +186,12 @@ fn register_appbar(window: &WebviewWindow, monitor: notch::Rect, height: i32) {
         lParam: LPARAM(0),
     };
     unsafe {
-        let mut current = appbar_hwnd().lock().unwrap();
-        if current.is_none() {
-            if SHAppBarMessage(ABM_NEW, &mut data) != 0 {
-                *current = Some(h.0 as isize);
-            } else {
-                return;
-            }
+        if !current.is_some_and(|(raw, _, _)| raw == key.0)
+            && SHAppBarMessage(ABM_NEW, &mut data) == 0
+        {
+            return;
         }
+        *current = Some(key);
         let _ = SHAppBarMessage(ABM_QUERYPOS, &mut data);
         data.rc.left = monitor.left;
         data.rc.right = monitor.right;
@@ -201,8 +202,8 @@ fn register_appbar(window: &WebviewWindow, monitor: notch::Rect, height: i32) {
 }
 
 fn remove_appbar() {
-    let mut current = appbar_hwnd().lock().unwrap();
-    let Some(raw) = current.take() else { return };
+    let mut current = appbar().lock().unwrap();
+    let Some((raw, _, _)) = current.take() else { return };
     let mut data = APPBARDATA { cbSize: std::mem::size_of::<APPBARDATA>() as u32, hWnd: HWND(raw as *mut _), ..Default::default() };
     unsafe {
         let _ = SHAppBarMessage(ABM_REMOVE, &mut data);
@@ -228,7 +229,7 @@ fn transient_foreground_process() -> bool {
 }
 
 fn raise(hwnd: HWND, _force: bool) {
-    if transient_foreground_process() { return; }
+    if crate::dock::capture_overlay_active() || transient_foreground_process() { return; }
     unsafe {
         if GetWindowLongPtrW(hwnd, GWL_EXSTYLE) & WS_EX_TOPMOST.0 as isize != 0 {
             return;
@@ -272,7 +273,7 @@ fn foreign_window_at(point: POINT, own_pid: u32, topbar: HWND) -> bool {
 }
 
 fn check_z_order(app: &AppHandle, monitor: notch::Rect) {
-    if transient_foreground_process() { return; }
+    if crate::dock::capture_overlay_active() || transient_foreground_process() { return; }
     let Some(topbar) = app.get_webview_window("topbar") else { return };
     let Some(top_hwnd) = hwnd(&topbar) else { return };
     let width = monitor.right - monitor.left;
@@ -320,7 +321,6 @@ pub fn sync(app: &AppHandle, settings: &Settings, fullscreen: bool) {
     if fullscreen {
         let ui_window = window.clone();
         let _ = window.run_on_main_thread(move || { let _ = ui_window.hide(); });
-        remove_appbar();
         return;
     }
     let ui_window = window.clone();
@@ -586,7 +586,7 @@ pub fn bt_devices() -> Vec<String> {
     statuswatch::connected_bluetooth().map(|v| v.into_values().collect()).unwrap_or_default()
 }
 
-#[derive(Serialize)]
+#[derive(Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct BatteryInfo {
     pub level: u8,
@@ -598,7 +598,22 @@ pub fn battery_info() -> Option<BatteryInfo> {
     let mut status = windows::Win32::System::Power::SYSTEM_POWER_STATUS::default();
     unsafe { windows::Win32::System::Power::GetSystemPowerStatus(&mut status).ok()?; }
     if status.BatteryLifePercent == 255 { return None; }
-    Some(BatteryInfo { level: status.BatteryLifePercent, charging: status.ACLineStatus == 1 && status.BatteryFlag & 8 == 0, ac: status.ACLineStatus == 1 })
+    Some(BatteryInfo { level: status.BatteryLifePercent, charging: status.ACLineStatus == 1 && status.BatteryFlag != 255 && status.BatteryFlag & 8 != 0, ac: status.ACLineStatus == 1 })
+}
+
+// One Windows snapshot for every WebView; polling also detects charger changes.
+fn battery_snapshot() -> &'static Mutex<Option<BatteryInfo>> {
+    static SNAPSHOT: OnceLock<Mutex<Option<BatteryInfo>>> = OnceLock::new();
+    SNAPSHOT.get_or_init(|| Mutex::new(battery_info()))
+}
+
+pub fn start_battery_watch(app: AppHandle) {
+    std::thread::spawn(move || loop {
+        let current = battery_info();
+        *battery_snapshot().lock().unwrap() = current.clone();
+        let _ = app.emit("battery-info", &current);
+        std::thread::sleep(Duration::from_secs(2));
+    });
 }
 
 pub fn send_keys(combo: String) -> Result<(), String> {
@@ -808,162 +823,235 @@ pub async fn command_audio_output_name() -> String {
 #[tauri::command]
 pub fn command_send_keys(combo: String) -> Result<(), String> { send_keys(combo) }
 
-/// Panel de iconos ocultos de la bandeja de Windows 11 (`TopLevelWindowForOverflowXamlIsland`).
-const TRAY_OVERFLOW_CLASS: &str = "TopLevelWindowForOverflowXamlIsland";
+const TRAY_OVERFLOW_CLASSES: [&str; 2] = [
+    "NotifyIconOverflowWindow",
+    "TopLevelWindowForOverflowXamlIsland",
+];
 
-fn tray_overflow() -> Option<HWND> {
-    let wide: Vec<u16> = TRAY_OVERFLOW_CLASS.encode_utf16().chain(std::iter::once(0)).collect();
-    unsafe { windows::Win32::UI::WindowsAndMessaging::FindWindowW(PCWSTR(wide.as_ptr()), PCWSTR::null()).ok().filter(|h| !h.0.is_null()) }
-}
-
-fn tray_overflow_visible() -> Option<HWND> {
-    tray_overflow().filter(|h| unsafe { windows::Win32::UI::WindowsAndMessaging::IsWindowVisible(*h).as_bool() })
-}
-
-/// Cuándo se cerró por última vez el panel (para que el clic que lo cierra no lo vuelva a abrir).
-fn tray_closed_at() -> &'static Mutex<Option<std::time::Instant>> {
-    static AT: OnceLock<Mutex<Option<std::time::Instant>>> = OnceLock::new();
-    AT.get_or_init(|| Mutex::new(None))
-}
-
-/// Destino del panel de iconos ocultos mientras se abre: (HWND, centro x, y, hasta cuándo se fija).
-/// Lo usa la función de `SetWinEventHook`, que no admite capturas.
-static TRAY_TARGET: Mutex<Option<(isize, i32, i32, i32, i32)>> = Mutex::new(None);
-
-/// Coloca el panel centrado en `cx` (limitado al monitor `[min_x, max_x]`) con su borde superior en
-/// `top`, si no está ya ahí. Devuelve si estaba visible.
-fn place_tray_overflow(h: HWND, cx: i32, top: i32, min_x: i32, max_x: i32) -> bool {
-    use windows::Win32::UI::WindowsAndMessaging::{GetWindowRect, IsWindowVisible, SWP_NOZORDER};
-    let mut r = windows::Win32::Foundation::RECT::default();
+fn tray_is_open(hwnd: HWND) -> bool {
+    use windows::Win32::{
+        Graphics::Dwm::{DwmGetWindowAttribute, DWMWA_CLOAKED},
+        UI::WindowsAndMessaging::IsWindowVisible,
+    };
     unsafe {
-        if GetWindowRect(h, &mut r).is_err() { return false; }
-        let width = r.right - r.left;
-        let left = (cx - width / 2).clamp(min_x, (max_x - width).max(min_x));
-        if r.left != left || r.top != top {
-            let _ = SetWindowPos(h, None, left, top, 0, 0, SWP_NOSIZE | SWP_NOZORDER | SWP_NOACTIVATE);
-        }
-        IsWindowVisible(h).as_bool()
+        if !IsWindowVisible(hwnd).as_bool() { return false; }
+        // Explorer puede mantener visible el HWND de XAML aunque DWM ya haya ocultado su contenido.
+        let mut cloaked = 0u32;
+        let status = DwmGetWindowAttribute(
+            hwnd, DWMWA_CLOAKED, (&mut cloaked as *mut u32).cast(),
+            std::mem::size_of_val(&cloaked) as u32,
+        );
+        status.is_err() || cloaked == 0
     }
 }
 
-/// Explorer muestra o mueve el panel: se devuelve arriba en el mismo instante (sin esperar al sondeo).
-unsafe extern "system" fn tray_win_event(_hook: windows::Win32::UI::Accessibility::HWINEVENTHOOK, _event: u32, hwnd: HWND, id_object: i32, _id_child: i32, _thread: u32, _time: u32) {
-    if id_object != 0 || hwnd.0.is_null() { return; }
-    let Some((target, cx, top, min_x, max_x)) = *TRAY_TARGET.lock().unwrap() else { return };
-    if hwnd.0 as isize == target { place_tray_overflow(hwnd, cx, top, min_x, max_x); }
+#[derive(Clone, Copy)]
+struct TrayPlacement {
+    center_x: i32,
+    top: i32,
+    min_x: i32,
+    max_x: i32,
 }
 
-/// Atiende los mensajes del hilo (los eventos de `SetWinEventHook` llegan por la cola de mensajes)
-/// durante `ms` milisegundos, recolocando el panel cada ~1 ms. Devuelve si llegó a estar visible.
-fn pump_tray(h: HWND, place: (i32, i32, i32, i32), ms: u64) -> bool {
-    use windows::Win32::UI::WindowsAndMessaging::{DispatchMessageW, PeekMessageW, TranslateMessage, MSG, PM_REMOVE};
-    let end = std::time::Instant::now() + Duration::from_millis(ms);
-    let mut seen = false;
-    while std::time::Instant::now() < end {
+impl TrayPlacement {
+    fn from_button(window: &WebviewWindow, x: i32, bottom: i32) -> Result<Self, String> {
+        use windows::Win32::Graphics::Gdi::{ClientToScreen, GetMonitorInfoW, MonitorFromPoint, MONITORINFO, MONITOR_DEFAULTTONEAREST};
+        let hwnd = window.hwnd().map_err(|e| e.to_string())?;
+        let scale = window.scale_factor().map_err(|e| e.to_string())?;
+        let mut button = POINT { x, y: bottom };
+        let mut monitor = MONITORINFO { cbSize: std::mem::size_of::<MONITORINFO>() as u32, ..Default::default() };
         unsafe {
-            let mut msg = MSG::default();
-            while PeekMessageW(&mut msg, None, 0, 0, PM_REMOVE).as_bool() {
-                let _ = TranslateMessage(&msg);
-                DispatchMessageW(&msg);
+            ClientToScreen(hwnd, &mut button).ok().map_err(|e| e.to_string())?;
+            let handle = MonitorFromPoint(button, MONITOR_DEFAULTTONEAREST);
+            GetMonitorInfoW(handle, &mut monitor).ok().map_err(|e| e.to_string())?;
+        }
+        let margin = physical(TOPBAR_MARGIN, scale);
+        Ok(Self {
+            center_x: button.x,
+            top: button.y + physical(4, scale),
+            min_x: monitor.rcMonitor.left + margin,
+            max_x: monitor.rcMonitor.right - margin,
+        })
+    }
+
+    fn apply(self, hwnd: HWND) {
+        use windows::Win32::UI::WindowsAndMessaging::{GetWindowRect, SWP_NOZORDER};
+        let mut rect = windows::Win32::Foundation::RECT::default();
+        unsafe {
+            if GetWindowRect(hwnd, &mut rect).is_err() { return; }
+            let width = rect.right - rect.left;
+            let left = (self.center_x - width / 2).clamp(self.min_x, (self.max_x - width).max(self.min_x));
+            if width > 0 && (rect.left != left || rect.top != self.top) {
+                let _ = SetWindowPos(
+                    hwnd, None, left, self.top, 0, 0,
+                    SWP_NOSIZE | SWP_NOZORDER | SWP_NOACTIVATE | SWP_NOSENDCHANGING,
+                );
             }
         }
-        seen |= place_tray_overflow(h, place.0, place.1, place.2, place.3);
-        std::thread::sleep(Duration::from_millis(1));
     }
-    seen
+
+    fn apply_to_panels(self) -> bool {
+        // Incluye ventanas ocultas para prepararlas antes de Enter y resuelve un HWND nuevo si
+        // Explorer crea o sustituye el host XAML durante la apertura.
+        use windows::Win32::UI::WindowsAndMessaging::FindWindowW;
+        let mut visible = false;
+        for class in TRAY_OVERFLOW_CLASSES {
+            if let Ok(hwnd) = unsafe { FindWindowW(&HSTRING::from(class), PCWSTR::null()) } {
+                self.apply(hwnd);
+                visible |= tray_is_open(hwnd);
+            }
+        }
+        visible
+    }
 }
 
-fn set_cloak(h: HWND, cloak: bool) -> bool {
-    use windows::Win32::Graphics::Dwm::{DwmSetWindowAttribute, DWMWA_CLOAK};
-    let value = windows::core::BOOL::from(cloak);
-    unsafe { DwmSetWindowAttribute(h, DWMWA_CLOAK, &value as *const _ as _, std::mem::size_of_val(&value) as u32).is_ok() }
+thread_local! {
+    // Los eventos OUTOFCONTEXT se entregan en el hilo que instaló el hook.
+    static TRAY_PLACEMENT: std::cell::Cell<Option<TrayPlacement>> = const { std::cell::Cell::new(None) };
+}
+static TRAY_SESSION: Mutex<()> = Mutex::new(());
+static TRAY_CLOSED_AT: Mutex<Option<std::time::Instant>> = Mutex::new(None);
+
+unsafe extern "system" fn tray_win_event(
+    _hook: windows::Win32::UI::Accessibility::HWINEVENTHOOK, _event: u32, hwnd: HWND,
+    object: i32, child: i32, _thread: u32, _time: u32,
+) {
+    use windows::Win32::UI::WindowsAndMessaging::GetClassNameW;
+    if hwnd.0.is_null() || object != 0 || child != 0 { return; }
+    let mut class = [0u16; 64];
+    let len = GetClassNameW(hwnd, &mut class);
+    if len <= 0 || !TRAY_OVERFLOW_CLASSES.iter().any(|name| name.encode_utf16().eq(class[..len as usize].iter().copied())) {
+        return;
+    }
+    TRAY_PLACEMENT.with(|target| {
+        if let Some(placement) = target.get() { placement.apply(hwnd); }
+    });
 }
 
-/// Abre el panel nativo de iconos ocultos (Win+B enfoca el botón «Mostrar iconos ocultos» de la
-/// bandeja y Enter lo abre; funciona aunque Noki oculte la barra de tareas) y lo coloca justo debajo
-/// de la barra superior, centrado en el botón «^». Los iconos son los reales: clic izquierdo y
-/// derecho los gestiona Windows. Comprobado en Windows 11: la bandeja XAML no se expone por UI
-/// Automation con la barra de tareas oculta, pero el panel abierto sí, y se puede mover.
-///
-/// Sin parpadeo: Explorer lo abre en su sitio habitual (abajo a la derecha). Antes se movía tras un
-/// sondeo de 50 ms y se veía saltar. Ahora se coloca arriba ya oculto, se recoloca en el mismo
-/// instante en que Explorer lo muestra o lo mueve (WinEvent EVENT_OBJECT_SHOW / LOCATIONCHANGE +
-/// bucle de 1 ms; medido: ~5 ms abajo, menos de un fotograma) y se mantiene fijo durante la
-/// animación. DWMWA_CLOAK se intenta, pero Windows no deja ocultar ventanas de otro proceso.
-fn open_tray_overflow(app: &AppHandle, anchor_x: i32) -> Result<(), String> {
-    use windows::Win32::UI::Accessibility::{SetWinEventHook, UnhookWinEvent};
-    use windows::Win32::UI::WindowsAndMessaging::{EVENT_OBJECT_LOCATIONCHANGE, EVENT_OBJECT_SHOW, WINEVENT_OUTOFCONTEXT};
-    // Un segundo clic en «^» lo cierra: el propio clic ya lo ha cerrado (pierde el foco).
-    if tray_overflow_visible().is_some() || tray_closed_at().lock().unwrap().is_some_and(|at| at.elapsed() < Duration::from_millis(400)) {
-        return Ok(());
+/// Mantiene activa la cola que recibe los WinEvents, con una comprobación de respaldo al vencer
+/// el plazo. En la apertura el plazo es corto porque XAML reajusta varias veces tamaño y posición.
+fn pump_tray(placement: TrayPlacement, duration: Duration, interval_ms: u32) -> bool {
+    use windows::Win32::UI::WindowsAndMessaging::{
+        DispatchMessageW, MsgWaitForMultipleObjectsEx, PeekMessageW, MSG, MWMO_INPUTAVAILABLE, PM_REMOVE, QS_ALLINPUT,
+    };
+    let until = std::time::Instant::now() + duration;
+    let mut visible = placement.apply_to_panels();
+    loop {
+        let remaining = until.saturating_duration_since(std::time::Instant::now());
+        if remaining.is_zero() { return visible; }
+        unsafe {
+            let _ = MsgWaitForMultipleObjectsEx(None, interval_ms.min(remaining.as_millis().max(1) as u32), QS_ALLINPUT, MWMO_INPUTAVAILABLE);
+            let mut msg = MSG::default();
+            while PeekMessageW(&mut msg, None, 0, 0, PM_REMOVE).as_bool() { DispatchMessageW(&msg); }
+        }
+        visible = placement.apply_to_panels();
     }
-    let settings = app.state::<crate::notch::NotchState>().settings.lock().unwrap().clone();
-    let Some((_, monitor)) = notch::assignments(&settings, &notch::monitors(app)).into_iter().find(|(l, _)| l == "main") else { return Err("Sin monitor.".into()) };
-    let scale = monitor.scale;
-    let place = (
-        monitor.rect.left + physical(anchor_x, scale),
-        monitor.rect.top + physical(settings.topbar.height, scale) + physical(4, scale),
-        monitor.rect.left + physical(TOPBAR_MARGIN, scale),
-        monitor.rect.right - physical(TOPBAR_MARGIN, scale),
-    );
-    // La ventana del panel existe (oculta) desde que arranca Explorer: se prepara arriba y oculta.
-    let panel = tray_overflow();
-    let mut cloaked = false;
-    let mut hook = None;
-    if let Some(h) = panel {
-        cloaked = set_cloak(h, true);
-        place_tray_overflow(h, place.0, place.1, place.2, place.3);
-        *TRAY_TARGET.lock().unwrap() = Some((h.0 as isize, place.0, place.1, place.2, place.3));
-        let mut pid = 0u32;
-        unsafe { GetWindowThreadProcessId(h, Some(&mut pid)); }
-        let handle = unsafe { SetWinEventHook(EVENT_OBJECT_SHOW, EVENT_OBJECT_LOCATIONCHANGE, None, Some(tray_win_event), pid, 0, WINEVENT_OUTOFCONTEXT) };
-        if !handle.is_invalid() { hook = Some(handle); }
+}
+
+fn dismiss_tray_overflow() -> bool {
+    use windows::Win32::UI::{
+        Input::KeyboardAndMouse::VK_ESCAPE,
+        WindowsAndMessaging::{FindWindowW, PostMessageW, WM_CLOSE},
+    };
+    use windows::Win32::Foundation::WPARAM;
+    let mut found = false;
+    unsafe {
+        for class in TRAY_OVERFLOW_CLASSES {
+            let Ok(hwnd) = FindWindowW(&HSTRING::from(class), PCWSTR::null()) else { continue; };
+            if !tray_is_open(hwnd) { continue; }
+            found = true;
+            if GetForegroundWindow() == hwnd {
+                let escape = [key_input(VK_ESCAPE, Default::default()), key_input(VK_ESCAPE, KEYEVENTF_KEYUP)];
+                SendInput(&escape, std::mem::size_of::<INPUT>() as i32);
+            } else {
+                let _ = PostMessageW(Some(hwnd), WM_CLOSE, WPARAM(0), LPARAM(0));
+            }
+        }
     }
-    let inputs = [
+    found
+}
+
+fn watch_tray_overflow(placement: TrayPlacement, opened: tokio::sync::oneshot::Sender<Result<(), String>>) {
+    use windows::Win32::UI::{
+        Accessibility::{SetWinEventHook, UnhookWinEvent, HWINEVENTHOOK},
+        WindowsAndMessaging::{
+            EVENT_OBJECT_CLOAKED, EVENT_OBJECT_LOCATIONCHANGE, EVENT_OBJECT_SHOW, EVENT_OBJECT_UNCLOAKED,
+            WINEVENT_OUTOFCONTEXT, WINEVENT_SKIPOWNPROCESS,
+        },
+    };
+    // La barra de Noki no toma el foco: un segundo clic puede dejar el recuadro abierto.
+    if dismiss_tray_overflow() { let _ = opened.send(Ok(())); return; }
+    let Ok(_session) = TRAY_SESSION.try_lock() else { let _ = opened.send(Ok(())); return; };
+    if TRAY_CLOSED_AT.lock().unwrap().is_some_and(|at| at.elapsed() < Duration::from_millis(300)) {
+        let _ = opened.send(Ok(()));
+        return;
+    }
+
+    struct Hooks([HWINEVENTHOOK; 4]);
+    impl Drop for Hooks {
+        fn drop(&mut self) {
+            for hook in &self.0 {
+                if !hook.is_invalid() { unsafe { let _ = UnhookWinEvent(*hook); } }
+            }
+            TRAY_PLACEMENT.with(|target| target.set(None));
+        }
+    }
+    TRAY_PLACEMENT.with(|target| target.set(Some(placement)));
+    let _hooks = Hooks([
+        EVENT_OBJECT_SHOW, EVENT_OBJECT_LOCATIONCHANGE, EVENT_OBJECT_CLOAKED, EVENT_OBJECT_UNCLOAKED,
+    ].map(|event| unsafe {
+        // No depende del PID o HWND del panel antes de abrir. El callback filtra las dos clases.
+        SetWinEventHook(event, event, None, Some(tray_win_event), 0, 0, WINEVENT_OUTOFCONTEXT | WINEVENT_SKIPOWNPROCESS)
+    }));
+    let mut shown = placement.apply_to_panels();
+
+    let focus_tray = [
         key_input(VK_LWIN, KEYEVENTF_EXTENDEDKEY),
         key_input(VIRTUAL_KEY(0x42), Default::default()),
         key_input(VIRTUAL_KEY(0x42), KEYEVENTF_KEYUP),
         key_input(VK_LWIN, KEYEVENTF_EXTENDEDKEY | KEYEVENTF_KEYUP),
     ];
-    unsafe { SendInput(&inputs, std::mem::size_of::<INPUT>() as i32); }
-    let wait = |ms| match panel { Some(h) => pump_tray(h, place, ms), None => { std::thread::sleep(Duration::from_millis(ms)); false } };
-    wait(220);
     let enter = [key_input(VIRTUAL_KEY(0x0D), Default::default()), key_input(VIRTUAL_KEY(0x0D), KEYEVENTF_KEYUP)];
-    unsafe { SendInput(&enter, std::mem::size_of::<INPUT>() as i32); }
-    // Espera a que aparezca y la mantiene fija arriba 250 ms más (animación de apertura). Si Windows
-    // no lo abre en 700 ms (a veces Win+B no llega a enfocar la bandeja), se repite una vez.
-    let mut shown = None;
-    for attempt in 0..2 {
-        for _ in 0..if attempt == 0 { 14 } else { 30 } {
-            if wait(50) { shown = tray_overflow_visible(); }
-            if shown.is_some() { break; }
-        }
-        if shown.is_some() { break; }
-        unsafe { SendInput(&inputs, std::mem::size_of::<INPUT>() as i32); }
-        wait(220);
+    for timeout in [700, 1500] {
+        if shown { break; }
+        unsafe { SendInput(&focus_tray, std::mem::size_of::<INPUT>() as i32); }
+        pump_tray(placement, Duration::from_millis(220), 2);
         unsafe { SendInput(&enter, std::mem::size_of::<INPUT>() as i32); }
+        let deadline = std::time::Instant::now() + Duration::from_millis(timeout);
+        while std::time::Instant::now() < deadline {
+            if pump_tray(placement, Duration::from_millis(20), 2) {
+                shown = true;
+                break;
+            }
+        }
     }
-    if let Some(h) = shown {
-        if cloaked { place_tray_overflow(h, place.0, place.1, place.2, place.3); set_cloak(h, false); cloaked = false; }
-        pump_tray(h, place, 250);
+    if !shown {
+        let _ = opened.send(Err("Windows no abrió el panel de iconos ocultos.".into()));
+        return;
     }
-    if let Some(handle) = hook { unsafe { let _ = UnhookWinEvent(handle); } }
-    *TRAY_TARGET.lock().unwrap() = None;
-    if let (true, Some(h)) = (cloaked, panel) { set_cloak(h, false); }
-    let Some(panel) = shown else { return Err("Windows no abrió el panel de iconos ocultos.".into()) };
-    // Vigila su cierre (lo cierra Windows al hacer clic fuera o al elegir un icono).
-    let raw = panel.0 as isize;
-    std::thread::spawn(move || {
-        let h = HWND(raw as *mut _);
-        while unsafe { windows::Win32::UI::WindowsAndMessaging::IsWindowVisible(h).as_bool() } { std::thread::sleep(Duration::from_millis(40)); }
-        *tray_closed_at().lock().unwrap() = Some(std::time::Instant::now());
-    });
-    Ok(())
+
+    let _ = opened.send(Ok(()));
+    // XAML puede volver a anclar el panel después de la animación inicial. Conserva los hooks
+    // hasta que hayan desaparecido ambos hosts y tolera una sustitución breve entre ellos.
+    let mut hidden_since = None;
+    loop {
+        if pump_tray(placement, Duration::from_millis(25), 25) {
+            hidden_since = None;
+        } else if hidden_since.get_or_insert_with(std::time::Instant::now).elapsed() >= Duration::from_millis(90) {
+            *TRAY_CLOSED_AT.lock().unwrap() = hidden_since;
+            break;
+        }
+    }
 }
 
 #[tauri::command]
-pub async fn command_tray_overflow(app: AppHandle, anchor_x: i32) -> Result<(), String> {
-    tauri::async_runtime::spawn_blocking(move || open_tray_overflow(&app, anchor_x)).await.map_err(|e| e.to_string())?
+pub async fn command_tray_overflow(window: WebviewWindow, anchor_x: i32, anchor_bottom: i32) -> Result<(), String> {
+    if window.label() != "topbar" { return Err("El anclaje debe pertenecer a la barra superior.".into()); }
+    let placement = TrayPlacement::from_button(&window, anchor_x, anchor_bottom)?;
+    close_bar_panel_impl(window.app_handle());
+    let (opened, ready) = tokio::sync::oneshot::channel();
+    std::thread::spawn(move || watch_tray_overflow(placement, opened));
+    ready.await.map_err(|e| e.to_string())?
 }
 
 #[tauri::command]
@@ -980,7 +1068,7 @@ pub fn command_bar_panel_state() -> Option<String> { panel_state().lock().unwrap
 
 #[tauri::command]
 pub async fn command_battery_info() -> Option<BatteryInfo> {
-    blocking_with_timeout(Duration::from_secs(2), battery_info).await.flatten()
+    battery_snapshot().lock().unwrap().clone()
 }
 
 #[tauri::command]

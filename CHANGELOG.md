@@ -1,5 +1,13 @@
 # Changelog
 
+## [1.3.3]
+
+- Vista previa al pasar el cursor sobre un icono del Dock, con miniaturas, títulos y controles para enfocar o cerrar cada ventana.
+- Arrastre de archivos sobre el Dock para enfocar apps y carpetas, abrir archivos con una app, moverlos a una carpeta o enviarlos a la Papelera.
+- Nivel y estado de carga de la batería sincronizados en tiempo real entre la barra superior y sus paneles.
+- Capturas consecutivas con `PRTSC` sin que la barra de tareas nativa reaparezca ni se recalcule el área de trabajo. El Dock y la barra superior ignoran las superposiciones de captura.
+- El recuadro de iconos ocultos de Windows se ancla debajo del botón `^` y conserva su posición ante cambios de Explorer y DWM.
+
 ## [1.3.1]
 
 - Corregida la identidad de las apps UWP: ApplicationFrameHost resuelve el proceso real y se descartan ventanas vacías, ocultas y procesos de infraestructura del sistema.

@@ -1,3 +1,4 @@
+import { useBatteryInfo } from "../../hooks/useBatteryInfo.js";
 import { useEffect, useRef, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
@@ -27,7 +28,7 @@ export default function TopBar() {
   useGlassShape(shell, glass);
   const [now, setNow] = useState(() => new Date());
   const [avatar, setAvatar] = useState(null);
-  const [battery, setBattery] = useState(null);
+  const battery = useBatteryInfo();
   const [wifi, setWifi] = useState({ level: 3, off: false });
   const [bt, setBt] = useState([]);
   const [user, setUser] = useState({ displayName: "Usuario" });
@@ -48,7 +49,6 @@ export default function TopBar() {
     const timer = setTimeout(() => {
       invoke("command_user_avatar").then(setAvatar).catch(() => {});
       invoke("command_user_info").then(setUser).catch(() => {});
-      invoke("command_battery_info").then(setBattery).catch(() => {});
       invoke("system_stats").then(setStats).catch(() => {});
       invoke("quick_state").then((state) => {
         setBt(state?.bluetooth ? ["Bluetooth"] : []);
@@ -75,7 +75,14 @@ export default function TopBar() {
       <div className="topbar-left" />
       <div className="topbar-center-reserve" aria-hidden="true" />
       <div className="topbar-actions">
-        {t.showTray !== false && <Item title="Iconos ocultos" onClick={(e) => invoke("command_tray_overflow", { anchorX: Math.round(e.currentTarget.getBoundingClientRect().left + e.currentTarget.offsetWidth / 2) }).catch(() => {})}><ChevronIcon /></Item>}
+        {t.showTray !== false && <Item title="Iconos ocultos" onClick={(e) => {
+          const { left, width, bottom } = e.currentTarget.getBoundingClientRect();
+          const scale = window.devicePixelRatio;
+          invoke("command_tray_overflow", {
+            anchorX: Math.round((left + width / 2) * scale),
+            anchorBottom: Math.round(bottom * scale),
+          }).catch(console.error);
+        }}><ChevronIcon /></Item>}
         {t.showCpu && <Item title="CPU" onClick={() => invoke("command_open_task_manager")}><span className="topbar-text">CPU {stats ? Math.round(stats.cpu) : "--"}%</span></Item>}
         {t.showRam && <Item title="RAM" onClick={() => invoke("command_open_task_manager")}><span className="topbar-text">RAM {stats?.memTotal ? Math.round((stats.memUsed / stats.memTotal) * 100) : "--"}%</span></Item>}
         {t.showBluetooth && <Item title="Bluetooth" onClick={(e) => open("bluetooth", e)}><BluetoothIcon off={!bt.length} /></Item>}

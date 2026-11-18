@@ -1,3 +1,4 @@
+import { useBatteryInfo } from "../../hooks/useBatteryInfo.js";
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
@@ -78,7 +79,7 @@ export default function BarPanel() {
   const [kind, setKind] = useState(null);
   const [wifi, setWifi] = useState([]);
   const [devices, setDevices] = useState([]);
-  const [battery, setBattery] = useState(null);
+  const battery = useBatteryInfo();
   const [volume, setVolume] = useState(50);
   const [brightness, setBrightness] = useState(70);
   const [muted, setMuted] = useState(false);
@@ -106,7 +107,6 @@ export default function BarPanel() {
     const jobs = [];
     if (kind === "wifi") jobs.push(invoke("command_wifi_networks").then(setWifi));
     if (kind === "bluetooth") jobs.push(invoke("command_bt_devices").then(setDevices));
-    if (kind === "battery") jobs.push(invoke("command_battery_info").then(setBattery));
     if (kind === "sound") jobs.push(invoke("command_audio_output_name").then(setOutput));
     Promise.allSettled(jobs).finally(() => setLoading(false));
   }, [kind]);

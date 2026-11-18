@@ -5,19 +5,19 @@
 
 use crate::{icons, notch, settings::{DockPinned, Settings}, window_utils};
 use serde::Serialize;
-use windows::Win32::Graphics::Dwm::{DwmGetWindowAttribute, DWMWA_CLOAKED};
+use windows::Win32::Graphics::{
+    Dwm::{DwmGetWindowAttribute, DWMWA_CLOAKED},
+    Gdi::{CreateRectRgn, DeleteObject, GetWindowRgn, GetWindowRgnBox, SetWindowRgn, HGDIOBJ, HRGN, NULLREGION},
+};
 use std::{sync::{Mutex, OnceLock}, time::{Duration, Instant}};
 use tauri::{window::Color, AppHandle, Emitter, Manager, PhysicalPosition, PhysicalSize, WebviewUrl, WebviewWindow, WebviewWindowBuilder};
-use windows::{core::{w, PCWSTR}, Win32::{Foundation::{HWND, LPARAM, RECT}, Graphics::{Gdi::{GetMonitorInfoW, MonitorFromWindow, MONITORINFO, MONITOR_DEFAULTTONEAREST}}, UI::{Shell::{SHAppBarMessage, SHEmptyRecycleBinW, SHFileOperationW, SHQueryRecycleBinW, APPBARDATA, SHFILEOPSTRUCTW, FO_DELETE, FOF_ALLOWUNDO, FOF_NOCONFIRMATION, FOF_NOERRORUI, FOF_SILENT}, WindowsAndMessaging::{EnumChildWindows, EnumWindows, FindWindowExW, FindWindowW, GetClassNameW, GetWindowRect, GetAncestor, GetCursorPos, GetWindowLongPtrW, GetWindowTextLengthW, GetWindowTextW, GetWindowThreadProcessId, GetForegroundWindow, IsIconic, IsWindowVisible, SetForegroundWindow, SetWindowPos, ShowWindow, ShowWindowAsync, GA_ROOT, GWL_EXSTYLE, HWND_TOPMOST, SW_MINIMIZE, SW_RESTORE, SW_HIDE, SW_SHOW, SW_SHOWNA, SWP_ASYNCWINDOWPOS, SWP_NOACTIVATE, SWP_NOMOVE, SWP_NOSIZE, SWP_NOZORDER, WS_EX_TOOLWINDOW}}}};
+use windows::{core::{w, PCWSTR}, Win32::{Foundation::{HWND, LPARAM, RECT}, Graphics::{Gdi::{GetMonitorInfoW, MonitorFromWindow, MONITORINFO, MONITOR_DEFAULTTONEAREST}}, UI::{Shell::{SHAppBarMessage, SHEmptyRecycleBinW, SHFileOperationW, SHQueryRecycleBinW, APPBARDATA, SHFILEOPSTRUCTW, FO_DELETE, FOF_ALLOWUNDO, FOF_NOCONFIRMATION, FOF_NOERRORUI, FOF_SILENT}, WindowsAndMessaging::{EnumChildWindows, EnumWindows, FindWindowExW, FindWindowW, GetClassNameW, GetWindowRect, GetAncestor, GetCursorPos, GetWindowLongPtrW, GetWindowTextLengthW, GetWindowTextW, GetWindowThreadProcessId, GetForegroundWindow, IsIconic, IsWindowVisible, SetForegroundWindow, SetWindowPos, ShowWindow, ShowWindowAsync, GA_ROOT, GWL_EXSTYLE, HWND_TOPMOST, SW_MINIMIZE, SW_RESTORE, SW_HIDE, SW_SHOWNA, SWP_ASYNCWINDOWPOS, SWP_NOACTIVATE, SWP_NOMOVE, SWP_NOSIZE, SWP_NOZORDER, WS_EX_TOOLWINDOW}}}};
 
 const ABM_NEW: u32 = 0;
 const ABM_REMOVE: u32 = 1;
 const ABM_QUERYPOS: u32 = 2;
 const ABM_SETPOS: u32 = 3;
 const ABE_BOTTOM: u32 = 3;
-const ABM_GETSTATE: u32 = 4;
-const ABM_SETSTATE: u32 = 10;
-const ABS_AUTOHIDE: u32 = 1;
 
 #[derive(Default, Clone, Copy)]
 struct Hit { x: i32, y: i32, w: i32, h: i32, scale: f64 }
@@ -26,19 +26,28 @@ struct Hit { x: i32, y: i32, w: i32, h: i32, scale: f64 }
 struct AppBarState { hwnd: isize, rect: RECT, monitor: notch::Rect, height: i32, dpi_milli: i32 }
 
 static RUNNING_ORDER: OnceLock<Mutex<Vec<String>>> = OnceLock::new();
+static CAN_SHOW: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBool::new(false);
 static MENU_OPEN: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBool::new(false);
 
 pub(crate) fn set_menu_open(open: bool) { MENU_OPEN.store(open, std::sync::atomic::Ordering::SeqCst); }
 
+pub(crate) fn menu_open() -> bool { MENU_OPEN.load(std::sync::atomic::Ordering::SeqCst) }
+
 static HIT: OnceLock<Mutex<Hit>> = OnceLock::new();
 static APPBAR: OnceLock<Mutex<Option<AppBarState>>> = OnceLock::new();
 static SIZE: OnceLock<Mutex<Option<(i32, i32)>>> = OnceLock::new();
-static TASKBAR_STATE: OnceLock<Mutex<Option<u32>>> = OnceLock::new();
+struct HiddenTaskbar {
+    hwnd: isize,
+    region: Option<isize>,
+    hidden: bool,
+}
+
+// None desactiva el hook. Una región guardada de valor 0 indica que Explorer no usaba una región.
+static HIDDEN_TASKBARS: Mutex<Option<Vec<HiddenTaskbar>>> = Mutex::new(None);
 
 fn hit() -> &'static Mutex<Hit> { HIT.get_or_init(|| Mutex::new(Hit { scale: 1.0, ..Hit::default() })) }
 fn appbar() -> &'static Mutex<Option<AppBarState>> { APPBAR.get_or_init(|| Mutex::new(None)) }
 fn requested_size() -> &'static Mutex<Option<(i32, i32)>> { SIZE.get_or_init(|| Mutex::new(None)) }
-fn taskbar_state() -> &'static Mutex<Option<u32>> { TASKBAR_STATE.get_or_init(|| Mutex::new(None)) }
 
 #[derive(Serialize, Clone)]
 #[serde(rename_all = "camelCase")]
@@ -59,7 +68,7 @@ pub struct TrashState { pub items: u32, pub bytes: u64 }
 
 fn physical(v: i32, scale: f64) -> i32 { (v as f64 * scale).round() as i32 }
 
-fn hwnd(window: &WebviewWindow) -> Option<HWND> { window.hwnd().ok() }
+pub(crate) fn hwnd(window: &WebviewWindow) -> Option<HWND> { window.hwnd().ok() }
 
 
 /// Zona de trabajo real del monitor de `main`, no el rectángulo que incluye la barra de tareas.
@@ -96,33 +105,109 @@ fn taskbars() -> Vec<HWND> {
     out
 }
 
-/// Oculta de verdad la barra de tareas cuando la opción está activa. Solo con
-/// autoocultar, Windows la volvía a mostrar al acercar el ratón al borde inferior
-/// (justo donde está el Dock). Se llama cada 2 s: si Explorer la vuelve a mostrar, se oculta otra vez.
-pub fn sync_taskbar(settings: &Settings) {
-    // Nunca durante un recorte de pantalla: cambiar el AppBar de la barra de tareas mueve el área
-    // de trabajo y la superposición del recorte salta o se cierra.
-    if capture_overlay_active() { return; }
-    let Some(taskbar) = (unsafe { FindWindowW(w!("Shell_TrayWnd"), PCWSTR::null()) }).ok() else { return };
-    let mut data = APPBARDATA { cbSize: std::mem::size_of::<APPBARDATA>() as u32, hWnd: taskbar, ..Default::default() };
+fn clip_taskbar(hwnd: HWND) -> Option<isize> {
     unsafe {
-        let mut previous = taskbar_state().lock().unwrap();
-        if settings.dock.enabled && settings.dock.hide_taskbar && settings.general.visible {
-            if previous.is_none() {
-                *previous = Some(SHAppBarMessage(ABM_GETSTATE, &mut data) as u32);
-            }
-            // Autoocultar libera la zona de trabajo; SW_HIDE evita que reaparezca.
-            if SHAppBarMessage(ABM_GETSTATE, &mut data) as u32 & ABS_AUTOHIDE == 0 {
-                data.lParam = LPARAM(ABS_AUTOHIDE as isize);
-                let _ = SHAppBarMessage(ABM_SETSTATE, &mut data);
-            }
-            // ShowWindowAsync: la barra es de Explorer; ShowWindow esperaría a que responda.
-            for h in taskbars() { if IsWindowVisible(h).as_bool() { let _ = ShowWindowAsync(h, SW_HIDE); } }
-        } else if let Some(state) = previous.take() {
-            for h in taskbars() { let _ = ShowWindowAsync(h, SW_SHOWNA); }
-            data.lParam = LPARAM(state as isize);
-            let _ = SHAppBarMessage(ABM_SETSTATE, &mut data);
+        let original = CreateRectRgn(0, 0, 0, 0);
+        if original.is_invalid() { return None; }
+        let previous = if GetWindowRgn(hwnd, original).0 == 0 {
+            let _ = DeleteObject(HGDIOBJ(original.0));
+            0
+        } else {
+            original.0 as isize
+        };
+        // Explorer puede marcar la ventana visible antes de que llegue EVENT_OBJECT_SHOW.
+        // Una región vacía impide que se dibuje durante ese intervalo sin mover la ventana.
+        let empty = CreateRectRgn(0, 0, 0, 0);
+        if !empty.is_invalid() && SetWindowRgn(hwnd, Some(empty), false) != 0 {
+            return Some(previous); // Windows es dueño de la región instalada.
         }
+        if !empty.is_invalid() { let _ = DeleteObject(HGDIOBJ(empty.0)); }
+        if previous != 0 { let _ = DeleteObject(HGDIOBJ(previous as *mut _)); }
+        None
+    }
+}
+
+fn hide_taskbar(hwnd: HWND, bars: &mut Vec<HiddenTaskbar>) {
+    let raw = hwnd.0 as isize;
+    let bar = match bars.iter().position(|bar| bar.hwnd == raw) {
+        Some(index) => &mut bars[index],
+        None => {
+            bars.push(HiddenTaskbar { hwnd: raw, region: clip_taskbar(hwnd), hidden: false });
+            bars.last_mut().unwrap()
+        }
+    };
+    unsafe {
+        if IsWindowVisible(hwnd).as_bool() && ShowWindowAsync(hwnd, SW_HIDE).as_bool() {
+            bar.hidden = true;
+        }
+    }
+}
+
+fn window_class(hwnd: HWND, buffer: &mut [u16]) -> String {
+    let len = unsafe { GetClassNameW(hwnd, buffer) };
+    String::from_utf16_lossy(&buffer[..len.max(0) as usize])
+}
+
+fn is_taskbar_class(class: &str) -> bool {
+    matches!(class, "Shell_TrayWnd" | "Shell_SecondaryTrayWnd")
+}
+
+unsafe extern "system" fn taskbar_win_event(
+    _hook: windows::Win32::UI::Accessibility::HWINEVENTHOOK, _event: u32, hwnd: HWND,
+    object: i32, child: i32, _thread: u32, _time: u32,
+) {
+    if hwnd.0.is_null() || object != 0 || child != 0 { return; }
+    let mut state = HIDDEN_TASKBARS.lock().unwrap();
+    let Some(hidden) = state.as_mut() else { return };
+    let class = window_class(hwnd, &mut [0; 128]);
+    if is_taskbar_class(&class) {
+        hide_taskbar(hwnd, hidden);
+    } else if class == "Windows.UI.Core.CoreWindow" {
+        let mut pid = 0;
+        GetWindowThreadProcessId(hwnd, Some(&mut pid));
+        if icons::process_image_path(pid).is_some_and(|path| file_name(&path) == "shellexperiencehost.exe") {
+            for bar in taskbars() { hide_taskbar(bar, hidden); }
+        }
+    }
+}
+
+fn start_taskbar_watch() {
+    use windows::Win32::UI::{
+        Accessibility::{SetWinEventHook, UnhookWinEvent},
+        WindowsAndMessaging::{DispatchMessageW, GetMessageW, EVENT_OBJECT_SHOW, EVENT_SYSTEM_FOREGROUND, MSG, WINEVENT_OUTOFCONTEXT, WINEVENT_SKIPOWNPROCESS},
+    };
+    // Los WinEvents se entregan en el hilo que instaló el hook.
+    std::thread::spawn(|| unsafe {
+        let hooks = [EVENT_OBJECT_SHOW, EVENT_SYSTEM_FOREGROUND].map(|event| {
+            SetWinEventHook(event, event, None, Some(taskbar_win_event), 0, 0, WINEVENT_OUTOFCONTEXT | WINEVENT_SKIPOWNPROCESS)
+        });
+        if hooks.iter().any(|hook| hook.is_invalid()) {
+            eprintln!("[dock] No se pudieron instalar todos los hooks de la barra de tareas");
+        }
+        {
+            let mut state = HIDDEN_TASKBARS.lock().unwrap();
+            if let Some(hidden) = state.as_mut() {
+                for bar in taskbars() { hide_taskbar(bar, hidden); }
+            }
+        }
+        let mut message = MSG::default();
+        while GetMessageW(&mut message, None, 0, 0).0 > 0 {
+            DispatchMessageW(&message);
+        }
+        for hook in hooks.into_iter().filter(|hook| !hook.is_invalid()) {
+            let _ = UnhookWinEvent(hook);
+        }
+    });
+}
+
+fn sync_taskbar(settings: &Settings) {
+    if settings.dock.enabled && settings.dock.hide_taskbar && settings.general.visible {
+        let mut state = HIDDEN_TASKBARS.lock().unwrap();
+        if state.is_some() { return; }
+        let hidden = state.insert(Vec::new());
+        for bar in taskbars() { hide_taskbar(bar, hidden); }
+    } else {
+        restore_taskbar();
     }
 }
 
@@ -152,7 +237,11 @@ pub(crate) fn capture_in_progress() -> bool {
 }
 
 fn capture_overlay_now() -> bool {
-    const CAPTURE_CLASSES: [&str; 2] = ["Microsoft-Windows-SnipperToolbar", "Microsoft-Windows-SnipperCaptureForm"];
+    const CAPTURE_CLASSES: [&str; 3] = [
+        "Microsoft-Windows-SnipperToolbar",
+        "Microsoft-Windows-SnipperCaptureForm",
+        "ScreenClippingWindow",
+    ];
     unsafe {
         for class in CAPTURE_CLASSES {
             let wide: Vec<u16> = class.encode_utf16().chain(std::iter::once(0)).collect();
@@ -162,25 +251,38 @@ fn capture_overlay_now() -> bool {
         }
         let fg = GetForegroundWindow();
         if fg.0.is_null() { return false; }
-        let mut buf = [0u16; 128];
-        let n = GetClassNameW(fg, &mut buf);
-        let class = String::from_utf16_lossy(&buf[..n.max(0) as usize]);
+        let class = window_class(fg, &mut [0; 128]);
         if CAPTURE_CLASSES.contains(&class.as_str()) { return true; }
         let mut pid = 0u32;
         GetWindowThreadProcessId(fg, Some(&mut pid));
         let process = file_name(&icons::process_image_path(pid).unwrap_or_default());
-        // Incluye las ventanas emergentes XAML (Xaml_WindowedPopupClass) de esos mismos procesos.
-        matches!(process.as_str(), "screenclippinghost.exe" | "snippingtool.exe")
+        // Incluye CoreWindow y las ventanas emergentes XAML de estos procesos.
+        matches!(process.as_str(), "screenclippinghost.exe" | "snippingtool.exe" | "gamebar.exe" | "gamebarftserver.exe")
     }
 }
 
 pub fn restore_taskbar() {
-    let Some(taskbar) = (unsafe { FindWindowW(w!("Shell_TrayWnd"), PCWSTR::null()) }).ok() else { return };
-    let Some(state) = taskbar_state().lock().unwrap().take() else { return };
-    unsafe { for h in taskbars() { let _ = ShowWindow(h, SW_SHOWNA); } }
-    let mut data = APPBARDATA { cbSize: std::mem::size_of::<APPBARDATA>() as u32, hWnd: taskbar, lParam: LPARAM(state as isize), ..Default::default() };
-    unsafe { let _ = SHAppBarMessage(ABM_SETSTATE, &mut data); }
+    let mut state = HIDDEN_TASKBARS.lock().unwrap();
+    let Some(bars) = state.take() else { return };
+    let current = taskbars();
+    for bar in bars {
+        let hwnd = HWND(bar.hwnd as *mut _);
+        let exists = current.contains(&hwnd);
+        if let Some(original) = bar.region {
+            let restored = exists && unsafe {
+                GetWindowRgnBox(hwnd, &mut RECT::default()) == NULLREGION
+                    && SetWindowRgn(hwnd, (original != 0).then_some(HRGN(original as *mut _)), true) != 0
+            };
+            if !restored && original != 0 {
+                unsafe { let _ = DeleteObject(HGDIOBJ(original as *mut _)); }
+            }
+        }
+        if exists && bar.hidden {
+            unsafe { let _ = ShowWindowAsync(hwnd, SW_SHOWNA); }
+        }
+    }
 }
+
 fn create(app: &AppHandle) -> Option<WebviewWindow> {
     if let Some(w) = app.get_webview_window("dock") { return Some(w); }
     let window = WebviewWindowBuilder::new(app, "dock", WebviewUrl::App("index.html?view=dock".into()))
@@ -191,6 +293,9 @@ fn create(app: &AppHandle) -> Option<WebviewWindow> {
         .focusable(false)
         .build().ok()?;
     let _ = window.set_background_color(Some(Color(0, 0, 0, 0)));
+    crate::dock_drop::register(app, &window);
+    crate::dropzone::ensure(app, &window);
+    let _ = crate::dock_preview::ensure(app);
     Some(window)
 }
 
@@ -229,7 +334,8 @@ pub fn sync(app: &AppHandle, settings: &Settings, fullscreen: bool) {
     let Some(window) = create(app) else { return };
     let icon_size = settings.dock.icon_size.clamp(36, 64);
     sync_taskbar(settings);
-    let enabled = settings.dock.enabled && !fullscreen && settings.general.visible;
+    let enabled = settings.dock.enabled && settings.general.visible;
+    CAN_SHOW.store(enabled && !fullscreen, std::sync::atomic::Ordering::SeqCst);
     if !enabled {
         remove_appbar();
         let ui_window = window.clone();
@@ -240,6 +346,11 @@ pub fn sync(app: &AppHandle, settings: &Settings, fullscreen: bool) {
     let scale = work_area_with_monitor(app, settings.dock.hide_taskbar).map(|(_, scale)| scale).unwrap_or(monitor);
     let reserve = settings.dock.reserve_space && !settings.dock.autohide;
     let granted = if reserve { register_appbar(&window, fallback, physical(icon_size + 26, scale), scale) } else { remove_appbar(); None };
+    if fullscreen {
+        let ui_window = window.clone();
+        let _ = window.run_on_main_thread(move || { let _ = ui_window.hide(); });
+        return;
+    }
     let (work, _) = if let Some(rect) = granted {
         (rect, scale)
     } else {
@@ -338,14 +449,23 @@ unsafe extern "system" fn enum_callback(hwnd: HWND, lparam: LPARAM) -> windows::
 struct Running { title: String, hwnd: isize, path: String, aumid: String, recycle_bin: bool }
 
 /// Identify Explorer's current namespace using PIDLs, independent of title, language or URL.
-fn recycle_bin_windows() -> Vec<isize> {
-    use windows::{core::Interface, Win32::{System::{Com::{CoCreateInstance, CoInitializeEx, CoTaskMemFree, CoUninitialize, IServiceProvider, CLSCTX_ALL, COINIT_APARTMENTTHREADED}, Variant::VARIANT}, UI::Shell::{IFolderView, IPersistFolder2, IShellBrowser, IShellWindows, IWebBrowserApp, ShellWindows, SID_STopLevelBrowser, SHGetKnownFolderIDList, FOLDERID_RecycleBinFolder, KF_FLAG_DEFAULT, ILIsEqual}}};
+fn explorer_windows(path: Option<&str>) -> Vec<isize> {
+    use windows::{core::Interface, Win32::{System::{Com::{CoCreateInstance, CoInitializeEx, CoTaskMemFree, CoUninitialize, IServiceProvider, CLSCTX_ALL, COINIT_APARTMENTTHREADED}, Variant::VARIANT}, UI::Shell::{IFolderView, IPersistFolder2, IShellBrowser, IShellWindows, IWebBrowserApp, ShellWindows, SID_STopLevelBrowser, SHGetKnownFolderIDList, FOLDERID_RecycleBinFolder, KF_FLAG_DEFAULT, ILIsEqual, SHParseDisplayName}}};
     struct ComGuard(bool);
     impl Drop for ComGuard { fn drop(&mut self) { if self.0 { unsafe { CoUninitialize(); } } } }
     unsafe {
         let _com = ComGuard(CoInitializeEx(None, COINIT_APARTMENTTHREADED).is_ok());
         let Ok(windows): Result<IShellWindows, _> = CoCreateInstance(&ShellWindows, None, CLSCTX_ALL) else { return Vec::new(); };
-        let Ok(bin) = SHGetKnownFolderIDList(&FOLDERID_RecycleBinFolder, KF_FLAG_DEFAULT.0 as u32, None) else { return Vec::new(); };
+        let target = if let Some(path) = path {
+            let mut pidl = std::ptr::null_mut();
+            if SHParseDisplayName(&windows::core::HSTRING::from(path), None, &mut pidl, 0, None).is_err() {
+                return Vec::new();
+            }
+            pidl
+        } else {
+            let Ok(pidl) = SHGetKnownFolderIDList(&FOLDERID_RecycleBinFolder, KF_FLAG_DEFAULT.0 as u32, None) else { return Vec::new(); };
+            pidl
+        };
         let mut result = Vec::new();
         for i in 0..windows.Count().unwrap_or(0) {
             let resolved = (|| -> windows::core::Result<Option<isize>> {
@@ -356,22 +476,27 @@ fn recycle_bin_windows() -> Vec<isize> {
                 let view: IFolderView = shell.QueryActiveShellView()?.cast()?;
                 let folder: IPersistFolder2 = view.GetFolder()?;
                 let pidl = folder.GetCurFolder()?;
-                let matches = ILIsEqual(pidl, bin).as_bool();
+                let matches = ILIsEqual(pidl, target).as_bool();
                 CoTaskMemFree(Some(pidl.cast()));
                 Ok(if matches { Some(browser.HWND()?.0) } else { None })
             })();
             if let Ok(Some(hwnd)) = resolved { result.push(hwnd); }
         }
-        CoTaskMemFree(Some(bin.cast()));
+        CoTaskMemFree(Some(target.cast()));
         result
     }
 }
 
+fn enumerate_windows() -> Vec<Running> {
+    let mut list = Vec::new();
+    unsafe { let _ = EnumWindows(Some(enum_callback), LPARAM(&mut list as *mut Vec<Running> as isize)); }
+    list
+}
+
 fn running_windows() -> Vec<Running> {
-    let mut list: Vec<Running> = Vec::new();
-    unsafe { let _ = EnumWindows(Some(enum_callback), LPARAM(&mut list as *mut _ as isize)); }
+    let mut list = enumerate_windows();
     if list.iter().any(|w| file_name(&w.path) == "explorer.exe") {
-        let bins = recycle_bin_windows();
+        let bins = explorer_windows(None);
         for w in &mut list { w.recycle_bin = bins.contains(&w.hwnd); }
     }
     list
@@ -457,17 +582,72 @@ pub(crate) fn menu_item(settings: &Settings, key: &str) -> Option<DockItem> {
     items(settings).into_iter().find(|item| item.key == key)
 }
 
+pub(crate) fn drop_app(settings: &Settings, key: &str) -> Option<DockItem> {
+    let mut item = menu_item(settings, key)?;
+    if item.kind != "pinned" && item.kind != "running" { return None; }
+    if item.path.to_ascii_lowercase().starts_with("shell:") && !item.aumid.contains('!') {
+        if let Some(window) = running_windows().into_iter().find(|w| w.aumid.eq_ignore_ascii_case(&item.aumid)) {
+            item.path = window.path;
+        }
+    }
+    Some(item)
+}
+
 /// Ventanas abiertas que corresponden a una clave del Dock (`pin:` o `app:`).
 pub(crate) fn windows_for(settings: &Settings, key: &str) -> Vec<isize> {
-    let running = running_windows();
-    if let Some(pin) = settings.dock.pinned.iter().find(|p| pin_key(p) == key) {
-        return running.iter().filter(|w| pin_matches(pin, w)).map(|w| w.hwnd).collect();
-    }
-    if let Some(id) = key.strip_prefix("app:") {
-        return running.iter().filter(|w| identity(&w.path, &w.aumid) == id).map(|w| w.hwnd).collect();
-    }
-    Vec::new()
+    window_titles_for(settings, key).into_iter().map(|(hwnd, _)| hwnd).collect()
 }
+
+pub(crate) fn window_titles_for(settings: &Settings, key: &str) -> Vec<(isize, String)> {
+    if let Some(folder) = settings.dock.folders.iter().find(|folder| key.strip_prefix("folder:") == Some(folder.path.as_str())) {
+        return explorer_windows(Some(&folder.path)).into_iter().map(|raw| (raw, title(HWND(raw as *mut _)))).collect();
+    }
+    if key == "trash" && settings.dock.show_trash {
+        return explorer_windows(None).into_iter().map(|raw| (raw, title(HWND(raw as *mut _)))).collect();
+    }
+    let pin = settings.dock.pinned.iter().find(|p| pin_key(p) == key);
+    let app_id = key.strip_prefix("app:");
+    if pin.is_none() && app_id.is_none() { return Vec::new(); }
+    let windows = enumerate_windows().into_iter()
+        .filter(|w| pin.is_some_and(|p| pin_matches(p, w)) || app_id.is_some_and(|id| identity(&w.path, &w.aumid) == id))
+        .collect::<Vec<_>>();
+    // Solo consulta el espacio de nombres de Explorer cuando el icono representa Explorer.
+    // Durante un arrastre, Explorer puede mantener esa consulta COM ocupada.
+    let bins = if settings.dock.show_trash && windows.iter().any(|w| file_name(&w.path) == "explorer.exe") {
+        explorer_windows(None)
+    } else {
+        Vec::new()
+    };
+    windows.into_iter().filter(|w| !bins.contains(&w.hwnd)).map(|w| (w.hwnd, w.title)).collect()
+}
+
+pub(crate) fn can_show() -> bool {
+    CAN_SHOW.load(std::sync::atomic::Ordering::SeqCst)
+}
+
+pub(crate) fn focus_window(raw: isize) -> bool {
+    use windows::Win32::{System::Threading::{AttachThreadInput, GetCurrentThreadId}, UI::WindowsAndMessaging::{BringWindowToTop, IsWindow, PeekMessageW, MSG, PM_NOREMOVE}};
+    let h = HWND(raw as *mut _);
+    unsafe {
+        if !IsWindow(Some(h)).as_bool() { return false; }
+        let minimized = IsIconic(h).as_bool();
+        if minimized { let _ = ShowWindowAsync(h, SW_RESTORE); }
+        // Explorer conserva su captura de ratón durante OLE; subir el HWND permite activarlo
+        // sin cancelar el arrastre ni sintetizar una pulsación.
+        let _ = BringWindowToTop(h);
+        if SetForegroundWindow(h).as_bool() || GetForegroundWindow() == h { return true; }
+        let _ = PeekMessageW(&mut MSG::default(), None, 0, 0, PM_NOREMOVE);
+        let thread = GetCurrentThreadId();
+        let foreground = GetForegroundWindow();
+        let owner = if foreground.0.is_null() { 0 } else { GetWindowThreadProcessId(foreground, None) };
+        if owner == 0 || owner == thread || !AttachThreadInput(thread, owner, true).as_bool() { return false; }
+        let _ = BringWindowToTop(h);
+        let focused = SetForegroundWindow(h).as_bool() || GetForegroundWindow() == h;
+        let _ = AttachThreadInput(thread, owner, false);
+        focused
+    }
+}
+
 pub fn remove() { remove_appbar(); }
 
 #[tauri::command]
@@ -485,8 +665,10 @@ pub fn dock_set_hit(x: i32, y: i32, w: i32, h: i32) { let scale = hit().lock().u
 #[tauri::command]
 pub fn dock_resize(app: AppHandle, width: i32, height: i32) {
     *requested_size().lock().unwrap() = Some((width.clamp(120, 3000), height.clamp(60, 400)));
-    let settings = app.state::<notch::NotchState>().settings.lock().unwrap().clone();
-    sync(&app, &settings, false);
+    if capture_in_progress() { return; }
+    let state = app.state::<notch::NotchState>();
+    let settings = state.settings.lock().unwrap().clone();
+    sync(&app, &settings, state.fullscreen.load(std::sync::atomic::Ordering::SeqCst));
 }
 
 #[tauri::command]
@@ -526,9 +708,7 @@ pub async fn dock_activate(key: String, state: tauri::State<'_, notch::NotchStat
                 Some(i) => windows[(i + 1) % windows.len()],
                 None => windows[0],
             };
-            let h = HWND(target as *mut _);
-            let _ = ShowWindow(h, if IsIconic(h).as_bool() { SW_RESTORE } else { SW_SHOW });
-            let _ = SetForegroundWindow(h);
+            focus_window(target);
         }
         Ok(())
     }).await.map_err(|e| e.to_string())?
@@ -599,27 +779,20 @@ fn trash_drop_blocking(paths: Vec<String>) -> Result<(), String> {
     from.push(0);
     let mut op = SHFILEOPSTRUCTW { wFunc: FO_DELETE, pFrom: PCWSTR(from.as_ptr()), fFlags: FOF_ALLOWUNDO.0 as u16 | FOF_NOCONFIRMATION.0 as u16 | FOF_NOERRORUI.0 as u16 | FOF_SILENT.0 as u16, ..Default::default() };
     let code = unsafe { SHFileOperationW(&mut op) };
-    if code == 0 { Ok(()) } else { Err(format!("No se pudieron enviar los elementos a la papelera ({}).", code)) }
+    if code == 0 && !op.fAnyOperationsAborted.as_bool() { Ok(()) } else { Err(format!("No se pudieron enviar los elementos a la papelera ({}).", code)) }
 }
 
-/// Mantenimiento lento del Dock en su propio hilo: lista de apps abiertas (EnumWindows, procesos,
-/// AUMID) y barra de tareas (SHAppBarMessage y ShowWindow son llamadas síncronas a Explorer).
-/// Antes iban en el bucle de clics: si Explorer tardaba en responder (justo tras usar Impr Pant o
-/// Recortes), ese bucle se quedaba bloqueado y el Dock seguía en click-through, «congelado».
+/// Actualiza la lista de aplicaciones abiertas fuera del sondeo de clics.
 fn start_maintenance(app: AppHandle) {
     std::thread::spawn(move || {
         let mut last_signature: Option<Vec<String>> = None;
-        let mut last_taskbar = Instant::now() - Duration::from_secs(10);
         loop {
             std::thread::sleep(Duration::from_millis(1000));
             let settings = app.state::<notch::NotchState>().settings.lock().unwrap().clone();
-            if last_taskbar.elapsed() >= Duration::from_secs(2) {
-                last_taskbar = Instant::now();
-                sync_taskbar(&settings);
-            }
             if !settings.dock.enabled { continue; }
             let Some(window) = app.get_webview_window("dock") else { continue };
             let Some(h) = hwnd(&window) else { continue };
+            crate::dropzone::ensure(&app, &window);
             if !unsafe { IsWindowVisible(h).as_bool() } { continue; }
             let current = items(&settings);
             let signature = current.iter().map(|item| format!("{}:{}:{}", item.key, item.window_count, item.running)).collect::<Vec<_>>();
@@ -634,14 +807,17 @@ fn start_maintenance(app: AppHandle) {
 /// Sondeo económico: solo ajusta click-through y auto-ocultar cuando el dock está visible.
 /// Este bucle no hace ninguna llamada que pueda esperar a otro proceso.
 pub fn start(app: AppHandle) {
+    start_taskbar_watch();
+    sync_taskbar(&app.state::<notch::NotchState>().settings.lock().unwrap());
     start_maintenance(app.clone());
+    crate::dock_preview::watch(app.clone());
     std::thread::spawn(move || {
         let mut last: Option<(bool, bool)> = None;
         let mut last_check = Instant::now();
         let mut was_capturing = false;
         loop {
             let dock_settings = app.state::<notch::NotchState>().settings.lock().unwrap().dock.clone();
-            let interval = if dock_settings.autohide { 120 } else { 250 };
+            let interval = if crate::dock_drop::left_button_down() { 25 } else if dock_settings.autohide { 120 } else { 250 };
             std::thread::sleep(Duration::from_millis(interval));
             let Some(window) = app.get_webview_window("dock") else { continue };
             if !dock_settings.enabled { continue; }
@@ -654,6 +830,10 @@ pub fn start(app: AppHandle) {
             let capturing = capture_in_progress();
             let recovered = was_capturing && !capturing;
             was_capturing = capturing;
+            if capturing || !CAN_SHOW.load(std::sync::atomic::Ordering::SeqCst) {
+                last = None;
+                continue;
+            }
             if recovered {
                 last = None;
                 last_check = Instant::now() - Duration::from_secs(10);
@@ -664,6 +844,7 @@ pub fn start(app: AppHandle) {
             let hit_area = *hit().lock().unwrap();
             let mut p = windows::Win32::Foundation::POINT::default();
             unsafe { let _ = GetCursorPos(&mut p); }
+            crate::dock_drop::poll(&app, h, p);
             let inside = has_rect && hit_area.w > 0 && {
                 let x = ((p.x - rect.left) as f64 / hit_area.scale) as i32;
                 let y = ((p.y - rect.top) as f64 / hit_area.scale) as i32;
@@ -677,7 +858,7 @@ pub fn start(app: AppHandle) {
             let periodic = last_check.elapsed() >= Duration::from_secs(2);
             if periodic {
                 last_check = Instant::now();
-                if visible && !capturing {
+                if visible {
                     unsafe { let _ = SetWindowPos(h, Some(HWND_TOPMOST), 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE | SWP_ASYNCWINDOWPOS); }
                 }
             }
@@ -690,6 +871,7 @@ pub fn start(app: AppHandle) {
             last = Some((should_show, inside));
             let w = window.clone();
             let _ = window.run_on_main_thread(move || {
+                if !CAN_SHOW.load(std::sync::atomic::Ordering::SeqCst) { return; }
                 if should_show { let _ = w.show(); } else { let _ = w.hide(); }
                 let _ = w.set_ignore_cursor_events(!inside);
                 // tao reescribe GWL_EXSTYLE entero al cambiar el click-through: se repone justo después.

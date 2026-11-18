@@ -6,6 +6,12 @@ import TrashIcon from "./TrashIcon.jsx";
 import { useSettings } from "../../hooks/useSettings.js";
 import { useGlass, useGlassShape } from "../../lib/glass.js";
 
+function physicalBounds(node) {
+  const { left, top, right, bottom } = node.getBoundingClientRect();
+  const px = (value) => Math.round(value * window.devicePixelRatio);
+  return { left: px(left), top: px(top), right: px(right), bottom: px(bottom) };
+}
+
 function AppsIcon() { return <span className="apps-icon">{Array.from({ length: 9 }, (_, i) => <i key={i} />)}</span>; }
 
 export default function Dock() {
@@ -13,6 +19,9 @@ export default function Dock() {
   const [items, setItems] = useState([]);
   const [trash, setTrash] = useState({ items: 0 });
   const [menuOpen, setMenuOpen] = useState(false);
+  const [dropTarget, setDropTarget] = useState(null);
+  const [dropError, setDropError] = useState(null);
+  const hoverTimer = useRef(0);
   const pill = useRef(null);
   const itemRefs = useRef([]);
   const iconRefs = useRef([]);
@@ -40,7 +49,33 @@ export default function Dock() {
     invoke("trash_state").then(setTrash).catch(() => {});
   };
   useEffect(() => { refresh(); const timer = setInterval(refresh, 1000); return () => clearInterval(timer); }, []);
-  useEffect(() => { let stops = []; Promise.all([listen("context-menu-visibility", (event) => setMenuOpen(!!event.payload)), listen("settings-updated", refresh), listen("settings-changed", refresh), listen("dock-windows", (event) => setItems(event.payload ?? [])), listen("dock-recover", () => recover.current?.()), listen("dock-leave", () => leave.current?.())]).then((fns) => { stops = fns; }); return () => stops.forEach((stop) => stop()); }, []);
+  useEffect(() => {
+    const subscriptions = [
+      listen("context-menu-visibility", (event) => setMenuOpen(!!event.payload)),
+      listen("settings-updated", refresh),
+      listen("settings-changed", refresh),
+      listen("dock-windows", (event) => setItems(event.payload ?? [])),
+      listen("dock-recover", () => recover.current?.()),
+      listen("dock-leave", () => leave.current?.()),
+      listen("dock-file-hover", ({ payload }) => {
+        setDropTarget(payload);
+        if (payload) {
+          clearTimeout(hoverTimer.current);
+          invoke("dock_preview_close").catch(console.error);
+        }
+      }),
+      listen("dock-file-result", ({ payload }) => { setDropError(payload); refresh(); }),
+    ];
+    return () => {
+      clearTimeout(hoverTimer.current);
+      subscriptions.forEach((subscription) => subscription.then((stop) => stop()).catch(console.error));
+    };
+  }, []);
+  useEffect(() => {
+    if (!dropError) return;
+    const timer = setTimeout(() => setDropError(null), 3500);
+    return () => clearTimeout(timer);
+  }, [dropError]);
   const all = useMemo(() => [ ...(dock.showApps ? [{ key: "apps", name: "Aplicaciones", kind: "apps" }] : []), ...items, ...(dock.showTrash ? [{ key: "trash", name: "Papelera", kind: "trash", running: trash.items > 0 }] : []) ], [dock.showApps, dock.showTrash, items, trash.items]);
   // Lo que necesita el área de clic sin depender del cierre del efecto.
   geometry.current = { lift: dock.magnify ? maxSize - size : 0 };
@@ -53,6 +88,10 @@ export default function Dock() {
       const r = node.getBoundingClientRect();
       const lift = pointerX.current != null ? geometry.current.lift : 0;
       let box = { left: r.left - lift * 2, top: r.top - lift, right: r.right + lift * 2, bottom: r.bottom };
+      const icons = itemRefs.current.flatMap((item) => item?.dataset.dropKey
+        ? [{ key: item.dataset.dropKey, ...physicalBounds(item) }]
+        : []);
+      invoke("dock_drop_targets", { icons }).catch(console.error);
       invoke("dock_set_hit", { x: Math.round(box.left), y: Math.round(box.top), w: Math.round(box.right - box.left), h: Math.round(box.bottom - box.top) }).catch(() => {});
     };
     reportHit.current = report;
@@ -65,6 +104,7 @@ export default function Dock() {
     const timer = setInterval(report, 2000);
     return () => { observer.disconnect(); window.removeEventListener("resize", report); clearInterval(timer); };
   }, []);
+  useEffect(() => { reportHit.current?.(); }, [all, size]);
   // Desenfoque real debajo de la píldora. La píldora no cambia de tamaño al magnificar, así que el
   // vidrio nativo no se recoloca en cada fotograma (era la franja clara que asomaba encima del Dock).
   const glass = useGlass(settings, "dock");
@@ -135,6 +175,7 @@ export default function Dock() {
       item.style.zIndex = String(Math.round(value));
     });
     if (moving || x != null) frame.current = requestAnimationFrame(tick);
+    else reportHit.current?.();
   }
 
   function start() { if (!frame.current) frame.current = requestAnimationFrame(tick); }
@@ -163,18 +204,40 @@ export default function Dock() {
     return invoke("dock_activate", { key: item.key });
   }
 
+  function closePreview() {
+    clearTimeout(hoverTimer.current);
+    invoke("dock_preview_close").catch(console.error);
+  }
+
+  function schedulePreview(event, item) {
+    clearTimeout(hoverTimer.current);
+    if (event.buttons || menuOpen || dropTarget) return;
+    const node = event.currentTarget;
+    hoverTimer.current = setTimeout(() => {
+      if (node.isConnected) {
+        const icon = node.querySelector(".dock-icon") ?? node;
+        const a = physicalBounds(node);
+        const b = physicalBounds(icon);
+        const anchor = { left: Math.min(a.left, b.left), top: Math.min(a.top, b.top), right: Math.max(a.right, b.right), bottom: Math.max(a.bottom, b.bottom) };
+        invoke("dock_preview_open", { key: item.key, name: item.name, anchor }).catch(console.error);
+      }
+    }, 250);
+  }
+
   function openMenu(event, item) {
     event.stopPropagation();
+    closePreview();
     resetMagnification();
     invoke("dock_context_menu", { key: item.key }).catch(console.error);
   }
 
   return <div className="dock-stage" onContextMenu={(e) => { e.preventDefault(); resetMagnification(); invoke("desktop_context_menu", { section: "dock" }).catch(console.error); }} onMouseMove={onMouseMove} onMouseLeave={resetMagnification}>
+    {dropError && <div role="status" className="dock-drop-error">{dropError}</div>}
     <div ref={pill} className="dock-pill" style={pillVars}>
       {all.map((item, index) => {
         const icon = item.kind === "apps" ? <AppsIcon /> : item.kind === "trash" ? <TrashIcon full={trash.items > 0} /> : item.icon ? <img src={item.icon} alt="" /> : <ItemIcon path={item.path || (item.aumid ? `shell:AppsFolder\\${item.aumid}` : "")} name={item.name} />;
         const firstShelfIndex = all.findIndex((entry) => entry.kind === "folder" || entry.kind === "trash");
-        return <button key={item.key} title={item.name} className={`dock-item ${item.kind === "folder" ? "dock-folder" : ""} ${index === firstShelfIndex ? "dock-divider" : ""}`} style={{ width: size, height: size + 8 }} ref={(node) => { itemRefs.current[index] = node; iconRefs.current[index] = node?.querySelector(".dock-icon") ?? null; }} onClick={() => activate(item)} onContextMenu={(e) => { e.preventDefault(); openMenu(e, item); }} onMouseDown={(e) => { if (e.button === 1) { e.preventDefault(); invoke("dock_close_windows", { key: item.key }); } }}>
+        return <button key={item.key} aria-label={item.name} data-drop-key={item.kind === "apps" ? undefined : item.key} className={`dock-item ${dropTarget === item.key ? "dock-drop-target" : ""} ${item.kind === "folder" ? "dock-folder" : ""} ${index === firstShelfIndex ? "dock-divider" : ""}`} style={{ width: size, height: size + 8 }} ref={(node) => { itemRefs.current[index] = node; iconRefs.current[index] = node?.querySelector(".dock-icon") ?? null; }} onMouseEnter={(event) => schedulePreview(event, item)} onMouseLeave={() => clearTimeout(hoverTimer.current)} onClick={() => { closePreview(); activate(item); }} onContextMenu={(e) => { e.preventDefault(); openMenu(e, item); }} onMouseDown={(e) => { if (e.button === 1) { e.preventDefault(); invoke("dock_close_windows", { key: item.key }); } }}>
           <span className="dock-icon" style={{ width: size, height: size }}>{icon}</span>{item.running && item.kind !== "trash" && <span className="dock-dot" />}
         </button>;
       })}

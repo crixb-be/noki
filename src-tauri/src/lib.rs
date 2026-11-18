@@ -24,6 +24,8 @@ mod viz;
 mod topbar;
 mod backdrop;
 mod dock;
+mod dock_drop;
+mod dock_preview;
 mod context_menu;
 mod jump_lists;
 mod launchpad;
@@ -107,10 +109,12 @@ pub(crate) async fn commit_settings(app: &AppHandle, mut new: Settings) -> Resul
         appicon::apply(app, &new.appearance.app_icon);
     }
     // El cambio de ajustes debe verse de inmediato en las ventanas nativas, no en la siguiente vuelta lenta.
-    dock::sync_taskbar(&new);
-    topbar::sync(app, &new, false);
-    dock::sync(app, &new, false);
-    launchpad::sync(app, &new, false);
+    if !dock::capture_in_progress() {
+        let fullscreen = new.general.hide_on_fullscreen && state.fullscreen.load(SeqCst);
+        topbar::sync(app, &new, fullscreen);
+        dock::sync(app, &new, fullscreen);
+        launchpad::sync(app, &new, fullscreen);
+    }
     window_utils::sync_panel_glass(app, &new.appearance.panel_style);
     let payload = new.masked();
     let _ = app.emit("settings-updated", &payload);
@@ -851,6 +855,11 @@ pub fn run() {
             context_menu::dock_context_menu,
             context_menu::desktop_context_menu,
             dock::dock_items,
+            dock_drop::dock_drop_targets,
+            dock_preview::dock_preview_open,
+            dock_preview::dock_preview_state,
+            dock_preview::dock_preview_close,
+            dock_preview::dock_preview_action,
             dock::dock_set_hit,
             dock::dock_resize,
             dock::dock_activate,
@@ -921,6 +930,7 @@ pub fn run() {
             clipboard::start(handle.clone());
             viz::start(handle.clone());
             statuswatch::start(handle.clone());
+            topbar::start_battery_watch(handle.clone());
             updates::start_auto(handle.clone());
             // La casilla de la bandeja arranca con el valor guardado.
             if let Some(item) = handle.try_state::<TrayDnd>() {

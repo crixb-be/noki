@@ -7,6 +7,7 @@ import TopBar from "./components/topbar/TopBar.jsx";
 import BarPanel from "./components/topbar/BarPanel.jsx";
 import ContextMenu from "./components/ContextMenu.jsx";
 import Dock from "./components/dock/Dock.jsx";
+import DockPreview from "./components/dock/DockPreview.jsx";
 import Launchpad from "./components/launchpad/Launchpad.jsx";
 import Spotlight from "./components/spotlight/Spotlight.jsx";
 import "./index.css";
@@ -15,7 +16,7 @@ import "./index.css";
 const view = new URLSearchParams(window.location.search).get("view") ?? "notch";
 document.documentElement.dataset.view = view;
 
-const content = view === "contextmenu" ? <ContextMenu /> : view === "settings" ? <SettingsWindow /> : view === "topbar" ? <TopBar /> : view === "barpanel" ? <BarPanel /> : view === "dock" ? <Dock /> : view === "launchpad" ? <Launchpad /> : view === "spotlight" ? <Spotlight /> : <App />;
+const content = view === "contextmenu" ? <ContextMenu /> : view === "settings" ? <SettingsWindow /> : view === "topbar" ? <TopBar /> : view === "barpanel" ? <BarPanel /> : view === "dock" ? <Dock /> : view === "dockpreview" ? <DockPreview /> : view === "launchpad" ? <Launchpad /> : view === "spotlight" ? <Spotlight /> : <App />;
 ReactDOM.createRoot(document.getElementById("root")).render(content);
 // «Lista» cuando React ya ha pintado (dos fotogramas), no al evaluar el JS: el backend usa esta señal
 // para mostrar y colocar las ventanas. Las ventanas nacen ocultas y WebView2 puede no dar fotogramas

@@ -18,7 +18,7 @@ use tauri::{AppHandle, Emitter, WebviewWindow};
 use windows::{
     core::{implement, BOOL},
     Win32::{
-        Foundation::{HWND, LPARAM, POINTL},
+        Foundation::{HWND, LPARAM, POINT, POINTL},
         System::{
             Com::{IDataObject, DVASPECT_CONTENT, FORMATETC, TYMED_HGLOBAL},
             Ole::{
@@ -47,9 +47,14 @@ struct NotchDropTarget {
     label: String,
     /// Si lo que se arrastra trae archivos (se decide en DragEnter).
     files: Cell<bool>,
+    root: isize,
 }
 
 impl NotchDropTarget {
+    fn dock_point(&self, pt: &POINTL) -> (HWND, POINT) {
+        (HWND(self.root as *mut _), POINT { x: pt.x, y: pt.y })
+    }
+
     fn emit(&self, kind: &'static str, paths: Vec<String>) {
         let _ = self.app.emit("notch-drag", DragEvent { label: self.label.clone(), kind, paths });
     }
@@ -86,12 +91,18 @@ impl IDropTarget_Impl for NotchDropTarget_Impl {
         &self,
         data: windows::core::Ref<'_, IDataObject>,
         _keys: MODIFIERKEYS_FLAGS,
-        _pt: &POINTL,
+        pt: &POINTL,
         effect: *mut DROPEFFECT,
     ) -> windows::core::Result<()> {
         let paths = data.as_ref().and_then(paths_of);
-        let ok = paths.is_some();
+        let ok = paths.as_ref().is_some_and(|paths| !paths.is_empty());
         self.files.set(ok);
+        if self.label == "dock" {
+            let (window, at) = self.dock_point(pt);
+            let accepted = ok && crate::dock_drop::enter(&self.app, window, at, crate::dock_drop::Source::Ole);
+            unsafe { *effect = if accepted { DROPEFFECT_COPY } else { DROPEFFECT_NONE } };
+            return Ok(());
+        }
         unsafe { *effect = if ok { DROPEFFECT_COPY } else { DROPEFFECT_NONE } };
         if ok {
             self.emit("enter", paths.unwrap_or_default());
@@ -99,14 +110,23 @@ impl IDropTarget_Impl for NotchDropTarget_Impl {
         Ok(())
     }
 
-    fn DragOver(&self, _keys: MODIFIERKEYS_FLAGS, _pt: &POINTL, effect: *mut DROPEFFECT) -> windows::core::Result<()> {
-        unsafe { *effect = if self.files.get() { DROPEFFECT_COPY } else { DROPEFFECT_NONE } };
+    fn DragOver(&self, _keys: MODIFIERKEYS_FLAGS, pt: &POINTL, effect: *mut DROPEFFECT) -> windows::core::Result<()> {
+        let accepted = self.files.get() && if self.label == "dock" {
+            let (window, at) = self.dock_point(pt);
+            crate::dock_drop::poll(&self.app, window, at);
+            crate::dock_drop::accepts(window, at)
+        } else { true };
+        unsafe { *effect = if accepted { DROPEFFECT_COPY } else { DROPEFFECT_NONE } };
         Ok(())
     }
 
     fn DragLeave(&self) -> windows::core::Result<()> {
         if self.files.replace(false) {
-            self.emit("leave", vec![]);
+            if self.label == "dock" {
+                crate::dock_drop::leave(&self.app, crate::dock_drop::Source::Ole);
+            } else {
+                self.emit("leave", vec![]);
+            }
         }
         Ok(())
     }
@@ -115,11 +135,20 @@ impl IDropTarget_Impl for NotchDropTarget_Impl {
         &self,
         data: windows::core::Ref<'_, IDataObject>,
         _keys: MODIFIERKEYS_FLAGS,
-        _pt: &POINTL,
+        pt: &POINTL,
         effect: *mut DROPEFFECT,
     ) -> windows::core::Result<()> {
         let was = self.files.replace(false);
         let paths = if was { data.as_ref().and_then(paths_of) } else { None };
+        if self.label == "dock" {
+            let (window, at) = self.dock_point(pt);
+            let accepted = match paths {
+                Some(paths) => crate::dock_drop::drop_files(&self.app, window, at, paths, crate::dock_drop::Source::Ole),
+                None => { crate::dock_drop::leave(&self.app, crate::dock_drop::Source::Ole); false }
+            };
+            unsafe { *effect = if accepted { DROPEFFECT_COPY } else { DROPEFFECT_NONE } };
+            return Ok(());
+        }
         unsafe { *effect = if paths.is_some() { DROPEFFECT_COPY } else { DROPEFFECT_NONE } };
         match paths {
             Some(p) => self.emit("drop", p),
@@ -162,7 +191,7 @@ pub fn ensure(app: &AppHandle, window: &WebviewWindow) {
         if pending.is_empty() {
             return;
         }
-        let target: IDropTarget = NotchDropTarget { app: app2, label, files: Cell::new(false) }.into();
+        let target: IDropTarget = NotchDropTarget { app: app2, label, files: Cell::new(false), root: top.0 as isize }.into();
         for h in pending {
             let _ = RevokeDragDrop(h);
             if RegisterDragDrop(h, &target).is_ok() {
