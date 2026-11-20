@@ -224,14 +224,20 @@ fn transient_foreground_process() -> bool {
         if result.is_err() { return false; }
         path.truncate(length as usize);
         let path = String::from_utf16_lossy(&path);
-        matches!(path.rsplit(['\\', '/']).next().unwrap_or_default().to_ascii_lowercase().as_str(), "screenclippinghost.exe" | "snippingtool.exe" | "shellexperiencehost.exe" | "searchhost.exe")
+        match path.rsplit(['\\', '/']).next().unwrap_or_default().to_ascii_lowercase().as_str() {
+            "shellexperiencehost.exe" | "searchhost.exe" => true,
+            // Al grabar, el foco de Recortes no debe impedir que la barra recupere el orden Z.
+            "screenclippinghost.exe" | "snippingtool.exe" => !crate::dock::screen_recording_active(),
+            _ => false,
+        }
     }
 }
 
 fn raise(hwnd: HWND, _force: bool) {
     if crate::dock::capture_overlay_active() || transient_foreground_process() { return; }
     unsafe {
-        if GetWindowLongPtrW(hwnd, GWL_EXSTYLE) & WS_EX_TOPMOST.0 as isize != 0 {
+        // El marco puede tapar la barra aunque ambos conserven WS_EX_TOPMOST.
+        if !crate::dock::screen_recording_active() && GetWindowLongPtrW(hwnd, GWL_EXSTYLE) & WS_EX_TOPMOST.0 as isize != 0 {
             return;
         }
         let _ = SetWindowPos(

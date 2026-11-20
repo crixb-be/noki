@@ -219,9 +219,8 @@ fn sync_taskbar(settings: &Settings) {
     }
 }
 
-/// ¿Hay una herramienta de captura de Windows en marcha (Win+Shift+S, Recortes)? Su superposición
-/// es una ventana TOPMOST a pantalla completa: no hay que confundirla con un juego o un vídeo ni
-/// subir ninguna ventana de Noki por encima de ella.
+/// ¿Está activa la interfaz de recorte (Win+Shift+S, Recortes)? Subir Noki por encima
+/// de la selección puede interrumpirla.
 pub(crate) fn capture_overlay_active() -> bool {
     let active = capture_overlay_now();
     if active { *last_capture().lock().unwrap() = Some(Instant::now()); }
@@ -259,33 +258,116 @@ fn capture_window(hwnd: HWND) -> bool {
     matches!(process.as_str(), "screenclippinghost.exe" | "snippingtool.exe" | "gamebar.exe" | "gamebarftserver.exe")
 }
 
+fn snipping_window_name(hwnd: HWND, class: &str) -> bool {
+    let matches_name = |name: &str| {
+        let name = name.to_ascii_lowercase();
+        name.contains("snipping") || name.contains("screenclipping")
+    };
+    matches_name(class) || matches_name(&title(hwnd))
+}
+
+fn ignored_overlay_window(hwnd: HWND) -> bool {
+    use windows::Win32::UI::WindowsAndMessaging::{WS_EX_LAYERED, WS_EX_TRANSPARENT};
+    let mask = (WS_EX_LAYERED | WS_EX_TRANSPARENT).0 as isize;
+    if unsafe { GetWindowLongPtrW(hwnd, GWL_EXSTYLE) } & mask == mask || capture_window(hwnd) { return true; }
+    let class = window_class(hwnd, &mut [0; 128]);
+    class.to_ascii_lowercase().contains("microsoft.ui.content.desktopchildsitebridge") || snipping_window_name(hwnd, &class)
+}
+
+fn layered_window_translucent(hwnd: HWND) -> bool {
+    use windows::Win32::UI::WindowsAndMessaging::{GetLayeredWindowAttributes, LWA_ALPHA, LWA_COLORKEY};
+    let mut alpha = 255u8;
+    let mut flags = Default::default();
+    let has_attributes = unsafe { GetLayeredWindowAttributes(hwnd, None, Some(&mut alpha), Some(&mut flags)).is_ok() };
+    has_attributes && (flags.contains(LWA_COLORKEY) || (flags.contains(LWA_ALPHA) && alpha < 255))
+}
+
+pub(crate) fn eligible_foreground() -> Option<HWND> {
+    use windows::Win32::{System::Threading::GetCurrentProcessId, UI::WindowsAndMessaging::{IsZoomed, GWL_STYLE, WS_CAPTION, WS_EX_LAYERED, WS_EX_TRANSPARENT}};
+    unsafe {
+        let foreground = GetForegroundWindow();
+        if foreground.0.is_null() { return None; }
+        let hwnd = GetAncestor(foreground, GA_ROOT);
+        if hwnd.0.is_null() || !IsWindowVisible(hwnd).as_bool() || IsIconic(hwnd).as_bool() { return None; }
+        let mut pid = 0;
+        GetWindowThreadProcessId(hwnd, Some(&mut pid));
+        if pid == GetCurrentProcessId() { return None; }
+        let class = window_class(hwnd, &mut [0; 128]);
+        if matches!(class.as_str(), "Progman" | "WorkerW" | "Shell_TrayWnd" | "Shell_SecondaryTrayWnd") || ignored_overlay_window(hwnd) { return None; }
+        let ex = GetWindowLongPtrW(hwnd, GWL_EXSTYLE) as u32;
+        if ex & WS_EX_TRANSPARENT.0 != 0 || (ex & WS_EX_LAYERED.0 != 0 && layered_window_translucent(hwnd)) { return None; }
+        // Una ventana maximizada con barra de título puede cubrir el monitor si se oculta la barra de tareas.
+        if IsZoomed(hwnd).as_bool() && (GetWindowLongPtrW(hwnd, GWL_STYLE) as u32 & WS_CAPTION.0) == WS_CAPTION.0 { return None; }
+        Some(hwnd)
+    }
+}
+
+pub(crate) fn fullscreen_foreground() -> bool {
+    let Some(hwnd) = eligible_foreground() else { return false };
+    unsafe {
+        let mut rect = RECT::default();
+        if GetWindowRect(hwnd, &mut rect).is_err() { return false; }
+        let monitor = MonitorFromWindow(hwnd, MONITOR_DEFAULTTONEAREST);
+        let mut info = MONITORINFO { cbSize: std::mem::size_of::<MONITORINFO>() as u32, ..Default::default() };
+        if monitor.0.is_null() || !GetMonitorInfoW(monitor, &mut info).as_bool() { return false; }
+        let area = info.rcMonitor;
+        rect.left <= area.left && rect.top <= area.top && rect.right >= area.right && rect.bottom >= area.bottom
+    }
+}
+
 pub(crate) fn capture_foreground_excluded() -> bool {
-    use windows::Win32::UI::WindowsAndMessaging::{GetLayeredWindowAttributes, GWL_STYLE, LWA_ALPHA, LWA_COLORKEY, WS_CAPTION, WS_EX_LAYERED, WS_EX_NOACTIVATE, WS_EX_TRANSPARENT, WS_THICKFRAME};
+    use windows::Win32::UI::WindowsAndMessaging::{GWL_STYLE, WS_CAPTION, WS_EX_LAYERED, WS_EX_NOACTIVATE, WS_EX_TRANSPARENT, WS_THICKFRAME};
     unsafe {
         let hwnd = GetForegroundWindow();
         if hwnd.0.is_null() { return false; }
-        if capture_window(hwnd) { return true; }
+        if ignored_overlay_window(hwnd) { return true; }
         let style = GetWindowLongPtrW(hwnd, GWL_STYLE) as u32;
         let ex = GetWindowLongPtrW(hwnd, GWL_EXSTYLE) as u32;
         if style & (WS_CAPTION | WS_THICKFRAME).0 != 0 { return false; }
         if ex & WS_EX_TRANSPARENT.0 != 0 { return true; }
         if ex & WS_EX_LAYERED.0 == 0 { return false; }
-        let mut alpha = 255u8;
-        let mut flags = Default::default();
-        ex & (WS_EX_NOACTIVATE | WS_EX_TOOLWINDOW).0 != 0
-            || (GetLayeredWindowAttributes(hwnd, None, Some(&mut alpha), Some(&mut flags)).is_ok()
-                && (flags.contains(LWA_COLORKEY) || (flags.contains(LWA_ALPHA) && alpha < 255)))
+        ex & (WS_EX_NOACTIVATE | WS_EX_TOOLWINDOW).0 != 0 || layered_window_translucent(hwnd)
     }
+}
+
+pub(crate) fn screen_recording_active() -> bool {
+    use windows::Win32::{System::Threading::GetCurrentProcessId, UI::WindowsAndMessaging::{WS_EX_LAYERED, WS_EX_TOPMOST, WS_EX_TRANSPARENT}};
+    unsafe extern "system" fn recording_frame(hwnd: HWND, lparam: LPARAM) -> windows::core::BOOL {
+        let mask = (WS_EX_LAYERED | WS_EX_TRANSPARENT | WS_EX_TOPMOST).0 as isize;
+        if !IsWindowVisible(hwnd).as_bool() || GetWindowLongPtrW(hwnd, GWL_EXSTYLE) & mask != mask { return true.into(); }
+        // Leer el título de una ventana propia puede esperar al hilo de UI.
+        let mut pid = 0;
+        GetWindowThreadProcessId(hwnd, Some(&mut pid));
+        if pid == GetCurrentProcessId() { return true.into(); }
+        if !capture_window(hwnd) && !snipping_window_name(hwnd, &window_class(hwnd, &mut [0; 128])) { return true.into(); }
+        *(lparam.0 as *mut bool) = true;
+        false.into()
+    }
+
+    // El marco rojo sigue visible aunque Recortes pierda el foco. Se comparte el sondeo entre los bucles.
+    const TTL: Duration = Duration::from_millis(250);
+    static CACHE: OnceLock<Mutex<(Instant, bool)>> = OnceLock::new();
+    let mut cached = CACHE.get_or_init(|| Mutex::new((Instant::now() - TTL, false))).lock().unwrap();
+    if cached.0.elapsed() >= TTL {
+        let mut active = false;
+        unsafe { let _ = EnumWindows(Some(recording_frame), LPARAM(&mut active as *mut bool as isize)); }
+        *cached = (Instant::now(), active);
+    }
+    cached.1
 }
 
 fn capture_overlay_now() -> bool {
     unsafe {
         for class in CAPTURE_CLASSES {
             let wide: Vec<u16> = class.encode_utf16().chain(std::iter::once(0)).collect();
-            if let Ok(h) = FindWindowW(PCWSTR(wide.as_ptr()), PCWSTR::null()) {
-                if !h.0.is_null() && IsWindowVisible(h).as_bool() { return true; }
+            let mut after = None;
+            while let Ok(h) = FindWindowExW(None, after, PCWSTR(wide.as_ptr()), PCWSTR::null()) {
+                if h.0.is_null() { break; }
+                if IsWindowVisible(h).as_bool() { return true; }
+                after = Some(h);
             }
         }
+        if screen_recording_active() { return false; }
         capture_window(GetForegroundWindow())
     }
 }
@@ -930,17 +1012,18 @@ pub fn start(app: AppHandle) {
                 x >= hit_area.x && x < hit_area.x + hit_area.w && y >= hit_area.y && y < hit_area.y + hit_area.h
             };
             let near_bottom = work_area_with_monitor(&app, dock_settings.hide_taskbar).map(|(r, scale)| p.y >= r.bottom - physical(12, scale) && p.x >= r.left && p.x < r.right).unwrap_or(false);
-            if MENU_OPEN.load(std::sync::atomic::Ordering::SeqCst) { continue; }
-            let should_show = !dock_settings.autohide || inside || near_bottom || crate::shortcut_folder::is_open() || crate::dock_animation::in_flight();
+            let menu_open = menu_open();
             // Cada 2 s se reaplica todo aunque nada haya cambiado: si Windows o tao
-            // alteraron los estilos (clics ignorados) o el orden Z, se corrige solo.
+            // alteraron los estilos (clics ignorados) o el marco de grabación tapó el Dock, se corrige solo.
             let periodic = last_check.elapsed() >= Duration::from_secs(2);
-            if periodic {
+            if periodic && (!menu_open || screen_recording_active()) {
                 last_check = Instant::now();
                 if visible {
                     unsafe { let _ = SetWindowPos(h, Some(HWND_TOPMOST), 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE | SWP_ASYNCWINDOWPOS); }
                 }
             }
+            if menu_open { continue; }
+            let should_show = !dock_settings.autohide || inside || near_bottom || crate::shortcut_folder::is_open() || crate::dock_animation::in_flight();
             // El cursor sale del área de clic: la ventana pasa a click-through y WebView2 ya no recibe
             // `mouseleave`, así que se avisa a la vista (cierra el menú contextual y la magnificación).
             if last.is_some_and(|(_, was_inside)| was_inside) && !inside {

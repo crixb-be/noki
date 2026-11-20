@@ -27,7 +27,7 @@ use windows::Win32::{
     UI::{
         Input::KeyboardAndMouse::{GetAsyncKeyState, VK_ESCAPE, VK_LBUTTON, VK_RBUTTON},
         Shell::{
-            SHAppBarMessage, SHQueryUserNotificationState, APPBARDATA, QUNS_BUSY, QUNS_PRESENTATION_MODE,
+            SHAppBarMessage, SHQueryUserNotificationState, APPBARDATA, QUNS_PRESENTATION_MODE,
             QUNS_RUNNING_D3D_FULL_SCREEN,
         },
         WindowsAndMessaging::{
@@ -302,15 +302,13 @@ fn button_down() -> bool {
     unsafe { (GetAsyncKeyState(VK_LBUTTON.0 as i32) < 0) || (GetAsyncKeyState(VK_RBUTTON.0 as i32) < 0) }
 }
 
-/// ¿Hay una app a pantalla completa (juego, vídeo, F11) o una presentación?
+/// El marco rojo de Recortes hace que Windows devuelva QUNS_BUSY aunque la app en primer plano
+/// esté en modo ventana. Se comprueba el monitor o el estado explícito de juego/presentación.
 fn fullscreen_app_active() -> bool {
     if crate::dock::capture_foreground_excluded() { return false; }
-    unsafe {
-        match SHQueryUserNotificationState() {
-            Ok(st) => st == QUNS_BUSY || st == QUNS_RUNNING_D3D_FULL_SCREEN || st == QUNS_PRESENTATION_MODE,
-            Err(_) => false,
-        }
-    }
+    crate::dock::fullscreen_foreground()
+        || (unsafe { SHQueryUserNotificationState() }.is_ok_and(|st| st == QUNS_RUNNING_D3D_FULL_SCREEN || st == QUNS_PRESENTATION_MODE)
+            && crate::dock::eligible_foreground().is_some())
 }
 
 /// WS_EX_TOOLWINDOW lo oculta de Alt+Tab. Tao reescribe GWL_EXSTYLE entero (sin este bit) cada vez que
@@ -436,9 +434,6 @@ fn color_distance(a: (u8, u8, u8), b: (u8, u8, u8)) -> i32 {
     (a.0 as i32 - b.0 as i32).abs() + (a.1 as i32 - b.1 as i32).abs() + (a.2 as i32 - b.2 as i32).abs()
 }
 
-/// Solo reasigna TOPMOST si Windows/tao lo quitó. Antes se llamaba a SetWindowPos cada segundo,
-/// lo que reordenaba el z-order y bloqueaba al hilo de la ventana con un SendMessage síncrono.
-/// SWP_ASYNCWINDOWPOS evita esperar al hilo principal; SWP_NOSENDCHANGING no dispara WM_WINDOWPOSCHANGING.
 fn transient_foreground_process() -> bool {
     unsafe {
         let foreground = GetForegroundWindow();
@@ -453,10 +448,16 @@ fn transient_foreground_process() -> bool {
         if result.is_err() { return false; }
         path.truncate(length as usize);
         let path = String::from_utf16_lossy(&path);
-        matches!(path.rsplit(['\\', '/']).next().unwrap_or_default().to_ascii_lowercase().as_str(), "screenclippinghost.exe" | "snippingtool.exe" | "shellexperiencehost.exe" | "searchhost.exe")
+        match path.rsplit(['\\', '/']).next().unwrap_or_default().to_ascii_lowercase().as_str() {
+            "shellexperiencehost.exe" | "searchhost.exe" => true,
+            // Durante la grabación el marco sigue visible y el foco de Recortes no debe pausar el sondeo.
+            "screenclippinghost.exe" | "snippingtool.exe" => !crate::dock::screen_recording_active(),
+            _ => false,
+        }
     }
 }
 
+/// SWP_ASYNCWINDOWPOS evita esperar al hilo principal y SWP_NOSENDCHANGING evita WM_WINDOWPOSCHANGING.
 fn raise_topmost(hwnd: HWND, force: bool) {
     if transient_foreground_process() || crate::dock::capture_overlay_active() { return; }
     unsafe {
