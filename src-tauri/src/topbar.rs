@@ -318,7 +318,7 @@ pub fn sync(app: &AppHandle, settings: &Settings, fullscreen: bool) {
     });
     set_owner(app, true);
     register_appbar(&window, monitor.rect, height);
-    if fullscreen {
+    if fullscreen && !crate::dock::capture_foreground_excluded() {
         let ui_window = window.clone();
         let _ = window.run_on_main_thread(move || { let _ = ui_window.hide(); });
         return;
@@ -650,7 +650,7 @@ pub fn audio_output_name() -> String {
 }
 
 fn open_bar_panel_impl(app: &AppHandle, kind: String, anchor_x: i32) -> Result<(), String> {
-    if !["wifi", "bluetooth", "sound", "battery", "control", "user"].contains(&kind.as_str()) {
+    if !["wifi", "bluetooth", "sound", "battery", "control", "user", "ai-usage"].contains(&kind.as_str()) {
         return Err("Panel desconocido.".into());
     }
     let popup_id = format!("bar_panel:{kind}");
@@ -664,8 +664,8 @@ fn open_bar_panel_impl(app: &AppHandle, kind: String, anchor_x: i32) -> Result<(
         if state.height <= 0 { state.height = 320; }
     }
     position_panel(app, &panel);
-    let _ = panel.emit("bar-panel", &kind);
     popups::present(&panel, "bar_panel");
+    let _ = panel.emit_to("barpanel", "bar-panel", &kind);
     Ok(())
 }
 

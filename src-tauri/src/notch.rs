@@ -304,6 +304,7 @@ fn button_down() -> bool {
 
 /// ¿Hay una app a pantalla completa (juego, vídeo, F11) o una presentación?
 fn fullscreen_app_active() -> bool {
+    if crate::dock::capture_foreground_excluded() { return false; }
     unsafe {
         match SHQueryUserNotificationState() {
             Ok(st) => st == QUNS_BUSY || st == QUNS_RUNNING_D3D_FULL_SCREEN || st == QUNS_PRESENTATION_MODE,
@@ -748,7 +749,11 @@ fn run_loop(app: AppHandle) {
         let capturing = crate::dock::capture_in_progress();
         let capture_ended = was_capturing && !capturing;
         was_capturing = capturing;
-        if capturing {
+        if fullscreen && crate::dock::capture_foreground_excluded() {
+            fullscreen = false;
+            fullscreen_since = None;
+            if previous_fullscreen { st.fullscreen.store(false, SeqCst); }
+        } else if capturing {
             fullscreen_since = None;
         } else if capture_ended || now - last_fs >= Duration::from_millis(60) {
             last_fs = now;
@@ -770,7 +775,7 @@ fn run_loop(app: AppHandle) {
                 st.fullscreen.store(fullscreen, SeqCst);
             }
         }
-        if !capturing && (slow || capture_ended || previous_fullscreen != fullscreen) {
+        if (!capturing && (slow || capture_ended)) || previous_fullscreen != fullscreen {
             crate::topbar::sync(&app, &s, fullscreen);
             crate::dock::sync(&app, &s, fullscreen);
             crate::launchpad::sync(&app, &s, fullscreen);

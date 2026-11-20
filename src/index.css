@@ -123,6 +123,14 @@ html, body, #root {
 .dock-item:hover { filter: brightness(1.16); }
 .dock-divider::before { position: absolute; left: -5px; top: 12%; width: 1px; height: 76%; content: ""; background: rgba(255,255,255,.28); }
 .dock-icon { display: grid; place-items: center; transform-origin: center bottom; }
+.dock-icon-launching { animation: dock-launch-bounce 540ms infinite; }
+@keyframes dock-launch-bounce {
+  0%, 100% { translate: 0 0; }
+  44% { translate: 0 -11px; }
+  76% { translate: 0 0; }
+  87% { translate: 0 -2px; }
+}
+.dock-genie-canvas { display: block; width: 100%; height: 100%; pointer-events: none; }
 .dock-icon img { width: 100%; height: 100%; object-fit: contain; image-rendering: high-quality; image-rendering: auto; }
 .dock-fallback { display: grid; width: 100%; height: 100%; place-items: center; color: rgba(255,255,255,.95); font-size: 22px; font-weight: 700; }
 .apps-icon { display: grid; grid-template-columns: repeat(3, 1fr); gap: 3px; width: 72%; height: 72%; padding: 5px; border-radius: 15px; background: linear-gradient(135deg,#222,#555); box-sizing: border-box; }
@@ -417,3 +425,29 @@ html[data-view="contextmenu"], html[data-view="contextmenu"] body, html[data-vie
 .dock-preview-placeholder { color: rgba(255,255,255,.5); font-size: 24px; }
 .dock-preview-close { position: absolute; top: 3px; right: 4px; width: 23px; height: 23px; border: 0; border-radius: 5px; color: #fff; background: transparent; font-size: 19px; line-height: 1; cursor: pointer; }
 .dock-preview-close:hover, .dock-preview-close:focus-visible { background: #bd3947; }
+
+.dock-shortcut-icon { display: grid; place-items: center; line-height: 1; }
+.shortcut-folder-entry-icon { display: grid; place-items: center; flex: none; width: 20px; height: 20px; }
+.shortcut-folder-entry-icon img { width: 100%; height: 100%; object-fit: contain; }
+.shortcut-folder-panel { grid-template-rows: auto minmax(0, 1fr) auto; place-items: stretch; }
+.shortcut-folder-header { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 12px 12px 8px; border-bottom: 1px solid rgba(255,255,255,.15); }
+.shortcut-folder-list { min-height: 0; overflow: auto; padding: 6px; scrollbar-width: thin; }
+.shortcut-folder-footer { padding: 6px; border-top: 1px solid rgba(255,255,255,.15); }
+.shortcut-folder-action, .shortcut-folder-close { border: 0; border-radius: 6px; background: transparent; color: inherit; cursor: pointer; }
+.shortcut-folder-action { display: flex; align-items: center; gap: 8px; width: 100%; padding: 6px 8px; text-align: left; }
+.shortcut-folder-close { flex: none; width: 28px; height: 28px; font-size: 20px; line-height: 1; }
+.shortcut-folder-action:hover, .shortcut-folder-close:hover { background: rgba(255,255,255,.13); }
+.shortcut-folder-action:focus-visible, .shortcut-folder-close:focus-visible { outline: 1px solid currentColor; outline-offset: -1px; }
+.shortcut-folder-action:disabled { opacity: .5; cursor: default; }
+
+.ai-provider-icon { width: 16px; height: 16px; flex: none; }
+.ai-provider-claude { color: #db8060; }
+.ai-usage-percent { font-variant-numeric: tabular-nums; }
+.ai-usage-header { justify-content: space-between; }
+.ai-usage-header .panel-link { width: auto; margin: 0; }
+.ai-usage-header .panel-link:disabled { opacity: .5; cursor: default; }
+.ai-usage-provider { border-top: 1px solid currentColor; padding: 8px 0; }
+.ai-usage-provider h3 { display: flex; align-items: center; gap: 6px; margin: 0 0 5px; font-weight: 600; }
+.ai-usage-limit { margin: 5px 0 8px; }
+.ai-usage-limit > div { display: flex; justify-content: space-between; gap: 6px; }
+.ai-usage-limit progress { display: block; width: 100%; height: 5px; margin: 4px 0; accent-color: #8c78e0; }

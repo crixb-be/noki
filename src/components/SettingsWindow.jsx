@@ -1594,6 +1594,7 @@ function TopBarSettings({ s, set }) {
     <Row title="Alto de la barra"><Slider value={t.height} min={28} max={32} unit=" px" onChange={(v) => set({ topbar: { height: v } })} /></Row>
     <Row title="Tinte"><Select value={t.tint} options={[["auto", "Automático"], ["dark", "Oscuro"], ["light", "Claro"]]} onChange={(v) => set({ topbar: { tint: v } })} /></Row>
     <SectionTitle>Iconos visibles</SectionTitle>
+    <Row title="Mostrar uso de proveedores de IA" hint="Lee la cuota de las sesiones que ya tienes abiertas. Consulta directamente a cada proveedor cada cinco minutos y no guarda credenciales"><Toggle checked={t.showAiUsage} onChange={(v) => set({ topbar: { showAiUsage: v } })} /></Row>
     {iconRows.map(([id, title, hint]) => <Row key={id} title={title} hint={hint}><Toggle checked={t[id]} onChange={(v) => set({ topbar: { [id]: v } })} /></Row>)}
     <Row title="Avatar de Windows" hint="Elige una imagen o deja vacío para usar la foto de tu cuenta."><div className="flex items-center gap-2"><div className="h-10 w-10 overflow-hidden rounded-full bg-indigo-600">{avatar ? <img src={avatar} alt="" className="h-full w-full object-cover" /> : <span className="flex h-full items-center justify-center text-white">U</span>}</div><button className={button} onClick={async () => { const path = await open({ multiple: false, directory: false, filters: [{ name: "Imagen", extensions: ["png", "jpg", "jpeg", "webp", "bmp", "gif"] }] }); if (typeof path === "string") { const data = await invoke("set_avatar_image", { path }); setAvatar(data || null); } }}>Elegir imagen…</button><button className={button} onClick={async () => { const data = await invoke("set_avatar_image", { path: "" }); setAvatar(data || null); }}>Usar la de Windows</button></div></Row>
   </Page>;
@@ -1699,9 +1700,27 @@ function PinnedDockApps({ pinned, onChange }) {
 
 function DockSettings({ s, set }) {
   const d = s.dock ?? {};
+  const [folderError, setFolderError] = useState(null);
+  const [choosingFolder, setChoosingFolder] = useState(false);
   const updatePinned = (pinned) => set({ dock: { pinned } });
+  const updateFolder = (shortcutFolder) => set({ dock: { shortcutFolder } });
+
+  async function chooseFolder() {
+    setFolderError(null);
+    setChoosingFolder(true);
+    try {
+      const path = await open({ directory: true, multiple: false, defaultPath: d.shortcutFolder || undefined });
+      if (typeof path === "string") updateFolder(path);
+    } catch (error) {
+      setFolderError(String(error));
+    } finally {
+      setChoosingFolder(false);
+    }
+  }
+
   return <Page title="Dock" subtitle="Tus aplicaciones, ventanas y carpetas favoritas en la parte inferior.">
     <Row title="Activar Dock"><Toggle checked={d.enabled} onChange={(v) => set({ dock: { enabled: v } })} /></Row>
+    <Row title="Animar apps al abrir y minimizar"><Toggle checked={d.animateApps} onChange={(v) => set({ dock: { animateApps: v } })} /></Row>
     <Row title="Tamaño del Dock" hint="Tamaño base de los iconos; la píldora y su vidrio se ajustan al momento."><Slider value={Math.min(64, Math.max(36, d.iconSize ?? 44))} min={36} max={64} step={2} unit=" px" onChange={(v) => set({ dock: { iconSize: v } })} /></Row>
     <Row title="Magnificación" hint="Amplía los iconos alrededor del cursor."><Toggle checked={d.magnify} onChange={(v) => set({ dock: { magnify: v } })} /></Row>
     <Row title="Escala de magnificación"><Slider value={d.magnifyScale} min={1} max={2.5} step={0.1} unit="×" onChange={(v) => set({ dock: { magnifyScale: v } })} /></Row>
@@ -1711,6 +1730,17 @@ function DockSettings({ s, set }) {
     <Row title="Ocultar automáticamente"><Toggle checked={d.autohide} onChange={(v) => set({ dock: { autohide: v } })} /></Row>
     <Row title="Reservar espacio" hint="Las ventanas maximizadas dejan libre el borde inferior."><Toggle checked={d.reserveSpace} onChange={(v) => set({ dock: { reserveSpace: v } })} /></Row>
     <Row title="Ocultar la barra de tareas de Windows" hint="Guarda el estado actual y lo restaura al desactivar o salir de Noki."><Toggle checked={d.hideTaskbar} onChange={(v) => set({ dock: { hideTaskbar: v } })} /></Row>
+    <SectionTitle>Carpeta de accesos directos</SectionTitle>
+    <div className={`${CARD} flex flex-wrap items-center gap-3 px-4 py-3`}>
+      <div className="min-w-0 flex-1 break-all text-sm text-white/75">
+        {d.shortcutFolder ? <span data-no-i18n>{d.shortcutFolder}</span> : "Ninguna carpeta seleccionada"}
+      </div>
+      <div className="flex shrink-0 gap-2">
+        <button type="button" className={`${button} disabled:opacity-40`} disabled={!d.shortcutFolder || choosingFolder} onClick={() => { setFolderError(null); updateFolder(""); }}>Quitar</button>
+        <button type="button" className={button} disabled={choosingFolder} onClick={chooseFolder}>Elegir...</button>
+      </div>
+      {folderError && <p role="alert" className="w-full text-xs text-amber-300">{folderError}</p>}
+    </div>
     <SectionTitle>Aplicaciones ancladas</SectionTitle>
     <div className={`${CARD} overflow-hidden`}><PinnedDockApps pinned={d.pinned ?? []} onChange={updatePinned} /><button className={`${button} m-3`} onClick={async () => { const path = await open({ multiple: false, directory: false, filters: [{ name: "Programas", extensions: ["exe", "lnk", "url"] }] }); if (typeof path === "string") updatePinned([...(d.pinned ?? []), { name: path.split(/[\\/]/).pop().replace(/\.[^.]+$/, ""), path, args: "", aumid: "" }]); }}>Añadir programa…</button></div>
   </Page>;

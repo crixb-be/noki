@@ -6,6 +6,8 @@ import { BatteryIcon, BluetoothIcon, SpeakerIcon, WifiIcon } from "./SymbolIcons
 import { useMedia } from "../../hooks/useMedia.js";
 import { useSettings } from "../../hooks/useSettings.js";
 import { useGlass, useGlassShape } from "../../lib/glass.js";
+import { useLanguage } from "../../lib/i18n.js";
+import { AiUsagePanel } from "./AiUsage.jsx";
 
 const action = (uri) => invoke("command_open_system_uri", { uri }).catch(() => {});
 const Switch = ({ checked, onChange }) => <button type="button" role="switch" aria-checked={checked} onClick={() => onChange(!checked)} className={`panel-switch ${checked ? "on" : ""}`}><span /></button>;
@@ -74,6 +76,7 @@ function ControlCenter({ brightness, setBrightness, volume, setVolume }) {
 
 export default function BarPanel() {
   const { settings } = useSettings();
+  useLanguage(settings?.general?.language);
   // Estilo de paneles (Ajustes > Apariencia): «light» vidrio claro difuminado, «dark» oscuro opaco.
   useEffect(() => { document.documentElement.dataset.panels = settings?.appearance?.panelStyle === "dark" ? "dark" : "light"; }, [settings?.appearance?.panelStyle]);
   const [kind, setKind] = useState(null);
@@ -92,10 +95,28 @@ export default function BarPanel() {
   const [openCount, setOpenCount] = useState(0);
 
   useEffect(() => {
-    let stop;
-    invoke("command_bar_panel_state").then((value) => value && setKind(value)).catch(() => {});
-    listen("bar-panel", (event) => { setKind(typeof event.payload === "string" ? event.payload : event.payload?.kind ?? null); setOpenCount((n) => n + 1); }).then((fn) => { stop = fn; });
-    return () => stop?.();
+    let disposed = false;
+    let revision = 0;
+    const syncKind = () => {
+      const request = ++revision;
+      invoke("command_bar_panel_state").then((value) => {
+        if (!disposed && request === revision) setKind(value);
+      }).catch(console.error);
+    };
+    const subscription = listen("bar-panel", ({ payload }) => {
+      revision += 1;
+      if (!disposed) {
+        setKind(typeof payload === "string" ? payload : payload?.kind ?? null);
+        setOpenCount((n) => n + 1);
+      }
+    });
+    subscription.then(() => { if (!disposed) syncKind(); }).catch(console.error);
+    window.addEventListener("focus", syncKind);
+    return () => {
+      disposed = true;
+      window.removeEventListener("focus", syncKind);
+      subscription.then((unlisten) => unlisten()).catch(console.error);
+    };
   }, []);
   useEffect(() => {
     const onKey = (e) => { if (e.key === "Escape") invoke("command_close_bar_panel").catch(() => {}); };
@@ -135,6 +156,7 @@ export default function BarPanel() {
   const panelDark = settings?.topbar?.tint === "dark" || (settings?.topbar?.tint !== "light" && window.matchMedia?.("(prefers-color-scheme: dark)").matches !== false);
   const card = kind === "control" ? "cc-root" : `noki-popup-card noki-panel-surface ${panelDark ? "bar-panel-dark" : "bar-panel-light"}`;
   return <div ref={ref} className={`bar-panel ${card}`} onMouseDown={(e) => e.stopPropagation()}><div ref={body} className="bar-panel-body">
+    {kind === "ai-usage" && <AiUsagePanel enabled={settings?.topbar?.enabled && settings?.topbar?.showAiUsage} />}
     {kind === "wifi" && <>
       <header className="panel-head-mac"><h2>Wi-Fi</h2><Switch checked onChange={(v) => invoke("quick_set", { kind: "wifi", on: v })} /></header>
       <div className="panel-status"><span>Estado</span><span>{wifi.find((x) => x.connected)?.ssid ? `Conectado a ${wifi.find((x) => x.connected).ssid}` : "Sin conexión"}</span></div>

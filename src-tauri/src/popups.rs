@@ -48,12 +48,13 @@ fn window_name(id: &str) -> &'static str {
     if id == "contextmenu" { "contextmenu" }
     else if id == "launchpad" { "launchpad" }
     else if id == "spotlight" { "spotlight" }
+    else if id == "shortcutfolder" { "shortcutfolder" }
     else { "barpanel" }
 }
 
 /// Id con el que se registró la ventana (los paneles comparten «bar_panel»).
 fn base_id(id: &str) -> &'static str {
-    if id == "contextmenu" { "contextmenu" } else if id == "launchpad" { "launchpad" } else if id == "spotlight" { "spotlight" } else { "bar_panel" }
+    if id == "bar_panel" || id.starts_with("bar_panel:") { "bar_panel" } else { window_name(id) }
 }
 
 fn same_window(left: &str, right: &str) -> bool {
@@ -83,12 +84,8 @@ fn hide_window(app: &AppHandle, name: &'static str) {
 }
 
 fn hide_other_windows(app: &AppHandle, id: &str) {
-    for name in ["launchpad", "spotlight", "barpanel", "contextmenu"] {
-        let keep = (name == "contextmenu" && id == "contextmenu")
-            || (name == "launchpad" && id == "launchpad")
-            || (name == "spotlight" && id == "spotlight")
-            || (name == "barpanel" && id.starts_with("bar_panel:"));
-        if !keep { hide_window(app, name); }
+    for name in ["launchpad", "spotlight", "barpanel", "contextmenu", "shortcutfolder"] {
+        if name != window_name(id) { hide_window(app, name); }
     }
 }
 
@@ -129,7 +126,7 @@ pub fn close(app: &AppHandle, id: &str) -> bool {
 /// Alterna un popup. Un toggle del mismo id justo después de un cierre automático se suprime para
 /// evitar la carrera cierre -> clic en su botón -> reapertura.
 pub fn toggle(app: &AppHandle, id: &str) -> Result<bool, String> {
-    if !matches!(id, "launchpad" | "spotlight" | "contextmenu") && !id.starts_with("bar_panel:") {
+    if !matches!(id, "launchpad" | "spotlight" | "contextmenu" | "shortcutfolder") && !id.starts_with("bar_panel:") {
         return Err("Popup desconocido.".into());
     }
     // Visibilidad real de la ventana (fuera del candado): si quedó oculta por otra vía,
@@ -164,7 +161,11 @@ pub fn close_all(app: &AppHandle) {
         current.shown_at = None;
         current.generation = current.generation.wrapping_add(1);
     }
-    for name in ["launchpad", "spotlight", "barpanel", "contextmenu"] { hide_window(app, name); }
+    for name in ["launchpad", "spotlight", "barpanel", "contextmenu", "shortcutfolder"] { hide_window(app, name); }
+}
+
+pub(crate) fn is_active(id: &str) -> bool {
+    state().lock().unwrap().active_popup.as_deref() == Some(id)
 }
 
 #[tauri::command]
@@ -197,6 +198,7 @@ pub fn present(window: &WebviewWindow, id: &'static str) {
     let ui_window = window.clone();
     let _ = window.run_on_main_thread(move || unsafe {
         let Ok(hwnd) = ui_window.hwnd() else { return };
+        if !active_for_window(state().lock().unwrap().active_popup.as_deref(), id) { return; }
         // tao debe saber que está visible, o su hide() posterior no la ocultaría.
         let _ = ui_window.show();
         // Después de show(): tao acaba de reescribir los estilos.
@@ -291,9 +293,8 @@ pub fn start(app: AppHandle) {
             if crate::dock::capture_in_progress() { continue; }
             let mut cursor = POINT::default();
             if unsafe { GetCursorPos(&mut cursor) }.is_err() { continue; }
-            let inside = if id == "contextmenu" { crate::context_menu::contains_point(cursor) } else { ["launchpad", "spotlight", "barpanel", "dock", "topbar"]
+            let inside = if id == "contextmenu" { crate::context_menu::contains_point(cursor) } else { [window_name(&id), "dock", "topbar"]
                 .iter()
-                .filter(|label| **label == window_name(&id) || matches!(**label, "dock" | "topbar"))
                 .filter_map(|label| visible_rect(&app, label))
                 .any(|rect| contains(&rect, cursor)) };
             if !inside { auto_close(&app, &id, epoch); }

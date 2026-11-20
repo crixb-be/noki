@@ -1,5 +1,7 @@
 mod appicon;
 mod ai;
+mod ai_usage;
+mod claude_session;
 mod backgrounds;
 mod calendar;
 mod clipboard;
@@ -26,6 +28,8 @@ mod backdrop;
 mod dock;
 mod dock_drop;
 mod dock_preview;
+mod dock_animation;
+mod shortcut_folder;
 mod context_menu;
 mod jump_lists;
 mod launchpad;
@@ -91,6 +95,13 @@ pub(crate) async fn commit_settings(app: &AppHandle, mut new: Settings) -> Resul
     .await
     .map_err(|e| e.to_string())??;
     *state.settings.lock().unwrap() = new.clone();
+    if !new.dock.animate_apps { dock_animation::sync(app, false); }
+    if (new.topbar.enabled, new.topbar.show_ai_usage) != (prev.topbar.enabled, prev.topbar.show_ai_usage) {
+        ai_usage::settings_changed(app);
+    }
+    if new.dock.shortcut_folder != prev.dock.shortcut_folder {
+        shortcut_folder::close(app);
+    }
     state.dirty.store(true, SeqCst);
 
     let mut warning = None;
@@ -425,6 +436,7 @@ async fn open_settings(app: AppHandle, section: Option<String>) -> Result<(), St
 
 #[tauri::command]
 fn quit_app(app: AppHandle) {
+    dock_animation::restore_system();
     dock::restore_taskbar();
     topbar::remove();
     notch::appbar_remove(&app.state::<NotchState>());
@@ -804,6 +816,9 @@ pub fn run() {
             idle_seconds,
             detect_city,
             icons::app_icon,
+            icons::folder_custom_icon,
+            ai_usage::ai_usage_snapshot,
+            ai_usage::refresh_ai_usage,
             backgrounds::bg_import,
             backgrounds::bg_data,
             translate::translate_text,
@@ -860,6 +875,12 @@ pub fn run() {
             dock_preview::dock_preview_state,
             dock_preview::dock_preview_close,
             dock_preview::dock_preview_action,
+            dock_animation::dock_genie_state,
+            dock_animation::dock_genie_finished,
+            shortcut_folder::toggle_shortcut_folder,
+            shortcut_folder::close_shortcut_folder,
+            shortcut_folder::shortcut_folder_contents,
+            shortcut_folder::open_shortcut_entry,
             dock::dock_set_hit,
             dock::dock_resize,
             dock::dock_activate,
@@ -909,6 +930,7 @@ pub fn run() {
 
             std::panic::set_hook(Box::new(|info| {
                 eprintln!("[noki] panic: {info}");
+                crate::dock_animation::restore_system();
                 crate::dock::restore_taskbar();
             }));
 
@@ -931,6 +953,8 @@ pub fn run() {
             viz::start(handle.clone());
             statuswatch::start(handle.clone());
             topbar::start_battery_watch(handle.clone());
+            app.manage(ai_usage::UsageState::default());
+            ai_usage::start(handle.clone());
             updates::start_auto(handle.clone());
             // La casilla de la bandeja arranca con el valor guardado.
             if let Some(item) = handle.try_state::<TrayDnd>() {
@@ -961,6 +985,7 @@ pub fn run() {
 
     app.run(|app, event| {
         if let RunEvent::Exit = event {
+            dock_animation::restore_system();
             // Libera el espacio reservado en el escritorio.
             dock::restore_taskbar();
             topbar::remove();

@@ -118,6 +118,7 @@ pub async fn dock_preview_open(
         || !dock::can_show()
         || dock::capture_in_progress()
         || dock::menu_open()
+        || crate::shortcut_folder::is_open()
     {
         return Ok(());
     }
@@ -200,7 +201,7 @@ pub async fn dock_preview_open(
     popup
         .run_on_main_thread(move || {
             let generation = REQUEST.lock().unwrap();
-            if request != *generation || !dock::can_show() || dock::menu_open() {
+            if request != *generation || !dock::can_show() || dock::menu_open() || crate::shortcut_folder::is_open() {
                 return;
             }
             let mut point = POINT::default();
@@ -404,6 +405,10 @@ pub(crate) fn watch(app: AppHandle) {
 }
 
 fn capture(raw: isize) -> Option<String> {
+    capture_window(raw, 320, 180)
+}
+
+pub(crate) fn capture_window(raw: isize, max_width: u32, max_height: u32) -> Option<String> {
     let hwnd = HWND(raw as *mut _);
     let mut rect = RECT::default();
     let mut placement = WINDOWPLACEMENT {
@@ -486,7 +491,7 @@ fn capture(raw: isize) -> Option<String> {
         let _ = DeleteDC(dc);
         result?
     };
-    let scaled = image::DynamicImage::ImageRgb8(image).thumbnail(320, 180);
+    let scaled = image::DynamicImage::ImageRgb8(image).thumbnail(max_width, max_height);
     let mut png = Cursor::new(Vec::new());
     scaled.write_to(&mut png, image::ImageFormat::Png).ok()?;
     Some(format!(

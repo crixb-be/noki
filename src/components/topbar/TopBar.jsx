@@ -7,6 +7,7 @@ import { isEn, presetLanguage, useLanguage } from "../../lib/i18n.js";
 import { BatteryIcon, ChevronIcon, BellIcon, BluetoothIcon, CameraIcon, ControlCenterIcon, RecordIcon, SearchIcon, SpeakerIcon, WifiIcon } from "./SymbolIcons.jsx";
 import { BarPaint, barInk, useBarPaint } from "./barPaint.jsx";
 import { useGlass, useGlassShape } from "../../lib/glass.js";
+import { ProviderIcon, providers, useAiUsage } from "./AiUsage.jsx";
 
 function Item({ title, onClick, children, className = "" }) {
   return <button type="button" title={title} aria-label={title} onClick={onClick} className={`topbar-item ${className}`}>{children}</button>;
@@ -34,6 +35,7 @@ export default function TopBar() {
   const [user, setUser] = useState({ displayName: "Usuario" });
   const [stats, setStats] = useState(null);
   const t = settings?.topbar ?? {};
+  const usage = useAiUsage(t.enabled && t.showAiUsage);
   const paint = useBarPaint(settings);
 
   presetLanguage(settings?.general?.language);
@@ -85,6 +87,11 @@ export default function TopBar() {
         }}><ChevronIcon /></Item>}
         {t.showCpu && <Item title="CPU" onClick={() => invoke("command_open_task_manager")}><span className="topbar-text">CPU {stats ? Math.round(stats.cpu) : "--"}%</span></Item>}
         {t.showRam && <Item title="RAM" onClick={() => invoke("command_open_task_manager")}><span className="topbar-text">RAM {stats?.memTotal ? Math.round((stats.memUsed / stats.memTotal) * 100) : "--"}%</span></Item>}
+        {t.showAiUsage && Object.entries(providers).map(([id, name]) => {
+          const limits = usage?.[id]?.limits;
+          const active = limits?.find((limit) => limit.minutes === 300) ?? limits?.[0];
+          return <Item key={id} title={name} onClick={(event) => open("ai-usage", event)}><ProviderIcon provider={id} /><span className="topbar-text ai-usage-percent">{active ? `${Math.round(active.usedPercent)}%` : "—"}</span></Item>;
+        })}
         {t.showBluetooth && <Item title="Bluetooth" onClick={(e) => open("bluetooth", e)}><BluetoothIcon off={!bt.length} /></Item>}
         {t.showSound && <Item title="Sonido" onClick={(e) => open("sound", e)}><SpeakerIcon level={3} /></Item>}
         {t.showWifi && <Item title="Wi-Fi" onClick={(e) => open("wifi", e)}><WifiIcon level={wifi.level} off={wifi.off} /></Item>}

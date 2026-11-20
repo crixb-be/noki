@@ -179,6 +179,7 @@ pub struct TopBar {
     pub show_tray: bool,
     pub show_cpu: bool,
     pub show_ram: bool,
+    pub show_ai_usage: bool,
     pub show_wifi: bool,
     pub show_bluetooth: bool,
     pub show_sound: bool,
@@ -202,6 +203,7 @@ impl Default for TopBar {
             show_tray: true,
             show_cpu: false,
             show_ram: false,
+            show_ai_usage: false,
             show_wifi: true,
             show_bluetooth: true,
             show_sound: true,
@@ -238,6 +240,7 @@ pub struct DockFolder {
 #[serde(default, rename_all = "camelCase")]
 pub struct Dock {
     pub enabled: bool,
+    pub animate_apps: bool,
     pub icon_size: i32,
     pub magnify: bool,
     pub magnify_scale: f64,
@@ -250,6 +253,7 @@ pub struct Dock {
     pub reserve_space: bool,
     pub pinned: Vec<DockPinned>,
     pub folders: Vec<DockFolder>,
+    pub shortcut_folder: String,
 }
 
 impl Default for Dock {
@@ -271,6 +275,7 @@ impl Default for Dock {
         let downloads = std::env::var("USERPROFILE").map(|p| std::path::PathBuf::from(p).join("Downloads")).unwrap_or_default();
         Self {
             enabled: false,
+            animate_apps: false,
             icon_size: 44,
             magnify: true,
             magnify_scale: 1.6,
@@ -282,6 +287,7 @@ impl Default for Dock {
             reserve_space: false,
             pinned,
             folders: vec![DockFolder { name: "Descargas".into(), path: downloads.to_string_lossy().into_owned() }],
+            shortcut_folder: String::new(),
         }
     }
 }

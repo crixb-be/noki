@@ -3,8 +3,10 @@ import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import TrashIcon from "./TrashIcon.jsx";
+import FolderIcon from "./FolderIcon.jsx";
 import { useSettings } from "../../hooks/useSettings.js";
 import { useGlass, useGlassShape } from "../../lib/glass.js";
+import { useLanguage } from "../../lib/i18n.js";
 
 function physicalBounds(node) {
   const { left, top, right, bottom } = node.getBoundingClientRect();
@@ -16,11 +18,14 @@ function AppsIcon() { return <span className="apps-icon">{Array.from({ length: 9
 
 export default function Dock() {
   const { settings } = useSettings();
+  useLanguage(settings?.general?.language);
   const [items, setItems] = useState([]);
   const [trash, setTrash] = useState({ items: 0 });
   const [menuOpen, setMenuOpen] = useState(false);
   const [dropTarget, setDropTarget] = useState(null);
   const [dropError, setDropError] = useState(null);
+  const [launching, setLaunching] = useState(() => new Map());
+  const launchTimers = useRef(new Map());
   const hoverTimer = useRef(0);
   const pill = useRef(null);
   const itemRefs = useRef([]);
@@ -42,6 +47,50 @@ export default function Dock() {
   // Tras un recorte de pantalla (Impr Pant, Recortes) el backend pide reiniciar el estado de la vista.
   const recover = useRef(null);
   const leave = useRef(null);
+
+  function finishLaunch(key) {
+    const timer = launchTimers.current.get(key);
+    if (timer === undefined) return;
+    clearTimeout(timer);
+    launchTimers.current.delete(key);
+    setLaunching((current) => {
+      const next = new Map(current);
+      next.delete(key);
+      return next;
+    });
+  }
+
+  function beginLaunch(key, windowCount) {
+    if (!geometry.current.animate) return;
+    const timers = launchTimers.current;
+    clearTimeout(timers.get(key));
+    // Algunas aplicaciones funcionan en segundo plano y nunca abren una ventana.
+    timers.set(key, setTimeout(() => finishLaunch(key), 30000));
+    setLaunching((current) => new Map(current).set(key, windowCount));
+    refresh();
+  }
+
+  useEffect(() => {
+    if (!dock.animateApps) { setLaunching(new Map()); return; }
+    let disposed = false;
+    const subscriptions = [
+      listen("dock-app-launching", ({ payload: [key, windowCount] }) => { if (!disposed) beginLaunch(key, windowCount); }),
+      listen("dock-app-launch-failed", ({ payload: key }) => { if (!disposed) finishLaunch(key); }),
+    ];
+    return () => {
+      disposed = true;
+      launchTimers.current.forEach(clearTimeout);
+      launchTimers.current.clear();
+      subscriptions.forEach((subscription) => subscription.then((stop) => stop()).catch(console.error));
+    };
+  }, [dock.animateApps]);
+
+  useEffect(() => {
+    for (const [key, previousWindows] of launching) {
+      const item = items.find((entry) => entry.key === key);
+      if ((item?.windowCount ?? Number(!!item?.running)) > previousWindows) finishLaunch(key);
+    }
+  }, [items, launching]);
 
   const refresh = async () => {
     try { if (!(await getCurrentWindow().isVisible())) return; } catch { /* El navegador de desarrollo no expone visibilidad nativa. */ }
@@ -76,9 +125,15 @@ export default function Dock() {
     const timer = setTimeout(() => setDropError(null), 3500);
     return () => clearTimeout(timer);
   }, [dropError]);
-  const all = useMemo(() => [ ...(dock.showApps ? [{ key: "apps", name: "Aplicaciones", kind: "apps" }] : []), ...items, ...(dock.showTrash ? [{ key: "trash", name: "Papelera", kind: "trash", running: trash.items > 0 }] : []) ], [dock.showApps, dock.showTrash, items, trash.items]);
+  const all = useMemo(() => [
+    ...(dock.showApps ? [{ key: "apps", name: "Aplicaciones", kind: "apps" }] : []),
+    ...items,
+    ...(dock.shortcutFolder ? [{ key: "shortcutfolder", name: "Carpeta de accesos directos", kind: "shortcutfolder", path: dock.shortcutFolder }] : []),
+    ...(dock.showTrash ? [{ key: "trash", name: "Papelera", kind: "trash", running: trash.items > 0 }] : []),
+  ], [dock.showApps, dock.shortcutFolder, dock.showTrash, items, trash.items]);
+  const firstShelfIndex = all.findIndex((entry) => ["folder", "shortcutfolder", "trash"].includes(entry.kind));
   // Lo que necesita el área de clic sin depender del cierre del efecto.
-  geometry.current = { lift: dock.magnify ? maxSize - size : 0 };
+  geometry.current = { lift: dock.magnify ? maxSize - size : 0, animate: dock.animateApps };
   // Área de clic: la píldora (fija) y, mientras se magnifica, también la franja de encima donde
   // asoman los iconos ampliados (si no, al subir el cursor al icono grande el Dock lo soltaba).
   useEffect(() => {
@@ -88,9 +143,12 @@ export default function Dock() {
       const r = node.getBoundingClientRect();
       const lift = pointerX.current != null ? geometry.current.lift : 0;
       let box = { left: r.left - lift * 2, top: r.top - lift, right: r.right + lift * 2, bottom: r.bottom };
-      const icons = itemRefs.current.flatMap((item) => item?.dataset.dropKey
-        ? [{ key: item.dataset.dropKey, ...physicalBounds(item) }]
-        : []);
+      const icons = itemRefs.current.flatMap((item, index) => {
+        if (!item?.dataset.dropKey) return [];
+        const icon = geometry.current.animate && iconRefs.current[index];
+        const bounds = icon ? physicalBounds(icon) : null;
+        return [{ key: item.dataset.dropKey, ...physicalBounds(item), icon: bounds && [bounds.left, bounds.top, bounds.right, bounds.bottom] }];
+      });
       invoke("dock_drop_targets", { icons }).catch(console.error);
       invoke("dock_set_hit", { x: Math.round(box.left), y: Math.round(box.top), w: Math.round(box.right - box.left), h: Math.round(box.bottom - box.top) }).catch(() => {});
     };
@@ -104,7 +162,7 @@ export default function Dock() {
     const timer = setInterval(report, 2000);
     return () => { observer.disconnect(); window.removeEventListener("resize", report); clearInterval(timer); };
   }, []);
-  useEffect(() => { reportHit.current?.(); }, [all, size]);
+  useEffect(() => { reportHit.current?.(); }, [all, size, dock.animateApps]);
   // Desenfoque real debajo de la píldora. La píldora no cambia de tamaño al magnificar, así que el
   // vidrio nativo no se recoloca en cada fotograma (era la franja clara que asomaba encima del Dock).
   const glass = useGlass(settings, "dock");
@@ -197,11 +255,16 @@ export default function Dock() {
     start();
   }  recover.current = () => { resetMagnification(); reportHit.current?.(); refresh(); };
   leave.current = () => resetMagnification();
-  function activate(item) {
+  async function activate(item, node) {
+    if (item.kind === "shortcutfolder") {
+      const anchor = physicalBounds(node.querySelector(".dock-icon") ?? node);
+      return invoke("toggle_shortcut_folder", { x: Math.round((anchor.left + anchor.right) / 2), y: anchor.top });
+    }
+    await invoke("close_shortcut_folder");
     if (item.kind === "apps") return invoke("toggle_launchpad");
     if (item.kind === "trash") return invoke("trash_open");
     if (item.kind === "folder") return invoke("open_path", { path: item.path });
-    return invoke("dock_activate", { key: item.key });
+    if (await invoke("dock_activate", { key: item.key })) beginLaunch(item.key, 0);
   }
 
   function closePreview() {
@@ -235,10 +298,10 @@ export default function Dock() {
     {dropError && <div role="status" className="dock-drop-error">{dropError}</div>}
     <div ref={pill} className="dock-pill" style={pillVars}>
       {all.map((item, index) => {
-        const icon = item.kind === "apps" ? <AppsIcon /> : item.kind === "trash" ? <TrashIcon full={trash.items > 0} /> : item.icon ? <img src={item.icon} alt="" /> : <ItemIcon path={item.path || (item.aumid ? `shell:AppsFolder\\${item.aumid}` : "")} name={item.name} />;
-        const firstShelfIndex = all.findIndex((entry) => entry.kind === "folder" || entry.kind === "trash");
-        return <button key={item.key} aria-label={item.name} data-drop-key={item.kind === "apps" ? undefined : item.key} className={`dock-item ${dropTarget === item.key ? "dock-drop-target" : ""} ${item.kind === "folder" ? "dock-folder" : ""} ${index === firstShelfIndex ? "dock-divider" : ""}`} style={{ width: size, height: size + 8 }} ref={(node) => { itemRefs.current[index] = node; iconRefs.current[index] = node?.querySelector(".dock-icon") ?? null; }} onMouseEnter={(event) => schedulePreview(event, item)} onMouseLeave={() => clearTimeout(hoverTimer.current)} onClick={() => { closePreview(); activate(item); }} onContextMenu={(e) => { e.preventDefault(); openMenu(e, item); }} onMouseDown={(e) => { if (e.button === 1) { e.preventDefault(); invoke("dock_close_windows", { key: item.key }); } }}>
-          <span className="dock-icon" style={{ width: size, height: size }}>{icon}</span>{item.running && item.kind !== "trash" && <span className="dock-dot" />}
+        const shortcutFolder = item.kind === "shortcutfolder";
+        const icon = shortcutFolder ? <FolderIcon path={item.path} fallback="📂" className="dock-shortcut-icon" style={{ fontSize: size * 0.78 }} /> : item.kind === "apps" ? <AppsIcon /> : item.kind === "trash" ? <TrashIcon full={trash.items > 0} /> : item.icon ? <img src={item.icon} alt="" /> : <ItemIcon path={item.path || (item.aumid ? `shell:AppsFolder\\${item.aumid}` : "")} name={item.name} />;
+        return <button key={item.key} aria-label={item.name} aria-haspopup={shortcutFolder ? "dialog" : undefined} data-drop-key={item.kind === "apps" || shortcutFolder ? undefined : item.key} className={`dock-item ${dropTarget === item.key ? "dock-drop-target" : ""} ${item.kind === "folder" ? "dock-folder" : ""} ${index === firstShelfIndex ? "dock-divider" : ""}`} style={{ width: size, height: size + 8 }} ref={(node) => { itemRefs.current[index] = node; iconRefs.current[index] = node?.querySelector(".dock-icon") ?? null; }} onMouseEnter={(event) => schedulePreview(event, item)} onMouseLeave={() => clearTimeout(hoverTimer.current)} onClick={(event) => { closePreview(); activate(item, event.currentTarget).catch((error) => { finishLaunch(item.key); setDropError(String(error)); }); }} onContextMenu={shortcutFolder ? undefined : (e) => { e.preventDefault(); openMenu(e, item); }} onMouseDown={(e) => { if (e.button === 1 && !shortcutFolder) { e.preventDefault(); invoke("dock_close_windows", { key: item.key }); } }}>
+          <span className={`dock-icon${dock.animateApps && launching.has(item.key) ? " dock-icon-launching" : ""}`} style={{ width: size, height: size }}>{icon}</span>{item.running && item.kind !== "trash" && <span className="dock-dot" />}
         </button>;
       })}
     </div>

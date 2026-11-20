@@ -434,7 +434,17 @@ async fn execute(app: AppHandle, owner: isize, action: Control) -> Result<(), St
                 .await
                 .map_err(|e| e.to_string())?
         }
-        Control::Launch(item) => dock::dock_launch(item.path, item.args, item.aumid).await,
+        Control::Launch(item) => {
+            let animate = crate::dock_animation::enabled();
+            if animate {
+                let _ = app.emit_to("dock", "dock-app-launching", (&item.key, item.window_count));
+            }
+            let result = dock::dock_launch(item.path, item.args, item.aumid).await;
+            if animate && result.is_err() {
+                let _ = app.emit_to("dock", "dock-app-launch-failed", &item.key);
+            }
+            result
+        }
         Control::Pin(item) => {
             dock::dock_pin(app, item.path, item.name, item.args, item.aumid).await
         }

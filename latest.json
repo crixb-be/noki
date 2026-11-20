@@ -1,11 +1,11 @@
 {
-    "version":  "1.3.3",
-    "notes":  "- Vista previa al pasar el cursor sobre un icono del Dock, con miniaturas, tÃ­tulos y controles para enfocar o cerrar cada ventana.\n- Arrastre de archivos sobre el Dock para enfocar apps y carpetas, abrir archivos con una app, moverlos a una carpeta o enviarlos a la Papelera.\n- Nivel y estado de carga de la baterÃ­a sincronizados en tiempo real entre la barra superior y sus paneles.\n- Capturas consecutivas con `PRTSC` sin que la barra de tareas nativa reaparezca ni se recalcule el Ã¡rea de trabajo. El Dock y la barra superior ignoran las superposiciones de captura.\n- El recuadro de iconos ocultos de Windows se ancla debajo del botÃ³n `^` y conserva su posiciÃ³n ante cambios de Explorer y DWM.",
-    "pub_date":  "2026-11-18T05:07:59Z",
+    "version":  "1.4.0",
+    "notes":  "- Vista previa al pasar el cursor sobre un icono del Dock, con miniaturas, tÃƒÂ­tulos y controles para enfocar o cerrar cada ventana.\n- Arrastre de archivos sobre el Dock para enfocar apps y carpetas, abrir archivos con una app, moverlos a una carpeta o enviarlos a la Papelera.\n- Nivel y estado de carga de la baterÃƒÂ­a sincronizados en tiempo real entre la barra superior y sus paneles.\n- Capturas consecutivas con `PRTSC` sin que la barra de tareas nativa reaparezca ni se recalcule el ÃƒÂ¡rea de trabajo. El Dock y la barra superior ignoran las superposiciones de captura.\n- El recuadro de iconos ocultos de Windows se ancla debajo del botÃƒÂ³n `^` y conserva su posiciÃƒÂ³n ante cambios de Explorer y DWM.",
+    "pub_date":  "2026-11-20T04:49:55Z",
     "platforms":  {
                       "windows-x86_64":  {
-                                             "signature":  "dW50cnVzdGVkIGNvbW1lbnQ6IHNpZ25hdHVyZSBmcm9tIHRhdXJpIHNlY3JldCBrZXkKUlVTTnBFd3FJNE9ZOTVpRCtObjVKcHBHRDZvWXd5ZndzbTlIT2dUa05SYkxrenBKL1ZDN2hxRmljcUxtV0ltQ0FxWTJyL252dURqcDZSY1h6WTdaVzdkRXo2Skc1VGJ2YndJPQp0cnVzdGVkIGNvbW1lbnQ6IHRpbWVzdGFtcDoxNzk0OTc4NzY2CWZpbGU6Tm9raV8xLjMuM194NjQtc2V0dXAuZXhlCXZlcnNpb246MS4zLjMKcm8zNDRPQzJqL0NFSGlIZjduU2YzaGZNWXhtOENMaXJtQ1pDZnFyRDhZa1BKeWpKUHJSRVZwWEFYT1B3REluRDlLZXRjblQ1TnRVYUZoQzEwVG9KREE9PQo=",
-                                             "url":  "https://github.com/crixb-be/noki/releases/download/v1.3.3/Noki_1.3.3_x64-setup.exe"
+                                             "signature":  "dW50cnVzdGVkIGNvbW1lbnQ6IHNpZ25hdHVyZSBmcm9tIHRhdXJpIHNlY3JldCBrZXkKUlVTTnBFd3FJNE9ZOTZPcWF6UEQxeXFjck80TitZMVl6amVzWDRVNGR2NDUrRzFYTk5KZXFabitJMTNydVJnV2k3YVZ2Q2d4OHVVOHNUamZaZG1FeHJ3SDlsTG5idi9TOXdJPQp0cnVzdGVkIGNvbW1lbnQ6IHRpbWVzdGFtcDoxNzk1MTUwMTY1CWZpbGU6Tm9raV8xLjQuMF94NjQtc2V0dXAuZXhlCXZlcnNpb246MS40LjAKNlBaRy9zU0kySU1wVXdJY1loWVdEVXlmaDFyZVBuV0Rxc1ZrTmY1Ly85cUN0YytETkNJaDBVelNpSi9qTG1paFVjVzNrdG5lb1JxVkVBaW5ObWE5QWc9PQo=",
+                                             "url":  "https://github.com/crixb-be/noki/releases/download/v1.4.0/Noki_1.4.0_x64-setup.exe"
                                          }
                   }
 }

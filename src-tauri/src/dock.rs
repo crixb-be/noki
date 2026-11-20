@@ -236,12 +236,41 @@ pub(crate) fn capture_in_progress() -> bool {
     capture_overlay_active() || last_capture().lock().unwrap().is_some_and(|at| at.elapsed() < Duration::from_millis(1500))
 }
 
+const CAPTURE_CLASSES: [&str; 3] = [
+    "Microsoft-Windows-SnipperToolbar",
+    "Microsoft-Windows-SnipperCaptureForm",
+    "ScreenClippingWindow",
+];
+
+fn capture_window(hwnd: HWND) -> bool {
+    if hwnd.0.is_null() { return false; }
+    if CAPTURE_CLASSES.contains(&window_class(hwnd, &mut [0; 128]).as_str()) { return true; }
+    let mut pid = 0;
+    unsafe { GetWindowThreadProcessId(hwnd, Some(&mut pid)); }
+    let process = file_name(&icons::process_image_path(pid).unwrap_or_default());
+    matches!(process.as_str(), "screenclippinghost.exe" | "snippingtool.exe" | "gamebar.exe" | "gamebarftserver.exe")
+}
+
+pub(crate) fn capture_foreground_excluded() -> bool {
+    use windows::Win32::UI::WindowsAndMessaging::{GetLayeredWindowAttributes, GWL_STYLE, LWA_ALPHA, LWA_COLORKEY, WS_CAPTION, WS_EX_LAYERED, WS_EX_NOACTIVATE, WS_EX_TRANSPARENT, WS_THICKFRAME};
+    unsafe {
+        let hwnd = GetForegroundWindow();
+        if hwnd.0.is_null() { return false; }
+        if capture_window(hwnd) { return true; }
+        let style = GetWindowLongPtrW(hwnd, GWL_STYLE) as u32;
+        let ex = GetWindowLongPtrW(hwnd, GWL_EXSTYLE) as u32;
+        if style & (WS_CAPTION | WS_THICKFRAME).0 != 0 { return false; }
+        if ex & WS_EX_TRANSPARENT.0 != 0 { return true; }
+        if ex & WS_EX_LAYERED.0 == 0 { return false; }
+        let mut alpha = 255u8;
+        let mut flags = Default::default();
+        ex & (WS_EX_NOACTIVATE | WS_EX_TOOLWINDOW).0 != 0
+            || (GetLayeredWindowAttributes(hwnd, None, Some(&mut alpha), Some(&mut flags)).is_ok()
+                && (flags.contains(LWA_COLORKEY) || (flags.contains(LWA_ALPHA) && alpha < 255)))
+    }
+}
+
 fn capture_overlay_now() -> bool {
-    const CAPTURE_CLASSES: [&str; 3] = [
-        "Microsoft-Windows-SnipperToolbar",
-        "Microsoft-Windows-SnipperCaptureForm",
-        "ScreenClippingWindow",
-    ];
     unsafe {
         for class in CAPTURE_CLASSES {
             let wide: Vec<u16> = class.encode_utf16().chain(std::iter::once(0)).collect();
@@ -249,15 +278,7 @@ fn capture_overlay_now() -> bool {
                 if !h.0.is_null() && IsWindowVisible(h).as_bool() { return true; }
             }
         }
-        let fg = GetForegroundWindow();
-        if fg.0.is_null() { return false; }
-        let class = window_class(fg, &mut [0; 128]);
-        if CAPTURE_CLASSES.contains(&class.as_str()) { return true; }
-        let mut pid = 0u32;
-        GetWindowThreadProcessId(fg, Some(&mut pid));
-        let process = file_name(&icons::process_image_path(pid).unwrap_or_default());
-        // Incluye CoreWindow y las ventanas emergentes XAML de estos procesos.
-        matches!(process.as_str(), "screenclippinghost.exe" | "snippingtool.exe" | "gamebar.exe" | "gamebarftserver.exe")
+        capture_window(GetForegroundWindow())
     }
 }
 
@@ -335,7 +356,10 @@ pub fn sync(app: &AppHandle, settings: &Settings, fullscreen: bool) {
     let icon_size = settings.dock.icon_size.clamp(36, 64);
     sync_taskbar(settings);
     let enabled = settings.dock.enabled && settings.general.visible;
+    let fullscreen = fullscreen && !capture_foreground_excluded();
     CAN_SHOW.store(enabled && !fullscreen, std::sync::atomic::Ordering::SeqCst);
+    crate::dock_animation::sync(app, enabled && settings.dock.animate_apps);
+    if !enabled || fullscreen { crate::shortcut_folder::close(app); }
     if !enabled {
         remove_appbar();
         let ui_window = window.clone();
@@ -343,18 +367,20 @@ pub fn sync(app: &AppHandle, settings: &Settings, fullscreen: bool) {
         return;
     }
     let Some((fallback, monitor)) = notch::assignments(settings, &notch::monitors(app)).into_iter().find(|(l, _)| l == "main").map(|(_, m)| (m.rect, m.scale)) else { return };
-    let scale = work_area_with_monitor(app, settings.dock.hide_taskbar).map(|(_, scale)| scale).unwrap_or(monitor);
+    let (physical_monitor, scale) = work_area_with_monitor(app, true).unwrap_or((fallback, monitor));
     let reserve = settings.dock.reserve_space && !settings.dock.autohide;
-    let granted = if reserve { register_appbar(&window, fallback, physical(icon_size + 26, scale), scale) } else { remove_appbar(); None };
+    let granted = if reserve { register_appbar(&window, physical_monitor, physical(icon_size + 26, scale), scale) } else { remove_appbar(); None };
     if fullscreen {
         let ui_window = window.clone();
         let _ = window.run_on_main_thread(move || { let _ = ui_window.hide(); });
         return;
     }
-    let (work, _) = if let Some(rect) = granted {
-        (rect, scale)
+    // AppBar reserva espacio para otras ventanas. Con la barra de tareas oculta, el Dock se ancla
+    // al monitor físico aunque Windows siga reservando espacio al negociar ABM_SETPOS.
+    let work = if settings.dock.hide_taskbar {
+        physical_monitor
     } else {
-        work_area_with_monitor(app, settings.dock.hide_taskbar).unwrap_or((fallback, scale))
+        granted.or_else(|| work_area(app).map(|(area, _)| area)).unwrap_or(physical_monitor)
     };
     let requested = *requested_size().lock().unwrap();
     let (width, height) = requested.map(|(w, h)| (physical(w, scale), physical(h, scale))).unwrap_or_else(|| (
@@ -366,9 +392,9 @@ pub fn sync(app: &AppHandle, settings: &Settings, fullscreen: bool) {
     let left = work.left + (work.width() - width) / 2;
     let margin = physical(6, scale);
     let mut top = work.bottom - height - margin;
-    if top < fallback.top + fallback.height() / 2 {
+    if top < physical_monitor.top + physical_monitor.height() / 2 {
         eprintln!("[dock] posición defensiva: top={} queda en la mitad superior; recalculando desde rcMonitor", top);
-        top = fallback.bottom - height - margin;
+        top = physical_monitor.bottom - height - margin;
     }
     hit().lock().unwrap().scale = scale;
     let w = window.clone();
@@ -521,6 +547,14 @@ fn pin_matches(pin: &DockPinned, w: &Running) -> bool {
 }
 
 fn pin_key(pin: &DockPinned) -> String { format!("pin:{}:{}", identity(&pin.path, &pin.aumid), pin.args) }
+
+pub(crate) fn animation_windows(settings: &Settings) -> Vec<(isize, String)> {
+    running_windows().into_iter().filter(|window| !settings.dock.show_trash || !window.recycle_bin).filter_map(|window| {
+        let key = settings.dock.pinned.iter().find(|pin| pin_matches(pin, &window)).map(pin_key)
+            .or_else(|| settings.dock.show_running.then(|| format!("app:{}", identity(&window.path, &window.aumid))))?;
+        Some((window.hwnd, key))
+    }).collect()
+}
 
 /// Normalize both existing pins and incoming settings without changing paths, arguments or order.
 pub(crate) fn normalize_pinned_names(settings: &mut Settings) -> bool {
@@ -690,27 +724,34 @@ pub(crate) fn dock_launch_blocking(path: String, args: String, aumid: String) ->
 }
 
 #[tauri::command]
-pub async fn dock_activate(key: String, state: tauri::State<'_, notch::NotchState>) -> Result<(), String> {
+pub async fn dock_activate(app: AppHandle, key: String, state: tauri::State<'_, notch::NotchState>) -> Result<bool, String> {
     let settings = state.settings.lock().unwrap().clone();
     tauri::async_runtime::spawn_blocking(move || {
         let windows = windows_for(&settings, &key);
         if windows.is_empty() {
             // Sin ventanas: lanzar si es un elemento anclado.
-            if let Some(pin) = settings.dock.pinned.iter().find(|p| pin_key(p) == key) { return dock_launch_blocking(pin.path.clone(), pin.args.clone(), pin.aumid.clone()); }
-            return Ok(());
+            if let Some(pin) = settings.dock.pinned.iter().find(|p| pin_key(p) == key) {
+                // ShellExecute puede esperar a que la app entre en reposo. Inicia el rebote cuando
+                // se confirma que hace falta lanzar, antes de esperar el retorno de Windows.
+                if settings.dock.animate_apps && crate::dock_animation::enabled() {
+                    let _ = app.emit_to("dock", "dock-app-launching", (&key, 0));
+                }
+                return dock_launch_blocking(pin.path.clone(), pin.args.clone(), pin.aumid.clone()).map(|_| true);
+            }
+            return Ok(false);
         }
         unsafe {
             let fg = GetForegroundWindow().0 as isize;
             let target = match windows.iter().position(|h| *h == fg) {
                 // Una sola ventana y ya está delante: minimizar.
-                Some(_) if windows.len() == 1 => { let _ = ShowWindow(HWND(fg as *mut _), SW_MINIMIZE); return Ok(()); }
+                Some(_) if windows.len() == 1 => { let _ = ShowWindow(HWND(fg as *mut _), SW_MINIMIZE); return Ok(false); }
                 // Varias: alternar a la siguiente.
                 Some(i) => windows[(i + 1) % windows.len()],
                 None => windows[0],
             };
             focus_window(target);
         }
-        Ok(())
+        Ok(false)
     }).await.map_err(|e| e.to_string())?
 }
 
@@ -850,9 +891,9 @@ pub fn start(app: AppHandle) {
                 let y = ((p.y - rect.top) as f64 / hit_area.scale) as i32;
                 x >= hit_area.x && x < hit_area.x + hit_area.w && y >= hit_area.y && y < hit_area.y + hit_area.h
             };
-            let near_bottom = work_area(&app).map(|(r, scale)| p.y >= r.bottom - physical(12, scale) && p.x >= r.left && p.x < r.right).unwrap_or(false);
+            let near_bottom = work_area_with_monitor(&app, dock_settings.hide_taskbar).map(|(r, scale)| p.y >= r.bottom - physical(12, scale) && p.x >= r.left && p.x < r.right).unwrap_or(false);
             if MENU_OPEN.load(std::sync::atomic::Ordering::SeqCst) { continue; }
-            let should_show = !dock_settings.autohide || inside || near_bottom;
+            let should_show = !dock_settings.autohide || inside || near_bottom || crate::shortcut_folder::is_open() || crate::dock_animation::in_flight();
             // Cada 2 s se reaplica todo aunque nada haya cambiado: si Windows o tao
             // alteraron los estilos (clics ignorados) o el orden Z, se corrige solo.
             let periodic = last_check.elapsed() >= Duration::from_secs(2);

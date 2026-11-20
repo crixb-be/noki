@@ -1,5 +1,9 @@
 # Changelog
 
+## [1.4.0]
+
+- Animaciones opcionales del Dock, desactivadas por defecto. Los iconos rebotan al lanzar una app y el efecto Genie conecta sus ventanas con el icono al minimizar y restaurar.
+
 ## [1.3.3]
 
 - Vista previa al pasar el cursor sobre un icono del Dock, con miniaturas, títulos y controles para enfocar o cerrar cada ventana.

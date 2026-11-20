@@ -21,9 +21,21 @@ pub struct IconBounds {
     top: i32,
     right: i32,
     bottom: i32,
+    icon: Option<[i32; 4]>,
 }
 
 static ICONS: Mutex<Vec<IconBounds>> = Mutex::new(Vec::new());
+
+pub(crate) fn animation_anchor(app: &AppHandle, key: &str) -> Option<RECT> {
+    let [left, top, right, bottom] = ICONS.lock().unwrap().iter().find(|icon| icon.key == key)?.icon?;
+    let dock = app.get_webview_window("dock")?;
+    let hwnd = dock::hwnd(&dock)?;
+    let mut origin = POINT::default();
+    if !unsafe { windows::Win32::Graphics::Gdi::ClientToScreen(hwnd, &mut origin).as_bool() } {
+        return None;
+    }
+    Some(RECT { left: origin.x + left, top: origin.y + top, right: origin.x + right, bottom: origin.y + bottom })
+}
 
 #[tauri::command]
 pub fn dock_drop_targets(window: WebviewWindow, icons: Vec<IconBounds>) {

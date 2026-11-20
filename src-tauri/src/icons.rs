@@ -13,9 +13,9 @@
 
 use base64::{engine::general_purpose::STANDARD, Engine};
 use image::{imageops::FilterType, ImageEncoder, RgbaImage};
-use std::{collections::HashMap, sync::{OnceLock, RwLock}};
+use std::{collections::HashMap, path::Path, sync::{OnceLock, RwLock}};
 use windows::{
-    core::{HSTRING, Interface, PCWSTR},
+    core::{w, HSTRING, Interface, PCWSTR},
     Win32::{
         Foundation::{CloseHandle, HWND, SIZE},
         Graphics::Gdi::{DeleteObject, GetDC, GetDIBits, GetObjectW, ReleaseDC, BITMAP, BITMAPINFO, BITMAPINFOHEADER, BI_RGB, DIB_RGB_COLORS, HBITMAP, HGDIOBJ},
@@ -23,14 +23,16 @@ use windows::{
         System::{
             Com::{CoCreateInstance, CoInitializeEx, COINIT_APARTMENTTHREADED, IPersistFile, CLSCTX_INPROC_SERVER, STGM_READ},
             Com::StructuredStorage::PROPVARIANT,
+            Environment::ExpandEnvironmentStringsW,
             Threading::{OpenProcess, QueryFullProcessImageNameW, PROCESS_NAME_FORMAT, PROCESS_QUERY_LIMITED_INFORMATION},
             Variant::VT_LPWSTR,
+            WindowsProgramming::GetPrivateProfileStringW,
         },
         UI::{
             Controls::{IImageList, ILD_TRANSPARENT},
             Shell::{
                 IExtractIconW, IShellItem, IShellItemImageFactory, IShellLinkW, SHCreateItemFromParsingName, SHGetFileInfoW,
-                SHGetImageList, SHFILEINFOW, SHGFI_SYSICONINDEX, SHIL_EXTRALARGE, SHIL_JUMBO, SIIGBF_BIGGERSIZEOK, SIIGBF_ICONONLY, ShellLink,
+                SHDefExtractIconW, SHGetImageList, SHFILEINFOW, SHGFI_ICON, SHGFI_LARGEICON, SHGFI_SYSICONINDEX, SHIL_EXTRALARGE, SHIL_JUMBO, SIIGBF_BIGGERSIZEOK, SIIGBF_ICONONLY, ShellLink,
                 PropertiesSystem::{IPropertyStore, SHGetPropertyStoreForWindow},
             },
             WindowsAndMessaging::{DestroyIcon, GetIconInfo, HICON, ICONINFO},
@@ -153,6 +155,10 @@ fn resize_clean(img: &RgbaImage, w: u32, h: u32) -> RgbaImage {
 /// dentro de uno de 256), se recorta a su contenido antes de ampliarlo.
 fn finish(img: RgbaImage) -> Option<String> {
     if generic_application_icon(&img) { return None; }
+    finish_at(img, OUT_PX)
+}
+
+fn finish_at(img: RgbaImage, size: u32) -> Option<String> {
     let (bx, by, bw, bh) = content_box(&img)?;
     let (w, h) = img.dimensions();
     let img = if bw.max(bh) * 2 <= w.max(h) {
@@ -162,14 +168,14 @@ fn finish(img: RgbaImage) -> Option<String> {
         image::imageops::crop_imm(&img, cx, cy, side.min(w), side.min(h)).to_image()
     } else { img };
     let (w, h) = img.dimensions();
-    let scale = OUT_PX as f64 / w.max(h) as f64;
+    let scale = size as f64 / w.max(h) as f64;
     let (nw, nh) = (((w as f64 * scale).round() as u32).max(1), ((h as f64 * scale).round() as u32).max(1));
     let resized = if (nw, nh) == (w, h) { img } else { resize_clean(&img, nw, nh) };
-    let mut canvas = RgbaImage::new(OUT_PX, OUT_PX);
-    image::imageops::overlay(&mut canvas, &resized, ((OUT_PX - nw) / 2) as i64, ((OUT_PX - nh) / 2) as i64);
+    let mut canvas = RgbaImage::new(size, size);
+    image::imageops::overlay(&mut canvas, &resized, ((size - nw) / 2) as i64, ((size - nh) / 2) as i64);
     let mut bytes = Vec::new();
     image::codecs::png::PngEncoder::new(&mut bytes)
-        .write_image(canvas.as_raw(), OUT_PX, OUT_PX, image::ExtendedColorType::Rgba8)
+        .write_image(canvas.as_raw(), size, size, image::ExtendedColorType::Rgba8)
         .ok()?;
     Some(png_data(bytes))
 }
@@ -418,6 +424,48 @@ pub async fn app_icon(path: String) -> Result<String, String> {
     let url = tauri::async_runtime::spawn_blocking(move || render(&path)).await.map_err(|e| e.to_string())?;
     remember(key, url.clone());
     Ok(url)
+}
+
+fn custom_folder_png(folder: &Path) -> Option<String> {
+    let ini = folder.join("desktop.ini");
+    if !folder.is_absolute() || !ini.is_file() { return None; }
+    let ini = HSTRING::from(ini.as_os_str());
+    let read = |key: PCWSTR| {
+        let mut output = vec![0; 32768];
+        let count = unsafe { GetPrivateProfileStringW(w!(".ShellClassInfo"), key, PCWSTR::null(), Some(&mut output), &ini) } as usize;
+        String::from_utf16_lossy(&output[..count])
+    };
+    let resource = read(w!("IconResource"));
+    let (file, index) = if resource.trim().is_empty() {
+        let file = read(w!("IconFile"));
+        let index = read(w!("IconIndex")).trim().parse().unwrap_or(0);
+        (file, index)
+    } else if let Some((file, index)) = resource.rsplit_once(',').and_then(|(file, index)| Some((file, index.trim().parse::<i32>().ok()?))) {
+        (file.to_owned(), index)
+    } else {
+        (resource, 0)
+    };
+    let file = file.trim().trim_matches('"');
+    if file.is_empty() { return None; }
+    let mut expanded = vec![0; 32768];
+    let length = unsafe { ExpandEnvironmentStringsW(&HSTRING::from(file), Some(&mut expanded)) } as usize;
+    let file = if (1..=expanded.len()).contains(&length) { String::from_utf16_lossy(&expanded[..length - 1]) } else { file.to_owned() };
+    let path = folder.join(file);
+    let image = unsafe {
+        let mut icon = HICON::default();
+        let _ = SHDefExtractIconW(&HSTRING::from(path.as_os_str()), index, 0, Some(&mut icon), None, 64);
+        hicon_rgba(icon).or_else(|| {
+            let mut info = SHFILEINFOW::default();
+            let result = SHGetFileInfoW(&HSTRING::from(folder.as_os_str()), Default::default(), Some(&mut info), std::mem::size_of::<SHFILEINFOW>() as u32, SHGFI_ICON | SHGFI_LARGEICON);
+            (result != 0).then(|| hicon_rgba(info.hIcon)).flatten()
+        })
+    }?;
+    finish_at(image, 64)
+}
+
+#[tauri::command]
+pub async fn folder_custom_icon(path: String) -> Option<String> {
+    tauri::async_runtime::spawn_blocking(move || custom_folder_png(Path::new(&path))).await.ok().flatten()
 }
 
 /// Stable application labels, never window/tab titles. Cache expensive metadata/Shell lookups.
