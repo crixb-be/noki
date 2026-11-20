@@ -32,7 +32,7 @@ export default function Dock() {
   const iconRefs = useRef([]);
   const pointerX = useRef(null);
   const frame = useRef(0);
-  const dock = settings?.dock ?? { enabled: true, iconSize: 44, magnify: true, magnifyScale: 1.6, showApps: true, showRunning: true, showTrash: true, autohide: false, pinned: [], folders: [] };
+  const dock = settings?.dock ?? { enabled: true, iconSize: 44, magnify: true, magnifyScale: 1.6, showApps: true, showRunning: true, showTrash: true, showDownloads: true, autohide: false, pinned: [], folders: [] };
   // Tamaño y escala vienen de Ajustes (antes estaban fijos: 44-46 px y 62 px máximo).
   // «Tamaño del Dock» (Ajustes): tamaño base de los iconos, 36-64 px. El relleno y el hueco de la
   // píldora escalan con él (variables CSS), así que la píldora, el área de clic y el vidrio cambian juntos.
@@ -127,10 +127,10 @@ export default function Dock() {
   }, [dropError]);
   const all = useMemo(() => [
     ...(dock.showApps ? [{ key: "apps", name: "Aplicaciones", kind: "apps" }] : []),
-    ...items,
+    ...items.filter((item) => !item.isDownloads || dock.showDownloads),
     ...(dock.shortcutFolder ? [{ key: "shortcutfolder", name: "Carpeta de accesos directos", kind: "shortcutfolder", path: dock.shortcutFolder }] : []),
     ...(dock.showTrash ? [{ key: "trash", name: "Papelera", kind: "trash", running: trash.items > 0 }] : []),
-  ], [dock.showApps, dock.shortcutFolder, dock.showTrash, items, trash.items]);
+  ], [dock.showApps, dock.shortcutFolder, dock.showTrash, dock.showDownloads, items, trash.items]);
   const firstShelfIndex = all.findIndex((entry) => ["folder", "shortcutfolder", "trash"].includes(entry.kind));
   // Lo que necesita el área de clic sin depender del cierre del efecto.
   geometry.current = { lift: dock.magnify ? maxSize - size : 0, animate: dock.animateApps };
@@ -256,6 +256,14 @@ export default function Dock() {
   }  recover.current = () => { resetMagnification(); reportHit.current?.(); refresh(); };
   leave.current = () => resetMagnification();
   async function activate(item, node) {
+    if (item.kind === "pinned" || item.kind === "running") {
+      const [launched] = await Promise.all([
+        invoke("dock_activate", { key: item.key }),
+        invoke("close_shortcut_folder"),
+      ]);
+      if (launched) beginLaunch(item.key, 0);
+      return;
+    }
     if (item.kind === "shortcutfolder") {
       const anchor = physicalBounds(node.querySelector(".dock-icon") ?? node);
       return invoke("toggle_shortcut_folder", { x: Math.round((anchor.left + anchor.right) / 2), y: anchor.top });
@@ -264,7 +272,6 @@ export default function Dock() {
     if (item.kind === "apps") return invoke("toggle_launchpad");
     if (item.kind === "trash") return invoke("trash_open");
     if (item.kind === "folder") return invoke("open_path", { path: item.path });
-    if (await invoke("dock_activate", { key: item.key })) beginLaunch(item.key, 0);
   }
 
   function closePreview() {

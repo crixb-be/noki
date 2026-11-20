@@ -9,9 +9,9 @@ use windows::Win32::Graphics::{
     Dwm::{DwmGetWindowAttribute, DWMWA_CLOAKED},
     Gdi::{CreateRectRgn, DeleteObject, GetWindowRgn, GetWindowRgnBox, SetWindowRgn, HGDIOBJ, HRGN, NULLREGION},
 };
-use std::{sync::{Mutex, OnceLock}, time::{Duration, Instant}};
+use std::{collections::HashMap, sync::{Mutex, OnceLock}, time::{Duration, Instant}};
 use tauri::{window::Color, AppHandle, Emitter, Manager, PhysicalPosition, PhysicalSize, WebviewUrl, WebviewWindow, WebviewWindowBuilder};
-use windows::{core::{w, PCWSTR}, Win32::{Foundation::{HWND, LPARAM, RECT}, Graphics::{Gdi::{GetMonitorInfoW, MonitorFromWindow, MONITORINFO, MONITOR_DEFAULTTONEAREST}}, UI::{Shell::{SHAppBarMessage, SHEmptyRecycleBinW, SHFileOperationW, SHQueryRecycleBinW, APPBARDATA, SHFILEOPSTRUCTW, FO_DELETE, FOF_ALLOWUNDO, FOF_NOCONFIRMATION, FOF_NOERRORUI, FOF_SILENT}, WindowsAndMessaging::{EnumChildWindows, EnumWindows, FindWindowExW, FindWindowW, GetClassNameW, GetWindowRect, GetAncestor, GetCursorPos, GetWindowLongPtrW, GetWindowTextLengthW, GetWindowTextW, GetWindowThreadProcessId, GetForegroundWindow, IsIconic, IsWindowVisible, SetForegroundWindow, SetWindowPos, ShowWindow, ShowWindowAsync, GA_ROOT, GWL_EXSTYLE, HWND_TOPMOST, SW_MINIMIZE, SW_RESTORE, SW_HIDE, SW_SHOWNA, SWP_ASYNCWINDOWPOS, SWP_NOACTIVATE, SWP_NOMOVE, SWP_NOSIZE, SWP_NOZORDER, WS_EX_TOOLWINDOW}}}};
+use windows::{core::{w, PCWSTR}, Win32::{Foundation::{HWND, LPARAM, RECT}, Graphics::{Gdi::{GetMonitorInfoW, MonitorFromWindow, MONITORINFO, MONITOR_DEFAULTTONEAREST}}, UI::{Shell::{SHAppBarMessage, SHEmptyRecycleBinW, SHFileOperationW, SHQueryRecycleBinW, APPBARDATA, SHFILEOPSTRUCTW, FO_DELETE, FOF_ALLOWUNDO, FOF_NOCONFIRMATION, FOF_NOERRORUI, FOF_SILENT}, WindowsAndMessaging::{EnumChildWindows, EnumWindows, FindWindowExW, FindWindowW, GetClassNameW, GetWindowRect, GetAncestor, GetCursorPos, GetWindowLongPtrW, GetWindowTextLengthW, GetWindowTextW, GetWindowThreadProcessId, GetForegroundWindow, IsIconic, IsWindowVisible, SetForegroundWindow, SetWindowPos, ShowWindowAsync, GA_ROOT, GWL_EXSTYLE, HWND_TOPMOST, SW_MINIMIZE, SW_RESTORE, SW_HIDE, SW_SHOWNA, SWP_ASYNCWINDOWPOS, SWP_NOACTIVATE, SWP_NOMOVE, SWP_NOSIZE, SWP_NOZORDER, WS_EX_TOOLWINDOW}}}};
 
 const ABM_NEW: u32 = 0;
 const ABM_REMOVE: u32 = 1;
@@ -26,6 +26,13 @@ struct Hit { x: i32, y: i32, w: i32, h: i32, scale: f64 }
 struct AppBarState { hwnd: isize, rect: RECT, monitor: notch::Rect, height: i32, dpi_milli: i32 }
 
 static RUNNING_ORDER: OnceLock<Mutex<Vec<String>>> = OnceLock::new();
+const ACTIVATION_GUARD: Duration = Duration::from_millis(350);
+static ACTIVATIONS: std::sync::LazyLock<Mutex<HashMap<isize, Instant>>> =
+    std::sync::LazyLock::new(|| Mutex::new(HashMap::new()));
+
+pub(crate) fn recently_activated(raw: isize) -> bool {
+    ACTIVATIONS.lock().unwrap().get(&raw).is_some_and(|at| at.elapsed() < ACTIVATION_GUARD)
+}
 static CAN_SHOW: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBool::new(false);
 static MENU_OPEN: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBool::new(false);
 
@@ -60,6 +67,7 @@ pub struct DockItem {
     pub running: bool,
     pub window_count: usize,
     pub kind: String,
+    pub is_downloads: bool,
 }
 
 #[derive(Serialize)]
@@ -574,7 +582,7 @@ pub fn items(settings: &Settings) -> Vec<DockItem> {
         if icons::is_shell_host(&p.path) { continue; }
         let mut count = 0;
         for (i, w) in running.iter().enumerate() { if pin_matches(p, w) { used[i] = true; count += 1; } }
-        out.push(DockItem { key: pin_key(p), name: p.name.clone(), path: icons::resolve_program(&p.path), args: p.args.clone(), aumid: p.aumid.clone(), running: count > 0, window_count: count, kind: "pinned".into() });
+        out.push(DockItem { key: pin_key(p), name: p.name.clone(), path: icons::resolve_program(&p.path), args: p.args.clone(), aumid: p.aumid.clone(), running: count > 0, window_count: count, kind: "pinned".into(), is_downloads: false });
     }
     let first = out.len();
     if settings.dock.show_running {
@@ -586,7 +594,7 @@ pub fn items(settings: &Settings) -> Vec<DockItem> {
             if let Some(group) = groups.iter_mut().find(|(g, _)| *g == id) { group.1 += 1; continue; }
             groups.push((id, 1));
             let icon_path = if w.aumid.is_empty() { w.path.clone() } else { format!("shell:AppsFolder\\{}", w.aumid) };
-            out.push(DockItem { key: String::new(), name: icons::program_name(&w.path, &w.aumid), path: icon_path, args: String::new(), aumid: w.aumid.clone(), running: true, window_count: 1, kind: "running".into() });
+            out.push(DockItem { key: String::new(), name: icons::program_name(&w.path, &w.aumid), path: icon_path, args: String::new(), aumid: w.aumid.clone(), running: true, window_count: 1, kind: "running".into(), is_downloads: false });
         }
         let first_running = out.len() - groups.len();
         for (item, (id, count)) in out[first_running..].iter_mut().zip(groups) { item.key = format!("app:{id}"); item.window_count = count; }
@@ -596,8 +604,10 @@ pub fn items(settings: &Settings) -> Vec<DockItem> {
     let mut order = RUNNING_ORDER.get_or_init(|| Mutex::new(Vec::new())).lock().unwrap();
     stable_running_order(&mut order, &mut out[first..]);
     drop(order);
+    let downloads = crate::settings::default_downloads_path();
     for folder in &settings.dock.folders {
-        out.push(DockItem { key: format!("folder:{}", folder.path), name: folder.name.clone(), path: folder.path.clone(), args: String::new(), aumid: String::new(), running: false, window_count: 0, kind: "folder".into() });
+        let is_downloads = folder.path.eq_ignore_ascii_case(&downloads.to_string_lossy());
+        out.push(DockItem { key: format!("folder:{}", folder.path), name: folder.name.clone(), path: folder.path.clone(), args: String::new(), aumid: String::new(), running: false, window_count: 0, kind: "folder".into(), is_downloads });
     }
     out
 }
@@ -660,25 +670,36 @@ pub(crate) fn can_show() -> bool {
 }
 
 pub(crate) fn focus_window(raw: isize) -> bool {
-    use windows::Win32::{System::Threading::{AttachThreadInput, GetCurrentThreadId}, UI::WindowsAndMessaging::{BringWindowToTop, IsWindow, PeekMessageW, MSG, PM_NOREMOVE}};
+    use windows::Win32::{
+        System::Threading::{AttachThreadInput, GetCurrentThreadId},
+        UI::WindowsAndMessaging::{
+            AllowSetForegroundWindow, BringWindowToTop, IsWindow, PeekMessageW, ASFW_ANY,
+            MSG, PM_NOREMOVE,
+        },
+    };
     let h = HWND(raw as *mut _);
     unsafe {
         if !IsWindow(Some(h)).as_bool() { return false; }
-        let minimized = IsIconic(h).as_bool();
-        if minimized { let _ = ShowWindowAsync(h, SW_RESTORE); }
-        // Explorer conserva su captura de ratón durante OLE; subir el HWND permite activarlo
-        // sin cancelar el arrastre ni sintetizar una pulsación.
-        let _ = BringWindowToTop(h);
-        if SetForegroundWindow(h).as_bool() || GetForegroundWindow() == h { return true; }
+        let _ = AllowSetForegroundWindow(ASFW_ANY);
+        if IsIconic(h).as_bool() {
+            if !ShowWindowAsync(h, SW_RESTORE).as_bool() { return false; }
+            // La solicitud se procesa en la cola de la ventana de destino.
+            let deadline = Instant::now() + Duration::from_millis(150);
+            while IsIconic(h).as_bool() && Instant::now() < deadline {
+                std::thread::sleep(Duration::from_millis(5));
+            }
+        }
         let _ = PeekMessageW(&mut MSG::default(), None, 0, 0, PM_NOREMOVE);
         let thread = GetCurrentThreadId();
         let foreground = GetForegroundWindow();
         let owner = if foreground.0.is_null() { 0 } else { GetWindowThreadProcessId(foreground, None) };
-        if owner == 0 || owner == thread || !AttachThreadInput(thread, owner, true).as_bool() { return false; }
+        let attached = owner != 0 && owner != thread && AttachThreadInput(thread, owner, true).as_bool();
+        let focused = SetForegroundWindow(h).as_bool();
         let _ = BringWindowToTop(h);
-        let focused = SetForegroundWindow(h).as_bool() || GetForegroundWindow() == h;
-        let _ = AttachThreadInput(thread, owner, false);
-        focused
+        if attached {
+            let _ = AttachThreadInput(thread, owner, false);
+        }
+        focused || GetForegroundWindow() == h
     }
 }
 
@@ -725,6 +746,11 @@ pub(crate) fn dock_launch_blocking(path: String, args: String, aumid: String) ->
 
 #[tauri::command]
 pub async fn dock_activate(app: AppHandle, key: String, state: tauri::State<'_, notch::NotchState>) -> Result<bool, String> {
+    let clicked_foreground = unsafe {
+        let foreground = GetForegroundWindow();
+        (!foreground.0.is_null() && !IsIconic(foreground).as_bool()).then_some(foreground.0 as isize)
+    };
+    let clicked_after_activation = clicked_foreground.is_some_and(recently_activated);
     let settings = state.settings.lock().unwrap().clone();
     tauri::async_runtime::spawn_blocking(move || {
         let windows = windows_for(&settings, &key);
@@ -740,17 +766,29 @@ pub async fn dock_activate(app: AppHandle, key: String, state: tauri::State<'_, 
             }
             return Ok(false);
         }
-        unsafe {
-            let fg = GetForegroundWindow().0 as isize;
-            let target = match windows.iter().position(|h| *h == fg) {
-                // Una sola ventana y ya está delante: minimizar.
-                Some(_) if windows.len() == 1 => { let _ = ShowWindow(HWND(fg as *mut _), SW_MINIMIZE); return Ok(false); }
-                // Varias: alternar a la siguiente.
+        let target = {
+            let mut activations = ACTIVATIONS.lock().unwrap();
+            activations.retain(|_, at| at.elapsed() < ACTIVATION_GUARD);
+            let focused = clicked_foreground.filter(|&raw| unsafe {
+                let foreground = HWND(raw as *mut _);
+                GetForegroundWindow() == foreground && !IsIconic(foreground).as_bool()
+            });
+            let index = windows.iter().position(|&raw| Some(raw) == focused);
+            let target = match index {
+                Some(i) if windows.len() == 1 => {
+                    let raw = windows[i];
+                    if !clicked_after_activation && !activations.contains_key(&raw) {
+                        unsafe { let _ = ShowWindowAsync(HWND(raw as *mut _), SW_MINIMIZE); }
+                    }
+                    return Ok(false);
+                }
                 Some(i) => windows[(i + 1) % windows.len()],
                 None => windows[0],
             };
-            focus_window(target);
-        }
+            activations.insert(target, Instant::now());
+            target
+        };
+        focus_window(target);
         Ok(false)
     }).await.map_err(|e| e.to_string())?
 }
@@ -925,7 +963,7 @@ pub fn start(app: AppHandle) {
 #[cfg(test)]
 mod order_tests {
     use super::*;
-    fn item(key: &str) -> DockItem { DockItem { key: key.into(), name: key.into(), path: String::new(), args: String::new(), aumid: String::new(), running: true, window_count: 1, kind: "running".into() } }
+    fn item(key: &str) -> DockItem { DockItem { key: key.into(), name: key.into(), path: String::new(), args: String::new(), aumid: String::new(), running: true, window_count: 1, kind: "running".into(), is_downloads: false } }
     #[test]
     fn activation_does_not_reorder_running_apps() {
         let mut order = vec!["a".into(), "b".into()];

@@ -827,6 +827,7 @@ export const EN = {
   "Mostrar «Aplicaciones» en el Dock": "Show “Applications” in Dock",
   "Mostrar ventanas abiertas": "Show open windows",
   "Mostrar papelera": "Show Trash",
+  "Mostrar Descargas": "Show Downloads",
   "Animar apps al abrir y minimizar": "Animate apps when opening and minimizing",
   "Mostrar uso de proveedores de IA": "Show AI provider usage",
   "Lee la cuota de las sesiones que ya tienes abiertas. Consulta directamente a cada proveedor cada cinco minutos y no guarda credenciales": "Reads the quota of your existing sessions. It checks each provider directly every five minutes and stores no credentials",

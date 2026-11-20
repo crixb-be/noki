@@ -404,6 +404,9 @@ unsafe extern "system" fn on_event(
         return;
     }
     let raw = hwnd.0 as isize;
+    if !restoring && dock::recently_activated(raw) {
+        return;
+    }
     let snapshot = {
         let mut cache = SNAPSHOTS.lock().unwrap();
         let Some(snapshot) = cache.get_mut(&raw) else {
@@ -547,7 +550,7 @@ fn present(app: &AppHandle, generation: u64, snapshot: Snapshot, target: RECT, r
     };
     let handle = app.clone();
     let _ = app.run_on_main_thread(move || {
-        if !active(generation) || !dock::can_show() {
+        if !active(generation) || !dock::can_show() || (!restoring && dock::recently_activated(raw)) {
             return;
         }
         let Some(window) = handle.get_webview_window(LABEL) else {

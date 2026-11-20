@@ -1,5 +1,10 @@
 # Changelog
 
+## [1.4.1]
+
+- El Dock restaura y enfoca las ventanas minimizadas y evita que un rebote del clic vuelva a minimizarlas.
+- Nuevo interruptor «Mostrar Descargas» en Ajustes → Dock, activado por defecto.
+
 ## [1.4.0]
 
 - Animaciones opcionales del Dock, desactivadas por defecto. Los iconos rebotan al lanzar una app y el efecto Genie conecta sus ventanas con el icono al minimizar y restaurar.

@@ -236,6 +236,12 @@ pub struct DockFolder {
     pub path: String,
 }
 
+pub(crate) fn default_downloads_path() -> std::path::PathBuf {
+    std::env::var_os("USERPROFILE")
+        .map(|profile| std::path::PathBuf::from(profile).join("Downloads"))
+        .unwrap_or_default()
+}
+
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq)]
 #[serde(default, rename_all = "camelCase")]
 pub struct Dock {
@@ -247,6 +253,7 @@ pub struct Dock {
     pub show_apps: bool,
     pub show_running: bool,
     pub show_trash: bool,
+    pub show_downloads: bool,
     pub autohide: bool,
     #[serde(default)]
     pub hide_taskbar: bool,
@@ -272,7 +279,7 @@ impl Default for Dock {
             pinned.push(DockPinned { name: "Microsoft Edge".into(), path: path.to_string_lossy().into_owned(), args: String::new(), aumid: String::new() });
         }
         pinned.push(DockPinned { name: "Bloc de notas".into(), path: "notepad.exe".into(), args: String::new(), aumid: String::new() });
-        let downloads = std::env::var("USERPROFILE").map(|p| std::path::PathBuf::from(p).join("Downloads")).unwrap_or_default();
+        let downloads = default_downloads_path();
         Self {
             enabled: false,
             animate_apps: false,
@@ -282,6 +289,7 @@ impl Default for Dock {
             show_apps: true,
             show_running: true,
             show_trash: true,
+            show_downloads: true,
             autohide: false,
             hide_taskbar: false,
             reserve_space: false,
@@ -1051,6 +1059,18 @@ pub fn config_dir(app: &AppHandle) -> Option<PathBuf> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn downloads_are_visible_by_default_and_can_be_hidden() {
+        let mut dock: Dock = serde_json::from_str(r#"{"showTrash":false}"#).unwrap();
+        assert!(dock.show_downloads);
+
+        dock.show_downloads = false;
+        let saved = serde_json::to_value(&dock).unwrap();
+        assert_eq!(saved["showDownloads"], false);
+        let reloaded: Dock = serde_json::from_value(saved).unwrap();
+        assert!(!reloaded.show_downloads);
+    }
 
     #[test]
     fn migrates_windows_text_shortcuts_to_safe_defaults() {

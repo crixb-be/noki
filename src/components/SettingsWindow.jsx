@@ -1727,6 +1727,7 @@ function DockSettings({ s, set }) {
     <Row title="Mostrar «Aplicaciones» en el Dock" hint="Icono para abrir la cuadrícula con todos tus programas."><Toggle checked={d.showApps} onChange={(v) => set({ dock: { showApps: v } })} /></Row>
     <Row title="Mostrar ventanas abiertas"><Toggle checked={d.showRunning} onChange={(v) => set({ dock: { showRunning: v } })} /></Row>
     <Row title="Mostrar papelera"><Toggle checked={d.showTrash} onChange={(v) => set({ dock: { showTrash: v } })} /></Row>
+    <Row title="Mostrar Descargas"><Toggle checked={d.showDownloads} onChange={(v) => set({ dock: { showDownloads: v } })} /></Row>
     <Row title="Ocultar automáticamente"><Toggle checked={d.autohide} onChange={(v) => set({ dock: { autohide: v } })} /></Row>
     <Row title="Reservar espacio" hint="Las ventanas maximizadas dejan libre el borde inferior."><Toggle checked={d.reserveSpace} onChange={(v) => set({ dock: { reserveSpace: v } })} /></Row>
     <Row title="Ocultar la barra de tareas de Windows" hint="Guarda el estado actual y lo restaura al desactivar o salir de Noki."><Toggle checked={d.hideTaskbar} onChange={(v) => set({ dock: { hideTaskbar: v } })} /></Row>
