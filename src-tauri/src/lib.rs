@@ -1,6 +1,8 @@
 mod appicon;
 mod ai;
 mod ai_usage;
+mod antigravity_statusline;
+pub use antigravity_statusline::run_antigravity_statusline;
 mod claude_session;
 mod gemini_session;
 mod backgrounds;
@@ -678,6 +680,8 @@ fn backup_import_blocking(app: &AppHandle, current: Settings, store: store::Stor
     // Copias nuevas no traen claves: se conservan las de este equipo. Copias antiguas (≤0.5) sí las traen:
     // se pasan al Administrador de credenciales.
     new.keep_keys_missing_in(&current);
+    // Una copia no puede activar la consulta directa: exige ver el aviso de riesgo en este equipo.
+    new.keep_local_consent(&current);
     new.sync_secrets(&current)?;
     let data = doc.get("data").and_then(|v| v.as_object()).cloned().unwrap_or_default();
     settings::save(&app, &new)?;
@@ -817,6 +821,7 @@ pub fn run() {
             icons::folder_custom_icon,
             ai_usage::ai_usage_snapshot,
             ai_usage::refresh_ai_usage,
+            antigravity_statusline::antigravity_statusline_command,
             backgrounds::bg_import,
             backgrounds::bg_data,
             translate::translate_text,

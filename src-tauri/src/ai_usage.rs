@@ -1,6 +1,6 @@
 //! Cuotas de suscripción de las sesiones locales. Solo las métricas llegan a la interfaz.
-use crate::{claude_session, gemini_session, notch::NotchState, settings::{Settings, TopBar}};
-use futures_util::FutureExt;
+use crate::{antigravity_statusline, claude_session, gemini_session, notch::NotchState, settings::{Settings, TopBar}};
+use futures_util::{future::{select, Either}, FutureExt};
 use serde::Serialize;
 use serde_json::{json, Value};
 use std::{
@@ -15,9 +15,12 @@ use tauri::{AppHandle, Emitter, Manager, State, WebviewWindow};
 use tokio::sync::Notify;
 
 const INTERVAL: Duration = Duration::from_secs(300);
+const ANTIGRAVITY_INTERVAL: Duration = Duration::from_secs(15);
 const TIMEOUT: Duration = Duration::from_secs(15);
+const GEMINI_CLI: &str = "Gemini CLI";
+const ANTIGRAVITY_CLI: &str = "Antigravity CLI";
 
-#[derive(Clone, Serialize)]
+#[derive(Clone, PartialEq, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub(crate) struct Limit {
     pub(crate) minutes: Option<u64>,
@@ -27,33 +30,40 @@ pub(crate) struct Limit {
     pub(crate) label: Option<String>,
 }
 
-#[derive(Clone, Default, Serialize)]
+#[derive(Clone, Default, PartialEq, Serialize)]
 #[serde(rename_all = "camelCase")]
 struct Provider {
     limits: Vec<Limit>,
     updated_at: Option<i64>,
     error: Option<&'static str>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    source: Option<&'static str>,
 }
 
 impl Provider {
-    fn apply(&mut self, result: Result<Vec<Limit>, &'static str>) {
+    fn queried(limits: Vec<Limit>, source: Option<&'static str>) -> Self {
+        Self {
+            limits,
+            updated_at: Some(chrono::Utc::now().timestamp()),
+            source,
+            ..Self::default()
+        }
+    }
+
+    fn apply(&mut self, result: Result<Self, &'static str>) {
         match result {
-            Ok(limits) => {
-                self.limits = limits;
-                self.updated_at = Some(chrono::Utc::now().timestamp());
-                self.error = None;
-            }
+            Ok(data) => *self = data,
             Err(error) => {
-                self.error = Some(error);
-                if matches!(
+                // A failed fallback means the previous Antigravity capture is no longer usable.
+                if self.source == Some(ANTIGRAVITY_CLI) || matches!(
                     error,
                     NO_SESSION | NO_LIMITS | claude_session::EXPIRED
                         | gemini_session::NO_SESSION | gemini_session::EXPIRED
                         | gemini_session::UNSUPPORTED | gemini_session::NO_QUOTA
                 ) {
-                    self.limits.clear();
-                    self.updated_at = None;
+                    *self = Self::default();
                 }
+                self.error = Some(error);
             }
         }
     }
@@ -67,7 +77,7 @@ pub struct Snapshot {
     refreshing: bool,
 }
 
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, PartialEq)]
 enum Kind {
     Claude,
     Codex,
@@ -85,6 +95,10 @@ impl Kind {
                 Self::Codex => topbar.show_codex_quota,
                 Self::Gemini => topbar.show_gemini_quota,
             }
+    }
+
+    fn local_only(self, topbar: &TopBar) -> bool {
+        self == Self::Gemini && !topbar.gemini_cli_direct
     }
 }
 
@@ -122,15 +136,17 @@ impl Providers {
         let mut wake = [false; 3];
         for kind in Kind::ALL {
             let enabled = kind.enabled(new);
-            if enabled == kind.enabled(prev) {
+            let was_enabled = kind.enabled(prev);
+            let mode_changed = enabled && was_enabled && kind.local_only(prev) != kind.local_only(new);
+            if enabled == was_enabled && !mode_changed {
                 continue;
             }
             changed = true;
-            if enabled {
-                wake[kind as usize] = true;
-            } else {
+            wake[kind as usize] = enabled || (kind == Kind::Gemini && !kind.local_only(prev));
+            if !enabled || mode_changed {
                 let slot = &mut self.0[kind as usize];
                 slot.data = Provider::default();
+                slot.refreshing = false;
                 slot.generation += 1;
             }
         }
@@ -178,64 +194,122 @@ async fn poll(app: AppHandle, kind: Kind) {
     let mut client = None;
     let mut gemini = gemini_session::Session::default();
     loop {
-        let generation = {
+        let request = {
             let mut providers = usage.snapshot.lock().unwrap();
             let settings = notch.settings.lock().unwrap();
             if kind.enabled(&settings.topbar) {
                 // Las solicitudes recibidas antes de iniciar se atienden en esta misma consulta.
                 let _ = wake.notified().now_or_never();
+                let local_only = kind.local_only(&settings.topbar);
                 let slot = &mut providers.0[index];
-                slot.refreshing = true;
+                slot.refreshing = !local_only;
                 let generation = slot.generation;
-                let snapshot = providers.snapshot(&settings.topbar);
-                drop(settings);
-                let _ = app.emit("ai-usage-updated", snapshot);
-                Some(generation)
+                if !local_only {
+                    let snapshot = providers.snapshot(&settings.topbar);
+                    drop(settings);
+                    let _ = app.emit("ai-usage-updated", snapshot);
+                }
+                Some((generation, local_only))
             } else {
                 None
             }
         };
-        let Some(generation) = generation else {
+        let Some((generation, local_only)) = request else {
             wake.notified().await;
             continue;
         };
         let started = tokio::time::Instant::now();
         let result = match kind {
             Kind::Codex => tauri::async_runtime::spawn_blocking(codex_limits)
-                .await.unwrap_or(Err(UNAVAILABLE)),
-            Kind::Claude | Kind::Gemini => {
-                let client = client.get_or_insert_with(|| reqwest::Client::builder()
-                    .timeout(TIMEOUT)
-                    .redirect(reqwest::redirect::Policy::none())
-                    .build());
-                match (kind, client.as_ref()) {
-                    (Kind::Claude, Ok(client)) => claude_limits(client).await,
-                    (Kind::Gemini, Ok(client)) => gemini.limits(client).await,
-                    (Kind::Gemini, Err(_)) => Err(gemini_session::UNAVAILABLE),
-                    _ => Err(UNAVAILABLE),
+                .await.unwrap_or(Err(UNAVAILABLE)).map(|limits| Provider::queried(limits, None)),
+            Kind::Claude => match client.get_or_insert_with(usage_client).as_ref() {
+                Ok(client) => claude_limits(client).await.map(|limits| Provider::queried(limits, None)),
+                Err(_) => Err(UNAVAILABLE),
+            },
+            Kind::Gemini if local_only => antigravity_provider().await,
+            Kind::Gemini => {
+                let mut query = std::pin::pin!(async {
+                    let direct = match client.get_or_insert_with(usage_client).as_ref() {
+                        Ok(client) => gemini.limits(client).await
+                            .map(|limits| Provider::queried(limits, Some(GEMINI_CLI))),
+                        Err(_) => Err(gemini_session::UNAVAILABLE),
+                    };
+                    let fallback = if direct.is_err() { antigravity_provider().await.ok() } else { None };
+                    gemini_with_fallback(direct, fallback)
+                });
+                let started_query = {
+                    let providers = usage.snapshot.lock().unwrap();
+                    let settings = notch.settings.lock().unwrap();
+                    if providers.0[index].generation != generation
+                        || !kind.enabled(&settings.topbar) || !settings.topbar.gemini_cli_direct
+                    {
+                        continue;
+                    }
+                    // Start discovery while the setting is still protected by the locks.
+                    query.as_mut().now_or_never()
+                };
+                match started_query {
+                    Some(result) => result,
+                    None => match select(std::pin::pin!(wake.notified()), query).await {
+                        Either::Left(_) => continue,
+                        Either::Right((result, _)) => result,
+                    },
                 }
             }
         };
-        let enabled = {
+        let current = {
             let mut providers = usage.snapshot.lock().unwrap();
             let settings = notch.settings.lock().unwrap();
-            let enabled = kind.enabled(&settings.topbar);
             let slot = &mut providers.0[index];
-            slot.refreshing = false;
-            if enabled {
-                if slot.generation == generation {
+            let current = kind.enabled(&settings.topbar) && slot.generation == generation;
+            if current {
+                slot.refreshing = false;
+                let changed = if local_only {
+                    let data = result.unwrap_or_else(|error| Provider { error: Some(error), ..Provider::default() });
+                    let changed = slot.data != data;
+                    slot.data = data;
+                    changed
+                } else {
                     slot.data.apply(result);
+                    true
+                };
+                if changed {
+                    let snapshot = providers.snapshot(&settings.topbar);
+                    drop(settings);
+                    let _ = app.emit("ai-usage-updated", snapshot);
                 }
-                let snapshot = providers.snapshot(&settings.topbar);
-                drop(settings);
-                let _ = app.emit("ai-usage-updated", snapshot);
             }
-            enabled
+            current
         };
-        if enabled {
-            let _ = tokio::time::timeout_at(started + INTERVAL, wake.notified()).await;
+        if current {
+            let interval = if local_only { ANTIGRAVITY_INTERVAL } else { INTERVAL };
+            let _ = tokio::time::timeout_at(started + interval, wake.notified()).await;
         }
     }
+}
+
+fn usage_client() -> reqwest::Result<reqwest::Client> {
+    reqwest::Client::builder()
+        .timeout(TIMEOUT)
+        .redirect(reqwest::redirect::Policy::none())
+        .build()
+}
+
+async fn antigravity_provider() -> Result<Provider, &'static str> {
+    let (limits, captured_at) = antigravity_statusline::limits().await?;
+    Ok(Provider {
+        limits,
+        updated_at: Some(captured_at),
+        source: Some(ANTIGRAVITY_CLI),
+        ..Provider::default()
+    })
+}
+
+fn gemini_with_fallback(
+    direct: Result<Provider, &'static str>,
+    fallback: Option<Provider>,
+) -> Result<Provider, &'static str> {
+    direct.or_else(|error| fallback.ok_or(error))
 }
 
 #[tauri::command]
@@ -437,13 +511,16 @@ mod tests {
         };
         let mut providers = Providers::default();
         providers.0[Kind::Codex as usize].refreshing = true;
-        providers.0[Kind::Claude as usize].data.apply(Ok(parse_claude(
-            &json!({"five_hour":{"utilization":37.0}}),
+        providers.0[Kind::Claude as usize].data.apply(Ok(Provider::queried(
+            parse_claude(&json!({"five_hour":{"utilization":37.0}})),
+            None,
         )));
         let snapshot = serde_json::to_value(providers.snapshot(&topbar)).unwrap();
         assert_eq!(snapshot.as_object().unwrap().len(), 4);
         assert_eq!(snapshot["refreshing"], false);
         assert!(snapshot["claude"]["limits"][0].get("label").is_none());
+        assert!(snapshot["claude"].get("source").is_none());
+        assert!(snapshot["codex"].get("source").is_none());
         assert_eq!(snapshot["gemini"]["limits"], json!([]));
 
         providers.0[Kind::Gemini as usize].refreshing = true;
@@ -465,13 +542,33 @@ mod tests {
             gemini_session::UNSUPPORTED,
             gemini_session::NO_QUOTA,
         ] {
-            provider.apply(Ok(limits.clone()));
+            provider.apply(Ok(Provider::queried(limits.clone(), Some(GEMINI_CLI))));
             provider.apply(Err(gemini_session::UNAVAILABLE));
             assert_eq!(provider.limits.len(), 1);
             assert!(provider.updated_at.is_some());
             provider.apply(Err(error));
             assert!(provider.limits.is_empty());
             assert!(provider.updated_at.is_none());
+            assert!(provider.source.is_none());
         }
+    }
+
+    #[test]
+    fn gemini_prefers_direct_then_local_then_the_direct_error() {
+        let direct = Provider::queried(vec![], Some(GEMINI_CLI));
+        let local = Provider {
+            updated_at: Some(1234),
+            source: Some(ANTIGRAVITY_CLI),
+            ..Provider::default()
+        };
+        let selected = gemini_with_fallback(Ok(direct), Some(local.clone())).unwrap();
+        assert_eq!(selected.source, Some(GEMINI_CLI));
+        let selected = gemini_with_fallback(Err(gemini_session::NO_SESSION), Some(local)).unwrap();
+        assert_eq!(selected.source, Some(ANTIGRAVITY_CLI));
+        assert_eq!(selected.updated_at, Some(1234));
+        assert_eq!(
+            gemini_with_fallback(Err(gemini_session::NO_SESSION), None).err(),
+            Some(gemini_session::NO_SESSION)
+        );
     }
 }

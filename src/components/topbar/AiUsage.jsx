@@ -79,7 +79,8 @@ export function AiUsagePanel({ topbar }) {
             {limit.resetsAt && <p className="panel-muted">Se reinicia el <time dateTime={new Date(limit.resetsAt * 1000).toISOString()}>{timestamp(limit.resetsAt)}</time></p>}
           </div>;
         })}
-        {provider?.updatedAt && <p className="panel-muted">Última consulta <time>{timestamp(provider.updatedAt)}</time></p>}
+        {provider?.source && <p className="panel-muted">Fuente: <span data-no-i18n>{provider.source}</span></p>}
+        {provider?.updatedAt && <p className="panel-muted"><span>{provider.source === "Antigravity CLI" ? "Dato recibido" : "Última consulta"}</span>{" "}<time>{timestamp(provider.updatedAt)}</time></p>}
         {provider?.error && <p className="panel-muted" role="status">{provider.error}</p>}
         {!provider?.limits.length && !provider?.error && <p className="panel-muted">Consultando cuota…</p>}
       </section>;

@@ -1579,6 +1579,31 @@ function Developer({ icon }) {
   );
 }
 
+function AntigravityStatuslineCopy() {
+  const [status, setStatus] = useState("idle");
+
+  async function copyCommand() {
+    setStatus("copying");
+    const text = await invoke("antigravity_statusline_command").catch(() => null);
+    if (text === null) {
+      setStatus("pathError");
+      return;
+    }
+    try {
+      await invoke("clip_copy", { text });
+      setStatus("copied");
+    } catch {
+      setStatus("error");
+    }
+  }
+
+  return <>
+    <button type="button" className={button} onClick={copyCommand} disabled={status === "copying"}>{status === "copied" ? "Copiado" : "Copiar comando"}</button>
+    {status === "error" && <div className="mt-1 max-w-36 text-xs text-red-300" role="alert">No se pudo copiar el comando.</div>}
+    {status === "pathError" && <div className="mt-1 max-w-36 text-xs text-red-300" role="alert">La ruta de Noki no es compatible con el comando de Antigravity CLI.</div>}
+  </>;
+}
+
 function TopBarSettings({ s, set }) {
   const t = s.topbar ?? {};
   const [avatar, setAvatar] = useState(null);
@@ -1594,11 +1619,15 @@ function TopBarSettings({ s, set }) {
     <Row title="Alto de la barra"><Slider value={t.height} min={28} max={32} unit=" px" onChange={(v) => set({ topbar: { height: v } })} /></Row>
     <Row title="Tinte"><Select value={t.tint} options={[["auto", "Automático"], ["dark", "Oscuro"], ["light", "Claro"]]} onChange={(v) => set({ topbar: { tint: v } })} /></Row>
     <SectionTitle>Monitores de IA</SectionTitle>
-    <Row title="Mostrar uso de proveedores de IA" hint="Lee la cuota de las sesiones que ya tienes abiertas. Consulta directamente a cada proveedor cada cinco minutos y no guarda credenciales"><Toggle checked={t.showAiUsage} onChange={(v) => set({ topbar: { showAiUsage: v } })} /></Row>
+    <Row title="Mostrar uso de proveedores de IA" hint="Muestra la cuota de los proveedores que actives. Claude y Codex se consultan cada cinco minutos, Gemini se lee de Antigravity CLI salvo que actives la consulta directa."><Toggle checked={t.showAiUsage} onChange={(v) => set({ topbar: { showAiUsage: v } })} /></Row>
     <Locked locked={!t.showAiUsage} reason="Activa los monitores de IA para elegir qué cuotas mostrar." action="Activar monitores" onAction={() => set({ topbar: { showAiUsage: true } })}>
       <Row title="Mostrar cuota de Claude"><Toggle checked={t.showClaudeQuota} onChange={(v) => set({ topbar: { showClaudeQuota: v } })} /></Row>
       <Row title="Mostrar cuota de GPT / Codex"><Toggle checked={t.showCodexQuota} onChange={(v) => set({ topbar: { showCodexQuota: v } })} /></Row>
       <Row title="Mostrar cuota de Gemini"><Toggle checked={t.showGeminiQuota} onChange={(v) => set({ topbar: { showGeminiQuota: v } })} /></Row>
+      {t.showGeminiQuota && <>
+        <Row title="Consulta directa de Gemini CLI (no permitida por Google)" hint="Usa tu sesión de Gemini CLI desde Noki. Los términos de Google lo prohíben y puede causar la suspensión de tus cuentas de Gemini CLI y Antigravity. Actívala solo si aceptas ese riesgo."><Toggle checked={t.geminiCliDirect} onChange={(v) => set({ topbar: { geminiCliDirect: v } })} /></Row>
+        <Row title="Cuota mediante Antigravity CLI" hint="Copia el comando y pégalo dentro de agy. Sustituye tu statusline actual. Noki solo guarda los porcentajes y reinicios, y se actualizan mientras usas agy."><AntigravityStatuslineCopy /></Row>
+      </>}
     </Locked>
     <SectionTitle>Iconos visibles</SectionTitle>
     {iconRows.map(([id, title, hint]) => <Row key={id} title={title} hint={hint}><Toggle checked={t[id]} onChange={(v) => set({ topbar: { [id]: v } })} /></Row>)}

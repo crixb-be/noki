@@ -183,6 +183,7 @@ pub struct TopBar {
     pub show_claude_quota: bool,
     pub show_codex_quota: bool,
     pub show_gemini_quota: bool,
+    pub gemini_cli_direct: bool,
     pub show_wifi: bool,
     pub show_bluetooth: bool,
     pub show_sound: bool,
@@ -210,6 +211,7 @@ impl Default for TopBar {
             show_claude_quota: true,
             show_codex_quota: true,
             show_gemini_quota: true,
+            gemini_cli_direct: false,
             show_wifi: true,
             show_bluetooth: true,
             show_sound: true,
@@ -987,6 +989,11 @@ impl Settings {
         Ok(())
     }
 
+    /// Importar una copia puede apagar la consulta directa de Gemini CLI, nunca encenderla.
+    pub fn keep_local_consent(&mut self, current: &Settings) {
+        self.topbar.gemini_cli_direct &= current.topbar.gemini_cli_direct;
+    }
+
     /// Mantiene las claves actuales para los proveedores en los que `other` no trae ninguna.
     pub fn keep_keys_missing_in(&mut self, current: &Settings) {
         for p in secrets::PROVIDERS {
@@ -1080,6 +1087,29 @@ mod tests {
         assert_eq!(saved["showCodexQuota"], false);
         assert_eq!(saved["showGeminiQuota"], false);
         assert_eq!(serde_json::from_value::<TopBar>(saved).unwrap(), topbar);
+    }
+
+    #[test]
+    fn gemini_cli_direct_requires_explicit_opt_in() {
+        assert!(!TopBar::default().gemini_cli_direct);
+        let old: Settings = serde_json::from_str(r#"{"topbar":{"showGeminiQuota":true}}"#).unwrap();
+        assert!(!old.topbar.gemini_cli_direct);
+
+        let opted_in: TopBar = serde_json::from_str(r#"{"geminiCliDirect":true}"#).unwrap();
+        assert!(opted_in.gemini_cli_direct);
+        assert_eq!(serde_json::to_value(opted_in).unwrap()["geminiCliDirect"], true);
+    }
+
+    #[test]
+    fn imported_backup_cannot_opt_in_to_gemini_cli_direct() {
+        for (local, backup, expected) in [(false, true, false), (false, false, false), (true, false, false), (true, true, true)] {
+            let mut current = Settings::default();
+            current.topbar.gemini_cli_direct = local;
+            let mut imported = Settings::default();
+            imported.topbar.gemini_cli_direct = backup;
+            imported.keep_local_consent(&current);
+            assert_eq!(imported.topbar.gemini_cli_direct, expected);
+        }
     }
 
     #[test]
