@@ -1,5 +1,11 @@
 # Changelog
 
+## [1.4.2]
+
+- La consulta directa de la cuota de Gemini CLI queda desactivada por defecto, también al actualizar desde 1.4.1. Google no permite ese acceso desde otras aplicaciones y puede suspender la cuenta. Quien acepte el riesgo puede activarla en Ajustes → Barra superior.
+- La cuota de Gemini se puede leer con la statusline oficial de Antigravity CLI (`agy`): copia el comando desde Ajustes → Barra superior y pégalo dentro de `agy`. Sustituye tu statusline actual. Noki no lee sus credenciales y solo guarda el nombre de cada cuota, su porcentaje, su reinicio y la hora de recepción.
+- El panel de uso de IA indica de dónde viene la cuota de Gemini y cuándo se recibió.
+
 ## [1.4.1]
 
 - El Dock restaura y enfoca las ventanas minimizadas y evita que un rebote del clic vuelva a minimizarlas.
