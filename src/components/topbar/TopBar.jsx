@@ -7,7 +7,7 @@ import { isEn, presetLanguage, useLanguage } from "../../lib/i18n.js";
 import { BatteryIcon, ChevronIcon, BellIcon, BluetoothIcon, CameraIcon, ControlCenterIcon, RecordIcon, SearchIcon, SpeakerIcon, WifiIcon } from "./SymbolIcons.jsx";
 import { BarPaint, barInk, useBarPaint } from "./barPaint.jsx";
 import { useGlass, useGlassShape } from "../../lib/glass.js";
-import { ProviderIcon, providers, useAiUsage } from "./AiUsage.jsx";
+import { ProviderIcon, enabledProviders, useAiUsage } from "./AiUsage.jsx";
 
 function Item({ title, onClick, children, className = "" }) {
   return <button type="button" title={title} aria-label={title} onClick={onClick} className={`topbar-item ${className}`}>{children}</button>;
@@ -35,7 +35,8 @@ export default function TopBar() {
   const [user, setUser] = useState({ displayName: "Usuario" });
   const [stats, setStats] = useState(null);
   const t = settings?.topbar ?? {};
-  const usage = useAiUsage(t.enabled && t.showAiUsage);
+  const visibleProviders = enabledProviders(t);
+  const usage = useAiUsage(visibleProviders.length > 0);
   const paint = useBarPaint(settings);
 
   presetLanguage(settings?.general?.language);
@@ -71,10 +72,14 @@ export default function TopBar() {
   const reserve = Math.max(180, settings?.appearance?.collapsedW ?? 240);
 
   if (!settings) return null;
+  const notchShift = Math.min(0, settings.appearance.offsetX ?? 0);
   return (
-    <div ref={shell} onContextMenu={(e) => { e.preventDefault(); invoke("desktop_context_menu", { section: "topbar" }).catch(console.error); }} className={`topbar-shell ${dark ? "topbar-dark" : "topbar-light"}${ink ? " topbar-ink" : ""}`} style={{ "--notch-reserve": `${reserve}px`, ...(ink ? { color: ink } : {}) }}>
+    <div ref={shell} onContextMenu={(e) => { e.preventDefault(); invoke("desktop_context_menu", { section: "topbar" }).catch(console.error); }} className={`topbar-shell ${dark ? "topbar-dark" : "topbar-light"}${ink ? " topbar-ink" : ""}`} style={{ "--notch-reserve": `${reserve}px`, "--notch-shift": `${notchShift}px`, ...(ink ? { color: ink } : {}) }}>
       <BarPaint settings={settings} tint={paint.tint} />
-      <div className="topbar-left" />
+      <div className="topbar-left">
+        {t.showClock && <Item title="Fecha y hora" onClick={() => invoke("command_open_system_uri", { uri: "ms-settings:dateandtime" })}><span className="topbar-clock">{formatClock(now)}</span></Item>}
+        {t.showAvatar && <Item title="Usuario" onClick={(e) => open("user", e)}><span className="topbar-avatar">{avatar ? <img src={avatar} alt="" /> : initials}</span></Item>}
+      </div>
       <div className="topbar-center-reserve" aria-hidden="true" />
       <div className="topbar-actions">
         {t.showTray !== false && <Item title="Iconos ocultos" onClick={(e) => {
@@ -87,7 +92,7 @@ export default function TopBar() {
         }}><ChevronIcon /></Item>}
         {t.showCpu && <Item title="CPU" onClick={() => invoke("command_open_task_manager")}><span className="topbar-text">CPU {stats ? Math.round(stats.cpu) : "--"}%</span></Item>}
         {t.showRam && <Item title="RAM" onClick={() => invoke("command_open_task_manager")}><span className="topbar-text">RAM {stats?.memTotal ? Math.round((stats.memUsed / stats.memTotal) * 100) : "--"}%</span></Item>}
-        {t.showAiUsage && Object.entries(providers).map(([id, name]) => {
+        {visibleProviders.map(([id, { name }]) => {
           const limits = usage?.[id]?.limits;
           const active = limits?.find((limit) => limit.minutes === 300) ?? limits?.[0];
           return <Item key={id} title={name} onClick={(event) => open("ai-usage", event)}><ProviderIcon provider={id} /><span className="topbar-text ai-usage-percent">{active ? `${Math.round(active.usedPercent)}%` : "—"}</span></Item>;
@@ -100,8 +105,6 @@ export default function TopBar() {
         {t.showControlCenter && <Item title="Centro de control" onClick={(e) => open("control", e)}><ControlCenterIcon /></Item>}
         {t.showCapture && <><Item title="Grabar" onClick={() => invoke("command_send_keys", { combo: "record" })}><RecordIcon /></Item><Item title="Captura" onClick={() => invoke("command_open_system_uri", { uri: "ms-screenclip:" })}><CameraIcon /></Item></>}
         {t.showNotifications && <Item title="Notificaciones" onClick={() => invoke("command_open_system_uri", { uri: "ms-actioncenter:" }).catch(() => invoke("command_send_keys", { combo: "notifications" }))}><BellIcon /></Item>}
-        {t.showAvatar && <Item title="Usuario" onClick={(e) => open("user", e)}><span className="topbar-avatar">{avatar ? <img src={avatar} alt="" /> : initials}</span></Item>}
-        {t.showClock && <Item title="Fecha y hora" onClick={() => invoke("command_open_system_uri", { uri: "ms-settings:dateandtime" })}><span className="topbar-clock">{formatClock(now)}</span></Item>}
       </div>
     </div>
   );

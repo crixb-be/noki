@@ -82,15 +82,15 @@ impl Login {
     }
 }
 
-fn nonempty(value: &Value) -> Option<&str> {
+pub(crate) fn nonempty(value: &Value) -> Option<&str> {
     value.as_str().filter(|value| !value.trim().is_empty())
 }
 
-fn now_ms() -> i64 {
+pub(crate) fn now_ms() -> i64 {
     chrono::Utc::now().timestamp_millis()
 }
 
-fn file_login(path: &Path) -> Option<(Value, i64)> {
+pub(crate) fn file_login(path: &Path) -> Option<(Value, i64)> {
     let file = File::open(path).ok()?;
     let metadata = file.metadata().ok()?;
     if !metadata.is_file() || metadata.len() > MAX_FILE_BYTES {
@@ -287,7 +287,7 @@ fn bounded_output(mut command: Command) -> Option<Output> {
     }
 }
 
-fn active_distros() -> Vec<String> {
+pub(crate) fn active_distros() -> Vec<String> {
     let mut command = wsl_command();
     command.args(["--list", "--running", "--quiet"]);
     let Some(output) = bounded_output(command).filter(|output| output.status.success()) else {

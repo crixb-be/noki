@@ -156,7 +156,7 @@ export default function BarPanel() {
   const panelDark = settings?.topbar?.tint === "dark" || (settings?.topbar?.tint !== "light" && window.matchMedia?.("(prefers-color-scheme: dark)").matches !== false);
   const card = kind === "control" ? "cc-root" : `noki-popup-card noki-panel-surface ${panelDark ? "bar-panel-dark" : "bar-panel-light"}`;
   return <div ref={ref} className={`bar-panel ${card}`} onMouseDown={(e) => e.stopPropagation()}><div ref={body} className="bar-panel-body">
-    {kind === "ai-usage" && <AiUsagePanel enabled={settings?.topbar?.enabled && settings?.topbar?.showAiUsage} />}
+    {kind === "ai-usage" && <AiUsagePanel topbar={settings?.topbar} />}
     {kind === "wifi" && <>
       <header className="panel-head-mac"><h2>Wi-Fi</h2><Switch checked onChange={(v) => invoke("quick_set", { kind: "wifi", on: v })} /></header>
       <div className="panel-status"><span>Estado</span><span>{wifi.find((x) => x.connected)?.ssid ? `Conectado a ${wifi.find((x) => x.connected).ssid}` : "Sin conexión"}</span></div>

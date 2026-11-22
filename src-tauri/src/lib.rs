@@ -2,6 +2,7 @@ mod appicon;
 mod ai;
 mod ai_usage;
 mod claude_session;
+mod gemini_session;
 mod backgrounds;
 mod calendar;
 mod clipboard;
@@ -94,11 +95,8 @@ pub(crate) async fn commit_settings(app: &AppHandle, mut new: Settings) -> Resul
     })
     .await
     .map_err(|e| e.to_string())??;
-    *state.settings.lock().unwrap() = new.clone();
+    ai_usage::replace_settings(app, &new);
     if !new.dock.animate_apps { dock_animation::sync(app, false); }
-    if (new.topbar.enabled, new.topbar.show_ai_usage) != (prev.topbar.enabled, prev.topbar.show_ai_usage) {
-        ai_usage::settings_changed(app);
-    }
     if new.dock.shortcut_folder != prev.dock.shortcut_folder {
         shortcut_folder::close(app);
     }
@@ -912,6 +910,7 @@ pub fn run() {
             legacy::migrate_data(&handle);
             let loaded = settings::load(&handle);
             app.manage(NotchState::new(loaded.clone()));
+            app.manage(ai_usage::UsageState::default());
             app.manage(store::Store::load(&handle));
             app.manage(ai::AiJobs::default());
             quick::start_keep_awake_thread();
@@ -953,7 +952,6 @@ pub fn run() {
             viz::start(handle.clone());
             statuswatch::start(handle.clone());
             topbar::start_battery_watch(handle.clone());
-            app.manage(ai_usage::UsageState::default());
             ai_usage::start(handle.clone());
             updates::start_auto(handle.clone());
             // La casilla de la bandeja arranca con el valor guardado.

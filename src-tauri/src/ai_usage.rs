@@ -1,5 +1,6 @@
 //! Cuotas de suscripción de las sesiones locales. Solo las métricas llegan a la interfaz.
-use crate::{claude_session, notch::NotchState};
+use crate::{claude_session, gemini_session, notch::NotchState, settings::{Settings, TopBar}};
+use futures_util::FutureExt;
 use serde::Serialize;
 use serde_json::{json, Value};
 use std::{
@@ -18,13 +19,15 @@ const TIMEOUT: Duration = Duration::from_secs(15);
 
 #[derive(Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
-struct Limit {
-    minutes: Option<u64>,
-    used_percent: f64,
-    resets_at: Option<i64>,
+pub(crate) struct Limit {
+    pub(crate) minutes: Option<u64>,
+    pub(crate) used_percent: f64,
+    pub(crate) resets_at: Option<i64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub(crate) label: Option<String>,
 }
 
-#[derive(Clone, Serialize)]
+#[derive(Clone, Default, Serialize)]
 #[serde(rename_all = "camelCase")]
 struct Provider {
     limits: Vec<Limit>,
@@ -33,14 +36,6 @@ struct Provider {
 }
 
 impl Provider {
-    const fn empty() -> Self {
-        Self {
-            limits: Vec::new(),
-            updated_at: None,
-            error: None,
-        }
-    }
-
     fn apply(&mut self, result: Result<Vec<Limit>, &'static str>) {
         match result {
             Ok(limits) => {
@@ -50,7 +45,12 @@ impl Provider {
             }
             Err(error) => {
                 self.error = Some(error);
-                if matches!(error, NO_SESSION | NO_LIMITS | claude_session::EXPIRED) {
+                if matches!(
+                    error,
+                    NO_SESSION | NO_LIMITS | claude_session::EXPIRED
+                        | gemini_session::NO_SESSION | gemini_session::EXPIRED
+                        | gemini_session::UNSUPPORTED | gemini_session::NO_QUOTA
+                ) {
                     self.limits.clear();
                     self.updated_at = None;
                 }
@@ -63,90 +63,201 @@ impl Provider {
 pub struct Snapshot {
     claude: Provider,
     codex: Provider,
+    gemini: Provider,
     refreshing: bool,
 }
 
-impl Default for Snapshot {
-    fn default() -> Self {
-        Self {
-            claude: Provider::empty(),
-            codex: Provider::empty(),
-            refreshing: false,
+#[derive(Clone, Copy)]
+enum Kind {
+    Claude,
+    Codex,
+    Gemini,
+}
+
+impl Kind {
+    const ALL: [Self; 3] = [Self::Claude, Self::Codex, Self::Gemini];
+
+    fn enabled(self, topbar: &TopBar) -> bool {
+        topbar.enabled
+            && topbar.show_ai_usage
+            && match self {
+                Self::Claude => topbar.show_claude_quota,
+                Self::Codex => topbar.show_codex_quota,
+                Self::Gemini => topbar.show_gemini_quota,
+            }
+    }
+}
+
+#[derive(Default)]
+struct Slot {
+    data: Provider,
+    refreshing: bool,
+    generation: u64,
+}
+
+#[derive(Default)]
+struct Providers([Slot; 3]);
+
+impl Providers {
+    fn snapshot(&self, topbar: &TopBar) -> Snapshot {
+        let [claude, codex, gemini] = Kind::ALL.map(|kind| {
+            if kind.enabled(topbar) {
+                self.0[kind as usize].data.clone()
+            } else {
+                Provider::default()
+            }
+        });
+        Snapshot {
+            claude,
+            codex,
+            gemini,
+            refreshing: Kind::ALL.into_iter().any(|kind| {
+                kind.enabled(topbar) && self.0[kind as usize].refreshing
+            }),
+        }
+    }
+
+    fn settings_changed(&mut self, app: &AppHandle, prev: &TopBar, new: &TopBar) {
+        let mut changed = false;
+        let mut wake = [false; 3];
+        for kind in Kind::ALL {
+            let enabled = kind.enabled(new);
+            if enabled == kind.enabled(prev) {
+                continue;
+            }
+            changed = true;
+            if enabled {
+                wake[kind as usize] = true;
+            } else {
+                let slot = &mut self.0[kind as usize];
+                slot.data = Provider::default();
+                slot.generation += 1;
+            }
+        }
+        if changed {
+            let _ = app.emit("ai-usage-updated", self.snapshot(new));
+            let state = app.state::<UsageState>();
+            for (wake, notify) in wake.into_iter().zip(&state.wake) {
+                if wake {
+                    notify.notify_one();
+                }
+            }
         }
     }
 }
 
 #[derive(Default)]
 pub struct UsageState {
-    snapshot: Mutex<Snapshot>,
-    wake: Notify,
+    snapshot: Mutex<Providers>,
+    wake: [Notify; 3],
 }
 
 use claude_session::{NO_SESSION, UNAVAILABLE};
 const NO_LIMITS: &str = "La cuenta no ofrece datos de cuota.";
 
-fn enabled(app: &AppHandle) -> bool {
-    let settings = app.state::<NotchState>();
-    let settings = settings.settings.lock().unwrap();
-    settings.topbar.enabled && settings.topbar.show_ai_usage
-}
-
-pub fn settings_changed(app: &AppHandle) {
-    let state = app.state::<UsageState>();
-    if !enabled(app) {
-        *state.snapshot.lock().unwrap() = Snapshot::default();
-    }
-    state.wake.notify_one();
+pub fn replace_settings(app: &AppHandle, new: &Settings) {
+    let usage = app.state::<UsageState>();
+    let notch = app.state::<NotchState>();
+    // Publica los ajustes y la transición juntos, con el mismo orden de bloqueo que las consultas.
+    let mut providers = usage.snapshot.lock().unwrap();
+    let prev = std::mem::replace(&mut *notch.settings.lock().unwrap(), new.clone());
+    providers.settings_changed(app, &prev.topbar, &new.topbar);
 }
 
 pub fn start(app: AppHandle) {
-    tauri::async_runtime::spawn(async move {
-        let state = app.state::<UsageState>();
-        let client = reqwest::Client::builder()
-            .timeout(TIMEOUT)
-            .redirect(reqwest::redirect::Policy::none())
-            .build();
-        loop {
-            if !enabled(&app) {
-                state.wake.notified().await;
-                continue;
+    for kind in Kind::ALL {
+        tauri::async_runtime::spawn(poll(app.clone(), kind));
+    }
+}
+
+async fn poll(app: AppHandle, kind: Kind) {
+    let usage = app.state::<UsageState>();
+    let notch = app.state::<NotchState>();
+    let index = kind as usize;
+    let wake = &usage.wake[index];
+    let mut client = None;
+    let mut gemini = gemini_session::Session::default();
+    loop {
+        let generation = {
+            let mut providers = usage.snapshot.lock().unwrap();
+            let settings = notch.settings.lock().unwrap();
+            if kind.enabled(&settings.topbar) {
+                // Las solicitudes recibidas antes de iniciar se atienden en esta misma consulta.
+                let _ = wake.notified().now_or_never();
+                let slot = &mut providers.0[index];
+                slot.refreshing = true;
+                let generation = slot.generation;
+                let snapshot = providers.snapshot(&settings.topbar);
+                drop(settings);
+                let _ = app.emit("ai-usage-updated", snapshot);
+                Some(generation)
+            } else {
+                None
             }
-            let started = tokio::time::Instant::now();
-            {
-                let mut snapshot = state.snapshot.lock().unwrap();
-                snapshot.refreshing = true;
-                let _ = app.emit("ai-usage-updated", &*snapshot);
+        };
+        let Some(generation) = generation else {
+            wake.notified().await;
+            continue;
+        };
+        let started = tokio::time::Instant::now();
+        let result = match kind {
+            Kind::Codex => tauri::async_runtime::spawn_blocking(codex_limits)
+                .await.unwrap_or(Err(UNAVAILABLE)),
+            Kind::Claude | Kind::Gemini => {
+                let client = client.get_or_insert_with(|| reqwest::Client::builder()
+                    .timeout(TIMEOUT)
+                    .redirect(reqwest::redirect::Policy::none())
+                    .build());
+                match (kind, client.as_ref()) {
+                    (Kind::Claude, Ok(client)) => claude_limits(client).await,
+                    (Kind::Gemini, Ok(client)) => gemini.limits(client).await,
+                    (Kind::Gemini, Err(_)) => Err(gemini_session::UNAVAILABLE),
+                    _ => Err(UNAVAILABLE),
+                }
             }
-            let codex = tauri::async_runtime::spawn_blocking(codex_limits);
-            let claude = match &client {
-                Ok(client) => claude_limits(client).await,
-                Err(_) => Err(UNAVAILABLE),
-            };
-            let codex = codex.await.unwrap_or(Err(UNAVAILABLE));
-            if enabled(&app) {
-                let mut snapshot = state.snapshot.lock().unwrap();
-                snapshot.claude.apply(claude);
-                snapshot.codex.apply(codex);
-                snapshot.refreshing = false;
-                let _ = app.emit("ai-usage-updated", &*snapshot);
+        };
+        let enabled = {
+            let mut providers = usage.snapshot.lock().unwrap();
+            let settings = notch.settings.lock().unwrap();
+            let enabled = kind.enabled(&settings.topbar);
+            let slot = &mut providers.0[index];
+            slot.refreshing = false;
+            if enabled {
+                if slot.generation == generation {
+                    slot.data.apply(result);
+                }
+                let snapshot = providers.snapshot(&settings.topbar);
+                drop(settings);
+                let _ = app.emit("ai-usage-updated", snapshot);
             }
-            let _ = tokio::time::timeout_at(started + INTERVAL, state.wake.notified()).await;
+            enabled
+        };
+        if enabled {
+            let _ = tokio::time::timeout_at(started + INTERVAL, wake.notified()).await;
         }
-    });
+    }
 }
 
 #[tauri::command]
-pub fn ai_usage_snapshot(state: State<UsageState>) -> Snapshot {
-    state.snapshot.lock().unwrap().clone()
+pub fn ai_usage_snapshot(state: State<UsageState>, notch: State<NotchState>) -> Snapshot {
+    let providers = state.snapshot.lock().unwrap();
+    let settings = notch.settings.lock().unwrap();
+    providers.snapshot(&settings.topbar)
 }
 
 #[tauri::command]
 pub fn refresh_ai_usage(window: WebviewWindow, state: State<UsageState>) {
-    if window.label() == "barpanel"
-        && enabled(window.app_handle())
-        && !state.snapshot.lock().unwrap().refreshing
-    {
-        state.wake.notify_one();
+    if window.label() != "barpanel" {
+        return;
+    }
+    let notch = window.state::<NotchState>();
+    let providers = state.snapshot.lock().unwrap();
+    let settings = notch.settings.lock().unwrap();
+    for kind in Kind::ALL {
+        let index = kind as usize;
+        if kind.enabled(&settings.topbar) && !providers.0[index].refreshing {
+            state.wake[index].notify_one();
+        }
     }
 }
 
@@ -187,6 +298,7 @@ fn parse_claude(value: &Value) -> Vec<Limit> {
             let window = &value[key];
             Some(Limit {
                 minutes: Some(minutes),
+                label: None,
                 used_percent: window["utilization"].as_f64()?.clamp(0.0, 100.0),
                 resets_at: window["resets_at"]
                     .as_str()
@@ -303,9 +415,63 @@ fn parse_codex(result: &Value) -> Vec<Limit> {
             let window = &value[key];
             Some(Limit {
                 minutes: window["windowDurationMins"].as_u64(),
+                label: None,
                 used_percent: window["usedPercent"].as_f64()?.clamp(0.0, 100.0),
                 resets_at: window["resetsAt"].as_i64(),
             })
         })
         .collect()
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn snapshot_counts_only_enabled_refreshes_and_omits_absent_labels() {
+        let topbar = TopBar {
+            enabled: true,
+            show_ai_usage: true,
+            show_codex_quota: false,
+            ..TopBar::default()
+        };
+        let mut providers = Providers::default();
+        providers.0[Kind::Codex as usize].refreshing = true;
+        providers.0[Kind::Claude as usize].data.apply(Ok(parse_claude(
+            &json!({"five_hour":{"utilization":37.0}}),
+        )));
+        let snapshot = serde_json::to_value(providers.snapshot(&topbar)).unwrap();
+        assert_eq!(snapshot.as_object().unwrap().len(), 4);
+        assert_eq!(snapshot["refreshing"], false);
+        assert!(snapshot["claude"]["limits"][0].get("label").is_none());
+        assert_eq!(snapshot["gemini"]["limits"], json!([]));
+
+        providers.0[Kind::Gemini as usize].refreshing = true;
+        assert!(providers.snapshot(&topbar).refreshing);
+    }
+
+    #[test]
+    fn transient_gemini_errors_keep_limits_and_definitive_errors_clear_them() {
+        let limits = vec![Limit {
+            minutes: None,
+            used_percent: 20.0,
+            resets_at: None,
+            label: Some("Gemini Flash".into()),
+        }];
+        let mut provider = Provider::default();
+        for error in [
+            gemini_session::NO_SESSION,
+            gemini_session::EXPIRED,
+            gemini_session::UNSUPPORTED,
+            gemini_session::NO_QUOTA,
+        ] {
+            provider.apply(Ok(limits.clone()));
+            provider.apply(Err(gemini_session::UNAVAILABLE));
+            assert_eq!(provider.limits.len(), 1);
+            assert!(provider.updated_at.is_some());
+            provider.apply(Err(error));
+            assert!(provider.limits.is_empty());
+            assert!(provider.updated_at.is_none());
+        }
+    }
 }

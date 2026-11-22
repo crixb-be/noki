@@ -180,6 +180,9 @@ pub struct TopBar {
     pub show_cpu: bool,
     pub show_ram: bool,
     pub show_ai_usage: bool,
+    pub show_claude_quota: bool,
+    pub show_codex_quota: bool,
+    pub show_gemini_quota: bool,
     pub show_wifi: bool,
     pub show_bluetooth: bool,
     pub show_sound: bool,
@@ -204,6 +207,9 @@ impl Default for TopBar {
             show_cpu: false,
             show_ram: false,
             show_ai_usage: false,
+            show_claude_quota: true,
+            show_codex_quota: true,
+            show_gemini_quota: true,
             show_wifi: true,
             show_bluetooth: true,
             show_sound: true,
@@ -1059,6 +1065,22 @@ pub fn config_dir(app: &AppHandle) -> Option<PathBuf> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn ai_usage_provider_flags_default_on_and_round_trip_off() {
+        let mut topbar: TopBar = serde_json::from_str(r#"{"enabled":true}"#).unwrap();
+        assert!(!topbar.show_ai_usage);
+        assert!(topbar.show_claude_quota && topbar.show_codex_quota && topbar.show_gemini_quota);
+
+        topbar.show_claude_quota = false;
+        topbar.show_codex_quota = false;
+        topbar.show_gemini_quota = false;
+        let saved = serde_json::to_value(&topbar).unwrap();
+        assert_eq!(saved["showClaudeQuota"], false);
+        assert_eq!(saved["showCodexQuota"], false);
+        assert_eq!(saved["showGeminiQuota"], false);
+        assert_eq!(serde_json::from_value::<TopBar>(saved).unwrap(), topbar);
+    }
 
     #[test]
     fn downloads_are_visible_by_default_and_can_be_hidden() {

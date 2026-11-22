@@ -114,7 +114,7 @@ function Row({ title, hint, children, grouped = false }) {
 
 const SECTION_ICONS = {
   "Fondo del notch": "🎨", "Franja a los costados del notch": "🌈", "Contenido": "🧩", "Qué se ve en el notch cerrado": "👁️",
-  "Reloj": "🕐", "Otros": "✨", "Pomodoro": "🍅", "Salud": "💚",
+  "Reloj": "🕐", "Otros": "✨", "Pomodoro": "🍅", "Salud": "💚", "Monitores de IA": "📊",
 };
 
 /** Cabecera de un grupo de ajustes. */
@@ -1593,8 +1593,14 @@ function TopBarSettings({ s, set }) {
     <Row title="Activar barra superior" hint="El notch comparte el mismo hueco y queda centrado sobre la barra."><Toggle checked={t.enabled} onChange={(v) => set({ topbar: { enabled: v } })} /></Row>
     <Row title="Alto de la barra"><Slider value={t.height} min={28} max={32} unit=" px" onChange={(v) => set({ topbar: { height: v } })} /></Row>
     <Row title="Tinte"><Select value={t.tint} options={[["auto", "Automático"], ["dark", "Oscuro"], ["light", "Claro"]]} onChange={(v) => set({ topbar: { tint: v } })} /></Row>
-    <SectionTitle>Iconos visibles</SectionTitle>
+    <SectionTitle>Monitores de IA</SectionTitle>
     <Row title="Mostrar uso de proveedores de IA" hint="Lee la cuota de las sesiones que ya tienes abiertas. Consulta directamente a cada proveedor cada cinco minutos y no guarda credenciales"><Toggle checked={t.showAiUsage} onChange={(v) => set({ topbar: { showAiUsage: v } })} /></Row>
+    <Locked locked={!t.showAiUsage} reason="Activa los monitores de IA para elegir qué cuotas mostrar." action="Activar monitores" onAction={() => set({ topbar: { showAiUsage: true } })}>
+      <Row title="Mostrar cuota de Claude"><Toggle checked={t.showClaudeQuota} onChange={(v) => set({ topbar: { showClaudeQuota: v } })} /></Row>
+      <Row title="Mostrar cuota de GPT / Codex"><Toggle checked={t.showCodexQuota} onChange={(v) => set({ topbar: { showCodexQuota: v } })} /></Row>
+      <Row title="Mostrar cuota de Gemini"><Toggle checked={t.showGeminiQuota} onChange={(v) => set({ topbar: { showGeminiQuota: v } })} /></Row>
+    </Locked>
+    <SectionTitle>Iconos visibles</SectionTitle>
     {iconRows.map(([id, title, hint]) => <Row key={id} title={title} hint={hint}><Toggle checked={t[id]} onChange={(v) => set({ topbar: { [id]: v } })} /></Row>)}
     <Row title="Avatar de Windows" hint="Elige una imagen o deja vacío para usar la foto de tu cuenta."><div className="flex items-center gap-2"><div className="h-10 w-10 overflow-hidden rounded-full bg-indigo-600">{avatar ? <img src={avatar} alt="" className="h-full w-full object-cover" /> : <span className="flex h-full items-center justify-center text-white">U</span>}</div><button className={button} onClick={async () => { const path = await open({ multiple: false, directory: false, filters: [{ name: "Imagen", extensions: ["png", "jpg", "jpeg", "webp", "bmp", "gif"] }] }); if (typeof path === "string") { const data = await invoke("set_avatar_image", { path }); setAvatar(data || null); } }}>Elegir imagen…</button><button className={button} onClick={async () => { const data = await invoke("set_avatar_image", { path: "" }); setAvatar(data || null); }}>Usar la de Windows</button></div></Row>
   </Page>;
