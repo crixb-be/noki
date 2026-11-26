@@ -3,6 +3,7 @@ import { useEffect, useRef, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import { useSettings } from "../../hooks/useSettings.js";
+import { speakerLevel, useSystemVolume } from "../../hooks/useSystemVolume.js";
 import { isEn, presetLanguage, useLanguage } from "../../lib/i18n.js";
 import { BatteryIcon, ChevronIcon, BellIcon, BluetoothIcon, CameraIcon, ControlCenterIcon, RecordIcon, SearchIcon, SpeakerIcon, WifiIcon } from "./SymbolIcons.jsx";
 import { BarPaint, barInk, useBarPaint } from "./barPaint.jsx";
@@ -38,6 +39,7 @@ export default function TopBar() {
   const visibleProviders = enabledProviders(t);
   const usage = useAiUsage(visibleProviders.length > 0);
   const paint = useBarPaint(settings);
+  const sound = useSystemVolume();
 
   presetLanguage(settings?.general?.language);
   useLanguage(settings?.general?.language);
@@ -98,7 +100,7 @@ export default function TopBar() {
           return <Item key={id} title={name} onClick={(event) => open("ai-usage", event)}><ProviderIcon provider={id} /><span className="topbar-text ai-usage-percent">{active ? `${Math.round(active.usedPercent)}%` : "—"}</span></Item>;
         })}
         {t.showBluetooth && <Item title="Bluetooth" onClick={(e) => open("bluetooth", e)}><BluetoothIcon off={!bt.length} /></Item>}
-        {t.showSound && <Item title="Sonido" onClick={(e) => open("sound", e)}><SpeakerIcon level={3} /></Item>}
+        {t.showSound && <Item title={sound.volume == null ? "Sonido" : `Sonido: ${sound.muted ? "silenciado" : `${sound.volume}%`}`} onClick={(e) => open("sound", e)}><SpeakerIcon level={speakerLevel(sound.volume)} muted={sound.muted} /></Item>}
         {t.showWifi && <Item title="Wi-Fi" onClick={(e) => open("wifi", e)}><WifiIcon level={wifi.level} off={wifi.off} /></Item>}
         {t.showBattery && battery && <Item title="Bateria" onClick={(e) => open("battery", e)}><BatteryIcon pct={batteryPct} charging={battery.charging} />{t.showBatteryPct && <span className="topbar-text">{batteryPct}%</span>}</Item>}
         {t.showSearch && <Item title="Buscar" onClick={() => invoke("toggle_spotlight")}><SearchIcon /></Item>}

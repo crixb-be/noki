@@ -381,6 +381,11 @@ fn set_volume(sys: State<SysHandle>, value: f32) {
 }
 
 #[tauri::command]
+fn get_volume() -> Option<system::VolumeState> {
+    system::volume_state()
+}
+
+#[tauri::command]
 fn set_mute(sys: State<SysHandle>, muted: bool) {
     sys.send(SysCmd::Mute(muted));
 }
@@ -793,6 +798,7 @@ pub fn run() {
             media_control,
             media_seek,
             set_volume,
+            get_volume,
             set_mute,
             set_brightness,
             open_settings,

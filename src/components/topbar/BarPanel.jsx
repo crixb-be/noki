@@ -5,6 +5,7 @@ import { listen } from "@tauri-apps/api/event";
 import { BatteryIcon, BluetoothIcon, SpeakerIcon, WifiIcon } from "./SymbolIcons.jsx";
 import { useMedia } from "../../hooks/useMedia.js";
 import { useSettings } from "../../hooks/useSettings.js";
+import { speakerLevel, useSystemVolume } from "../../hooks/useSystemVolume.js";
 import { useGlass, useGlassShape } from "../../lib/glass.js";
 import { useLanguage } from "../../lib/i18n.js";
 import { AiUsagePanel } from "./AiUsage.jsx";
@@ -25,7 +26,7 @@ function CcCircle({ title, icon, onClick }) {
  * Centro de control modular, como Capturas/macdock-centro-control.png: sin contenedor, cada módulo
  * flota como una píldora o tarjeta de vidrio con su propio desenfoque (`data-glass`).
  */
-function ControlCenter({ brightness, setBrightness, volume, setVolume }) {
+function ControlCenter({ brightness, setBrightness, volume, muted, setVolume }) {
   const [quick, setQuick] = useState({});
   const [airplane, setAirplane] = useState(false);
   const media = useMedia();
@@ -69,7 +70,7 @@ function ControlCenter({ brightness, setBrightness, volume, setVolume }) {
     </div>
     <div data-glass className="cc-module cc-slider">
       <span>Sonido</span>
-      <div className="cc-slider-row"><SpeakerIcon level={3} /><input className="cc-range" type="range" min="0" max="100" value={volume} style={{ "--v": `${volume}%` }} onChange={(e) => { const v = Number(e.target.value); setVolume(v); invoke("set_volume", { value: v }).catch(() => {}); }} /></div>
+      <div className="cc-slider-row"><SpeakerIcon level={speakerLevel(volume)} muted={muted} /><input className="cc-range" type="range" min="0" max="100" value={volume ?? 0} style={{ "--v": `${muted ? 0 : volume ?? 0}%` }} onChange={(e) => setVolume(Number(e.target.value))} /></div>
     </div>
   </>;
 }
@@ -83,9 +84,8 @@ export default function BarPanel() {
   const [wifi, setWifi] = useState([]);
   const [devices, setDevices] = useState([]);
   const battery = useBatteryInfo();
-  const [volume, setVolume] = useState(50);
+  const { volume, muted, setVolume, setMuted, refresh: refreshVolume } = useSystemVolume();
   const [brightness, setBrightness] = useState(70);
-  const [muted, setMuted] = useState(false);
   const [airplane, setAirplane] = useState(false);
   const [output, setOutput] = useState("Salida predeterminada");
   const [dark, setDark] = useState(false);
@@ -129,6 +129,7 @@ export default function BarPanel() {
     if (kind === "wifi") jobs.push(invoke("command_wifi_networks").then(setWifi));
     if (kind === "bluetooth") jobs.push(invoke("command_bt_devices").then(setDevices));
     if (kind === "sound") jobs.push(invoke("command_audio_output_name").then(setOutput));
+    if (kind === "sound" || kind === "control") refreshVolume();
     Promise.allSettled(jobs).finally(() => setLoading(false));
   }, [kind]);
   // La ventana mide exactamente lo que la tarjeta: sin huecos transparentes ni zonas sin pintar.
@@ -167,10 +168,10 @@ export default function BarPanel() {
       <button type="button" className="panel-link panel-link-plain" onClick={() => action("ms-settings:network-wifi")}>Configuración de red…</button>
     </>}
     {kind === "bluetooth" && <><header><BluetoothIcon /><div><h2>Bluetooth</h2><p>{loading ? "Buscando…" : devices.length ? "Activado" : "Ningún dispositivo conectado"}</p></div><Switch checked onChange={(v) => invoke("quick_set", { kind: "bluetooth", on: v })} /></header><PanelLabel>DISPOSITIVOS CONECTADOS</PanelLabel>{loading ? <p className="panel-empty">Buscando…</p> : devices.map((d) => <div className="panel-row" key={d}><BluetoothIcon /><span>{d}</span></div>)}{!loading && !devices.length && <p className="panel-empty">Ninguno conectado</p>}<PanelLink onClick={() => action("ms-settings:bluetooth")}>Configuración de Bluetooth…</PanelLink></>}
-    {kind === "sound" && <><header><SpeakerIcon level={3} muted={muted} /><div><h2>Sonido</h2><p>{output}</p></div><Switch checked={!muted} onChange={(v) => { setMuted(!v); invoke("set_mute", { muted: !v }); }} /></header><PanelLabel>VOLUMEN</PanelLabel><div className="panel-slider"><SpeakerIcon level={3} muted={muted} /><input type="range" min="0" max="100" value={volume} onChange={(e) => { const v = Number(e.target.value); setVolume(v); invoke("set_volume", { value: v }); }} /><span>{volume}%</span></div><PanelLink onClick={() => action("ms-settings:sound")}>Configuración de sonido…</PanelLink></>}
+    {kind === "sound" && <><header><SpeakerIcon level={speakerLevel(volume)} muted={muted} /><div><h2>Sonido</h2><p>{output}</p></div><Switch checked={!muted} onChange={(v) => setMuted(!v)} /></header><PanelLabel>VOLUMEN</PanelLabel><div className="panel-slider"><SpeakerIcon level={speakerLevel(volume)} muted={muted} /><input type="range" min="0" max="100" value={volume ?? 0} onChange={(e) => setVolume(Number(e.target.value))} /><span>{volume == null ? "—" : `${volume}%`}</span></div><PanelLink onClick={() => action("ms-settings:sound")}>Configuración de sonido…</PanelLink></>}
     {kind === "battery" && <><header><BatteryIcon pct={battery?.level ?? 100} charging={battery?.charging} /><div><h2>Batería</h2><p>{battery?.charging ? "Conectado, cargando" : "Usando batería"}</p></div></header><div className="battery-big">{battery?.level ?? "—"}%</div><p className="panel-muted">Fuente de energía: {battery?.ac ? "Corriente alterna" : "Batería"}</p><PanelLink onClick={() => action("ms-settings:batterysaver")}>Configuración de batería…</PanelLink></>}
     {kind === "user" && <><header><span className="panel-user">U</span><div><h2>Usuario</h2><p>Cambiar opciones de cuenta</p></div></header><PanelLink onClick={() => invoke("command_lock_user")}>Bloquear pantalla</PanelLink><PanelLink onClick={() => invoke("command_logoff_user")}>Cerrar sesión…</PanelLink><PanelLink onClick={() => action("ms-settings:yourinfo")}>Configuración de cuenta…</PanelLink></>}
-    {kind === "control" && <ControlCenter brightness={brightness} setBrightness={setBrightness} volume={volume} setVolume={setVolume} />}
+    {kind === "control" && <ControlCenter brightness={brightness} setBrightness={setBrightness} volume={volume} muted={muted} setVolume={setVolume} />}
   </div></div>;
 }
 

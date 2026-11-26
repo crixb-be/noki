@@ -60,6 +60,29 @@ struct Hud {
     muted: bool,
 }
 
+/// Volumen y silencio actuales de la salida predeterminada: fuente de verdad única para el OSD
+/// del notch, el icono de la barra superior y sus paneles (evento `volume-state` + `get_volume`).
+#[derive(Serialize, Clone, Copy, PartialEq, Eq, Debug)]
+pub struct VolumeState {
+    pub value: u8,
+    pub muted: bool,
+}
+
+static VOLUME: Mutex<Option<VolumeState>> = Mutex::new(None);
+
+/// Último volumen leído por el hilo de audio (None si aún no hay dispositivo).
+pub fn volume_state() -> Option<VolumeState> {
+    *VOLUME.lock().unwrap()
+}
+
+fn publish_volume(app: &AppHandle, now: Option<(u8, bool)>) {
+    let state = now.map(|(value, muted)| VolumeState { value, muted });
+    *VOLUME.lock().unwrap() = state;
+    if let Some(state) = state {
+        let _ = app.emit("volume-state", state);
+    }
+}
+
 #[derive(Serialize, Clone)]
 struct AudioDevice {
     name: String,
@@ -271,10 +294,13 @@ fn audio_and_brightness(app: AppHandle, rx: mpsc::Receiver<SysCmd>) {
                     }
                     known_device = true;
                     last_vol = read_volume(&ep); // el cambio de dispositivo no cuenta como cambio de volumen
+                    publish_volume(&app, last_vol);
                     current = Some(ep);
                 }
-            } else {
+            } else if current.is_some() {
                 current = None;
+                last_vol = None;
+                *VOLUME.lock().unwrap() = None;
             }
         }
 
@@ -285,6 +311,7 @@ fn audio_and_brightness(app: AppHandle, rx: mpsc::Receiver<SysCmd>) {
                     let _ = app.emit("hud", Hud { kind: "volume", value, muted });
                 }
                 last_vol = now;
+                publish_volume(&app, now);
             }
         }
 
