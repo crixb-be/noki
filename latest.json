@@ -1,10 +1,10 @@
 {
     "version":  "1.4.2",
     "notes":  "- La consulta directa de la cuota de Gemini CLI queda desactivada por defecto, también al actualizar desde 1.4.1. Google no permite ese acceso desde otras aplicaciones y puede suspender la cuenta. Quien acepte el riesgo puede activarla en Ajustes → Barra superior.\n- La cuota de Gemini se puede leer con la statusline oficial de Antigravity CLI (`agy`): copia el comando desde Ajustes → Barra superior y pégalo dentro de `agy`. Sustituye tu statusline actual. Noki no lee sus credenciales y solo guarda el nombre de cada cuota, su porcentaje, su reinicio y la hora de recepción.\n- El panel de uso de IA indica de dónde viene la cuota de Gemini y cuándo se recibió.",
-    "pub_date":  "2026-11-22T21:40:35Z",
+    "pub_date":  "2026-11-26T17:07:29Z",
     "platforms":  {
                       "windows-x86_64":  {
-                                             "signature":  "dW50cnVzdGVkIGNvbW1lbnQ6IHNpZ25hdHVyZSBmcm9tIHRhdXJpIHNlY3JldCBrZXkKUlVTTnBFd3FJNE9ZOStpM0xkT1BWVFF4YUoyTVJweHBNRTdIbW4wZlRWZm5IN0FzUTRZNXpxam1JWDYyMFIwb1BFdUVnK1gvM3lXWG5EeGlVVVRFMnl6VkhjLzlnK3pqRnd3PQp0cnVzdGVkIGNvbW1lbnQ6IHRpbWVzdGFtcDoxNzk1MzgzNTEwCWZpbGU6Tm9raV8xLjQuMl94NjQtc2V0dXAuZXhlCXZlcnNpb246MS40LjIKcUI1NWlaVDVLc2EweXdQZXpKaU9taEZFaHNmWHpIMkFNZ2daMnlaZ3NFV1FuNXlhVmJCNXJxcFU3T3ZZZFJoa0tHb2FvMU84K1FqU05CeElwQ1lHQWc9PQo=",
+                                             "signature":  "dW50cnVzdGVkIGNvbW1lbnQ6IHNpZ25hdHVyZSBmcm9tIHRhdXJpIHNlY3JldCBrZXkKUlVTTnBFd3FJNE9ZOS9RcHM0ZDR2WEdDMldiS0FJZ3JUNkNoMnk2ZnBnV2NVWG9mUnM3VXdwWElJY1hpME5raHFMYVcxOEJmNG9Hd1orNVNVeHpKeWJCaEFtUHRtOEpLbUFBPQp0cnVzdGVkIGNvbW1lbnQ6IHRpbWVzdGFtcDoxNzk1NzEyNzk4CWZpbGU6Tm9raV8xLjQuMl94NjQtc2V0dXAuZXhlCXZlcnNpb246MS40LjIKSmtYdlE3NGNYeTd1TGd3VDdNYlkzaDJyWU9wR3dpc2NrWXUrT2FNQXpMeERQb2hMMVFXMUtsK08vWWRUVGg1V3pvMmU5cGdFNmJqTS80T09helZxQ0E9PQo=",
                                              "url":  "https://github.com/crixb-be/noki/releases/download/v1.4.2/Noki_1.4.2_x64-setup.exe"
                                          }
                   }
